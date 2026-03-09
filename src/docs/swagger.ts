@@ -13,6 +13,7 @@ const swaggerDefinition = {
       description: "Local server",
     },
   ],
+  security: [{ bearerAuth: [] }],
   components: {
     securitySchemes: {
       bearerAuth: {
