@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
+exports.UserOrderByRelevanceFieldEnum = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.UserScalarFieldEnum = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/index-browser"));
 exports.Decimal = runtime.Decimal;
 exports.NullTypes = {
@@ -77,7 +77,8 @@ exports.AnyNull = runtime.objectEnumValues.instances.AnyNull;
 exports.ModelName = {
     IKU: 'IKU',
     Component: 'Component',
-    IKUComponent: 'IKUComponent'
+    IKUComponent: 'IKUComponent',
+    User: 'User'
 };
 /*
  * Enums
@@ -111,6 +112,14 @@ exports.IKUComponentScalarFieldEnum = {
     ikuId: 'ikuId',
     componentId: 'componentId'
 };
+exports.UserScalarFieldEnum = {
+    id: 'id',
+    email: 'email',
+    password: 'password',
+    name: 'name',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
 exports.SortOrder = {
     asc: 'asc',
     desc: 'desc'
@@ -135,4 +144,10 @@ exports.IKUComponentOrderByRelevanceFieldEnum = {
     id: 'id',
     ikuId: 'ikuId',
     componentId: 'componentId'
+};
+exports.UserOrderByRelevanceFieldEnum = {
+    id: 'id',
+    email: 'email',
+    password: 'password',
+    name: 'name'
 };

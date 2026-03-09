@@ -19,6 +19,13 @@ const swaggerDefinition = {
         },
     ],
     components: {
+        securitySchemes: {
+            bearerAuth: {
+                type: "http",
+                scheme: "bearer",
+                bearerFormat: "JWT",
+            },
+        },
         schemas: {
             Iku: {
                 type: "object",
@@ -123,6 +130,57 @@ const swaggerDefinition = {
                     message: { type: "string", example: "IKU code already exists" },
                 },
             },
+            User: {
+                type: "object",
+                properties: {
+                    id: { type: "string", format: "uuid" },
+                    email: { type: "string", format: "email" },
+                    name: { type: "string", nullable: true },
+                    createdAt: { type: "string", format: "date-time" },
+                    updatedAt: { type: "string", format: "date-time" },
+                },
+                required: ["id", "email"],
+            },
+            AuthToken: {
+                type: "object",
+                properties: {
+                    token: { type: "string" },
+                },
+                required: ["token"],
+            },
+            RegisterRequest: {
+                type: "object",
+                properties: {
+                    email: { type: "string", format: "email" },
+                    password: { type: "string" },
+                    name: { type: "string" },
+                },
+                required: ["email", "password"],
+            },
+            LoginRequest: {
+                type: "object",
+                properties: {
+                    email: { type: "string", format: "email" },
+                    password: { type: "string" },
+                },
+                required: ["email", "password"],
+            },
+            SuccessResponseSingleUser: {
+                type: "object",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "User registered successfully" },
+                    data: { $ref: "#/components/schemas/User" },
+                },
+            },
+            SuccessResponseAuth: {
+                type: "object",
+                properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Logged in successfully" },
+                    data: { $ref: "#/components/schemas/AuthToken" },
+                },
+            },
             SuccessResponseSingle: {
                 type: "object",
                 properties: {
@@ -168,7 +226,80 @@ const swaggerDefinition = {
         },
     },
     paths: {
+        "/api/auth/register": {
+            post: {
+                summary: "Register a new user",
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: { $ref: "#/components/schemas/RegisterRequest" },
+                            examples: {
+                                sample: {
+                                    value: { email: "user@example.com", password: "Secret123", name: "Jane Doe" },
+                                },
+                            },
+                        },
+                    },
+                },
+                responses: {
+                    "201": {
+                        description: "User registered successfully",
+                        content: {
+                            "application/json": {
+                                schema: { $ref: "#/components/schemas/SuccessResponseSingleUser" },
+                            },
+                        },
+                    },
+                    "400": {
+                        description: "Validation or business error",
+                        content: {
+                            "application/json": {
+                                schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "/api/auth/login": {
+            post: {
+                summary: "Log in and obtain a JWT",
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: { $ref: "#/components/schemas/LoginRequest" },
+                            examples: {
+                                sample: {
+                                    value: { email: "user@example.com", password: "Secret123" },
+                                },
+                            },
+                        },
+                    },
+                },
+                responses: {
+                    "200": {
+                        description: "Login successful",
+                        content: {
+                            "application/json": {
+                                schema: { $ref: "#/components/schemas/SuccessResponseAuth" },
+                            },
+                        },
+                    },
+                    "401": {
+                        description: "Invalid credentials",
+                        content: {
+                            "application/json": {
+                                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+                            },
+                        },
+                    },
+                },
+            },
+        },
         "/api/ikus": {
+            security: [{ bearerAuth: [] }],
             get: {
                 summary: "List IKUs",
                 description: "Returns a paginated list of IKU records.",
@@ -233,6 +364,7 @@ const swaggerDefinition = {
             },
         },
         "/api/ikus/{id}": {
+            security: [{ bearerAuth: [] }],
             get: {
                 summary: "Get an IKU by ID",
                 parameters: [
@@ -352,6 +484,7 @@ const swaggerDefinition = {
             },
         },
         "/api/ikus/{id}/components": {
+            security: [{ bearerAuth: [] }],
             get: {
                 summary: "List components mapped to an IKU",
                 parameters: [
@@ -492,6 +625,7 @@ const swaggerDefinition = {
             },
         },
         "/api/components": {
+            security: [{ bearerAuth: [] }],
             get: {
                 summary: "List Components",
                 description: "Returns a paginated list of Component records.",
@@ -562,6 +696,7 @@ const swaggerDefinition = {
             },
         },
         "/api/components/{id}": {
+            security: [{ bearerAuth: [] }],
             get: {
                 summary: "Get a Component by ID",
                 parameters: [

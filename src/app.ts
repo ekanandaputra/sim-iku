@@ -3,6 +3,7 @@ import "dotenv/config";
 import express from "express";
 import swaggerUi from "swagger-ui-express";
 
+import authRouter from "./routes/auth.route";
 import ikuRouter from "./routes/iku.route";
 import componentRouter from "./routes/component.route";
 import { swaggerSpec } from "./docs/swagger";
@@ -16,6 +17,7 @@ app.get("/", (req, res) => {
   res.send("Backend API Running");
 });
 
+app.use("/api/auth", authRouter);
 app.use("/api/ikus", ikuRouter);
 app.use("/api/components", componentRouter);
 

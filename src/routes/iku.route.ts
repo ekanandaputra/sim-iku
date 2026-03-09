@@ -10,9 +10,13 @@ import {
   unmapComponentFromIku,
 } from "../controllers/iku.controller";
 import { validateBody } from "../middleware/validate";
+import { authenticate } from "../middleware/auth";
 import { IkuCreateDto, IkuUpdateDto, IkuComponentMappingDto } from "../dtos/iku.dto";
 
 const router = Router();
+
+// Require authentication for all IKU management endpoints
+router.use(authenticate);
 
 router.get("/", listIkus);
 router.get("/:id", getIkuById);

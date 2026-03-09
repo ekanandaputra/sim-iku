@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defineExtension = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
+exports.defineExtension = exports.UserOrderByRelevanceFieldEnum = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.UserScalarFieldEnum = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/library"));
 /**
  * Prisma Errors
@@ -105,7 +105,8 @@ exports.AnyNull = runtime.objectEnumValues.instances.AnyNull;
 exports.ModelName = {
     IKU: 'IKU',
     Component: 'Component',
-    IKUComponent: 'IKUComponent'
+    IKUComponent: 'IKUComponent',
+    User: 'User'
 };
 /**
  * Enums
@@ -139,6 +140,14 @@ exports.IKUComponentScalarFieldEnum = {
     ikuId: 'ikuId',
     componentId: 'componentId'
 };
+exports.UserScalarFieldEnum = {
+    id: 'id',
+    email: 'email',
+    password: 'password',
+    name: 'name',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
 exports.SortOrder = {
     asc: 'asc',
     desc: 'desc'
@@ -163,5 +172,11 @@ exports.IKUComponentOrderByRelevanceFieldEnum = {
     id: 'id',
     ikuId: 'ikuId',
     componentId: 'componentId'
+};
+exports.UserOrderByRelevanceFieldEnum = {
+    id: 'id',
+    email: 'email',
+    password: 'password',
+    name: 'name'
 };
 exports.defineExtension = runtime.Extensions.defineExtension;

@@ -3,8 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const component_controller_1 = require("../controllers/component.controller");
 const validate_1 = require("../middleware/validate");
+const auth_1 = require("../middleware/auth");
 const component_dto_1 = require("../dtos/component.dto");
 const router = (0, express_1.Router)();
+// Require authentication for all component management endpoints
+router.use(auth_1.authenticate);
 router.get("/", component_controller_1.listComponents);
 router.get("/:id", component_controller_1.getComponentById);
 router.post("/", (0, validate_1.validateBody)(component_dto_1.ComponentCreateDto), component_controller_1.createComponent);
