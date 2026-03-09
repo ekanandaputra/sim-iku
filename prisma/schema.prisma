@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum ComponentDataType {
+  number
+  percentage
+  integer
+}
+
+enum ComponentSourceType {
+  database
+  api
+  manual
+}
+
+model IKU {
+  id          String          @id @default(uuid()) @db.VarChar(36)
+  code        String          @unique
+  name        String
+  description String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  components  IKUComponent[]
+}
+
+model Component {
+  id          String          @id @default(uuid()) @db.VarChar(36)
+  code        String          @unique
+  name        String
+  description String?
+  dataType    ComponentDataType @map("data_type")
+  sourceType  ComponentSourceType @map("source_type")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  ikus        IKUComponent[]
+}
+
+model IKUComponent {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  iku         IKU       @relation(fields: [ikuId], references: [id])
+  ikuId       String    @db.VarChar(36)
+  component   Component @relation(fields: [componentId], references: [id])
+  componentId String    @db.VarChar(36)
+
+  @@unique([ikuId, componentId])
+  @@map("iku_component")
+}

@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const iku_controller_1 = require("../controllers/iku.controller");
+const validate_1 = require("../middleware/validate");
+const iku_dto_1 = require("../dtos/iku.dto");
+const router = (0, express_1.Router)();
+router.get("/", iku_controller_1.listIkus);
+router.get("/:id", iku_controller_1.getIkuById);
+router.get("/:id/components", iku_controller_1.listIkuComponents);
+router.post("/:id/components", (0, validate_1.validateBody)(iku_dto_1.IkuComponentMappingDto), iku_controller_1.mapComponentToIku);
+router.delete("/:id/components/:componentId", iku_controller_1.unmapComponentFromIku);
+router.post("/", (0, validate_1.validateBody)(iku_dto_1.IkuCreateDto), iku_controller_1.createIku);
+router.put("/:id", (0, validate_1.validateBody)(iku_dto_1.IkuUpdateDto), iku_controller_1.updateIku);
+router.delete("/:id", iku_controller_1.deleteIku);
+exports.default = router;

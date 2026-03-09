@@ -1,0 +1,52 @@
+import { IsEnum, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
+import { ComponentDataType, ComponentSourceType } from "../generated/prisma/enums";
+
+export class ComponentCreateDto {
+  @IsNotEmpty({ message: "Code is required" })
+  @IsString({ message: "Code must be a string" })
+  @Length(1, 50, { message: "Code must be at most 50 characters" })
+  code!: string;
+
+  @IsNotEmpty({ message: "Name is required" })
+  @IsString({ message: "Name must be a string" })
+  @Length(1, 200, { message: "Name must be at most 200 characters" })
+  name!: string;
+
+  @IsOptional()
+  @IsString({ message: "Description must be a string" })
+  @Length(0, 500, { message: "Description must be at most 500 characters" })
+  description?: string;
+
+  @IsNotEmpty({ message: "Data type is required" })
+  @IsEnum(ComponentDataType, { message: "Data type must be one of: number, percentage, integer" })
+  dataType!: ComponentDataType;
+
+  @IsNotEmpty({ message: "Source type is required" })
+  @IsEnum(ComponentSourceType, { message: "Source type must be one of: database, api, manual" })
+  sourceType!: ComponentSourceType;
+}
+
+export class ComponentUpdateDto {
+  @IsNotEmpty({ message: "Code is required" })
+  @IsString({ message: "Code must be a string" })
+  @Length(1, 50, { message: "Code must be at most 50 characters" })
+  code!: string;
+
+  @IsNotEmpty({ message: "Name is required" })
+  @IsString({ message: "Name must be a string" })
+  @Length(1, 200, { message: "Name must be at most 200 characters" })
+  name!: string;
+
+  @IsOptional()
+  @IsString({ message: "Description must be a string" })
+  @Length(0, 500, { message: "Description must be at most 500 characters" })
+  description?: string;
+
+  @IsNotEmpty({ message: "Data type is required" })
+  @IsEnum(ComponentDataType, { message: "Data type must be one of: number, percentage, integer" })
+  dataType!: ComponentDataType;
+
+  @IsNotEmpty({ message: "Source type is required" })
+  @IsEnum(ComponentSourceType, { message: "Source type must be one of: database, api, manual" })
+  sourceType!: ComponentSourceType;
+}
