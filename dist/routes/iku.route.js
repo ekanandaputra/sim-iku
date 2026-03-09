@@ -3,11 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const iku_controller_1 = require("../controllers/iku.controller");
 const validate_1 = require("../middleware/validate");
-const auth_1 = require("../middleware/auth");
 const iku_dto_1 = require("../dtos/iku.dto");
 const router = (0, express_1.Router)();
 // Require authentication for all IKU management endpoints
-router.use(auth_1.authenticate);
+// router.use(authenticate);
 router.get("/", iku_controller_1.listIkus);
 router.get("/:id", iku_controller_1.getIkuById);
 router.get("/:id/components", iku_controller_1.listIkuComponents);

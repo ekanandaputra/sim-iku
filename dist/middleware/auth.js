@@ -11,8 +11,15 @@ function authenticate(req, res, next) {
     const token = authHeader.split(" ")[1];
     try {
         const payload = (0, jwt_1.verifyJwt)(token);
-        // Attach user info to request object for later use
-        req.user = { id: payload.userId, email: payload.email };
+        // validasi payload
+        if (!payload.userId || !payload.email) {
+            return res.status(401).json((0, response_1.errorResponse)("Invalid token payload"));
+        }
+        // attach user ke request
+        req.user = {
+            id: payload.userId,
+            email: payload.email,
+        };
         next();
     }
     catch (err) {
