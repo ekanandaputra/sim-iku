@@ -9,6 +9,8 @@ import {
   createIkuFormulaStep,
   updateIkuFormulaStep,
   deleteIkuFormulaStep,
+  getFormulaComponents,
+  testIkuFormula,
 } from "../controllers/ikuFormula.controller";
 import { validateBody } from "../middleware/validate";
 import {
@@ -24,6 +26,8 @@ const router = Router();
 
 router.get("/", listIkuFormulas);
 router.get("/:id", getIkuFormulaById);
+router.get("/:id/components", getFormulaComponents);
+router.post("/:id/test", testIkuFormula);
 router.post("/", validateBody(IkuFormulaCreateDto), createIkuFormula);
 router.put("/:id", validateBody(IkuFormulaUpdateDto), updateIkuFormula);
 router.delete("/:id", deleteIkuFormula);

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { evaluateFormula } from "../utils/formula";
 
 type PaginationQuery = {
   page?: string;
@@ -185,6 +186,86 @@ export const listIkuFormulaSteps = async (
     });
 
     res.json(successResponse(steps));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET COMPONENT CODES USED BY FORMULA
+ * GET /api/iku-formulas/:id/components
+ */
+export const getFormulaComponents = async (
+  req: Request<FormulaParams>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const formulaId = req.params.id;
+
+    const formula = await prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+    if (!formula) {
+      return res.status(404).json(errorResponse("Formula not found"));
+    }
+
+    const steps = await prisma.iKUFormulaDetail.findMany({
+      where: { formulaId },
+      orderBy: { sequence: "asc" },
+    });
+
+    const codes = new Set<string>();
+    for (const step of steps) {
+      if (step.leftType === "component") {
+        codes.add(step.leftValue);
+      }
+      if (step.rightType === "component") {
+        codes.add(step.rightValue);
+      }
+    }
+
+    const components = Array.from(codes).map((code) => ({ code }));
+
+    res.json(successResponse({ formulaId, components }));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * TEST FORMULA CALCULATION
+ * POST /api/iku-formulas/:id/test
+ */
+export const testIkuFormula = async (
+  req: Request<FormulaParams>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const formulaId = req.params.id;
+    const { componentValues } = req.body;
+
+    if (!componentValues || typeof componentValues !== "object" || Array.isArray(componentValues)) {
+      return res
+        .status(400)
+        .json(errorResponse("componentValues must be an object with numeric values"));
+    }
+
+    for (const [key, value] of Object.entries(componentValues)) {
+      if (typeof value !== "number" || Number.isNaN(value)) {
+        return res
+          .status(400)
+          .json(errorResponse(`componentValues['${key}'] must be a valid number`));
+      }
+    }
+
+    const formula = await prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+    if (!formula) {
+      return res.status(404).json(errorResponse("Formula not found"));
+    }
+
+    const evaluation = await evaluateFormula(formulaId, componentValues);
+
+    res.json(successResponse(evaluation));
   } catch (error) {
     next(error);
   }

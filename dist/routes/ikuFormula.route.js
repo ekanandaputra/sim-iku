@@ -8,6 +8,8 @@ const ikuFormulaDetail_dto_1 = require("../dtos/ikuFormulaDetail.dto");
 const router = (0, express_1.Router)();
 router.get("/", ikuFormula_controller_1.listIkuFormulas);
 router.get("/:id", ikuFormula_controller_1.getIkuFormulaById);
+router.get("/:id/components", ikuFormula_controller_1.getFormulaComponents);
+router.post("/:id/test", ikuFormula_controller_1.testIkuFormula);
 router.post("/", (0, validate_1.validateBody)(ikuFormula_dto_1.IkuFormulaCreateDto), ikuFormula_controller_1.createIkuFormula);
 router.put("/:id", (0, validate_1.validateBody)(ikuFormula_dto_1.IkuFormulaUpdateDto), ikuFormula_controller_1.updateIkuFormula);
 router.delete("/:id", ikuFormula_controller_1.deleteIkuFormula);

@@ -3,10 +3,27 @@ import { FormulaOperandType, FormulaOperator } from "../generated/prisma/enums";
 
 export type ComponentValues = Record<string, number>;
 
+export type FormulaEvaluationStep = {
+  sequence: number;
+  expression: string;
+  result: number;
+};
+
+export type FormulaEvaluationResult = {
+  result: number;
+  steps: FormulaEvaluationStep[];
+};
+
+/**
+ * Evaluate a formula by running all steps in sequence and returning the final result.
+ *
+ * Steps are executed using the provided component values and intermediate results are
+ * stored using the `resultKey` defined on each step.
+ */
 export async function evaluateFormula(
   formulaId: string,
   componentValues: ComponentValues
-): Promise<number> {
+): Promise<FormulaEvaluationResult> {
   const formula = await prisma.iKUFormula.findUnique({
     where: { id: formulaId },
     include: {
@@ -21,6 +38,7 @@ export async function evaluateFormula(
   }
 
   const tempResults: Record<string, number> = {};
+  const steps: FormulaEvaluationStep[] = [];
 
   const resolveOperand = (type: FormulaOperandType, value: string): number => {
     if (type === FormulaOperandType.component) {
@@ -46,6 +64,21 @@ export async function evaluateFormula(
     }
 
     throw new Error(`Unsupported operand type '${type}'`);
+  };
+
+  const operatorSymbol = (operator: FormulaOperator): string => {
+    switch (operator) {
+      case FormulaOperator.ADD:
+        return "+";
+      case FormulaOperator.SUB:
+        return "-";
+      case FormulaOperator.MUL:
+        return "*";
+      case FormulaOperator.DIV:
+        return "/";
+      default:
+        return operator as string;
+    }
   };
 
   for (const step of formula.details) {
@@ -75,6 +108,12 @@ export async function evaluateFormula(
     }
 
     tempResults[step.resultKey] = result;
+
+    steps.push({
+      sequence: step.sequence,
+      expression: `${step.leftValue} ${operatorSymbol(step.operator)} ${step.rightValue}`,
+      result,
+    });
   }
 
   const finalKey = formula.finalResultKey ?? "RESULT";
@@ -82,5 +121,8 @@ export async function evaluateFormula(
     throw new Error(`Final result key '${finalKey}' not found after evaluation`);
   }
 
-  return tempResults[finalKey];
+  return {
+    result: tempResults[finalKey],
+    steps,
+  };
 }
