@@ -7,6 +7,7 @@ type PaginationQuery = {
   page?: string;
   limit?: string;
   ikuId?: string;
+  includeInactive?: string;
 };
 
 type FormulaParams = {
@@ -32,7 +33,16 @@ export const listIkuFormulas = async (
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const where = req.query.ikuId ? { ikuId: req.query.ikuId } : undefined;
+    const includeInactive = req.query.includeInactive === "true";
+    const where: any = { ikuId: req.query.ikuId };
+
+    if (!includeInactive) {
+      where.isActive = true;
+    }
+
+    if (!req.query.ikuId) {
+      delete where.ikuId;
+    }
 
     const formulas = await prisma.iKUFormula.findMany({
       where,
@@ -63,7 +73,7 @@ export const getIkuFormulaById = async (
       where: { id },
     });
 
-    if (!formula) {
+    if (!formula || !formula.isActive) {
       return res.status(404).json(errorResponse("Formula not found"));
     }
 
@@ -83,7 +93,7 @@ export const createIkuFormula = async (
   next: NextFunction
 ) => {
   try {
-    const { ikuId, name, description, finalResultKey } = req.body;
+    const { ikuId, name, description, finalResultKey, isActive } = req.body;
 
     const iku = await prisma.iKU.findUnique({ where: { id: ikuId } });
     if (!iku) {
@@ -96,6 +106,7 @@ export const createIkuFormula = async (
         name,
         description,
         finalResultKey,
+        isActive,
       },
     });
 
@@ -116,7 +127,7 @@ export const updateIkuFormula = async (
 ) => {
   try {
     const id = req.params.id;
-    const { name, description, finalResultKey } = req.body;
+    const { name, description, finalResultKey, isActive } = req.body;
 
     const existing = await prisma.iKUFormula.findUnique({ where: { id } });
     if (!existing) {
@@ -129,6 +140,7 @@ export const updateIkuFormula = async (
         name,
         description,
         finalResultKey,
+        isActive,
       },
     });
 

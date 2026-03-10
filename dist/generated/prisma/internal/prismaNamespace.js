@@ -156,6 +156,7 @@ exports.IKUFormulaScalarFieldEnum = {
     name: 'name',
     description: 'description',
     finalResultKey: 'finalResultKey',
+    isActive: 'isActive',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 };

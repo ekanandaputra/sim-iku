@@ -13,7 +13,14 @@ const listIkuFormulas = async (req, res, next) => {
         const page = Math.max(1, Number(req.query.page) || 1);
         const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
         const skip = (page - 1) * limit;
-        const where = req.query.ikuId ? { ikuId: req.query.ikuId } : undefined;
+        const includeInactive = req.query.includeInactive === "true";
+        const where = { ikuId: req.query.ikuId };
+        if (!includeInactive) {
+            where.isActive = true;
+        }
+        if (!req.query.ikuId) {
+            delete where.ikuId;
+        }
         const formulas = await prisma_1.prisma.iKUFormula.findMany({
             where,
             skip,
@@ -37,7 +44,7 @@ const getIkuFormulaById = async (req, res, next) => {
         const formula = await prisma_1.prisma.iKUFormula.findUnique({
             where: { id },
         });
-        if (!formula) {
+        if (!formula || !formula.isActive) {
             return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
         }
         res.json((0, response_1.successResponse)(formula));
@@ -53,7 +60,7 @@ exports.getIkuFormulaById = getIkuFormulaById;
  */
 const createIkuFormula = async (req, res, next) => {
     try {
-        const { ikuId, name, description, finalResultKey } = req.body;
+        const { ikuId, name, description, finalResultKey, isActive } = req.body;
         const iku = await prisma_1.prisma.iKU.findUnique({ where: { id: ikuId } });
         if (!iku) {
             return res.status(404).json((0, response_1.errorResponse)("IKU not found"));
@@ -64,6 +71,7 @@ const createIkuFormula = async (req, res, next) => {
                 name,
                 description,
                 finalResultKey,
+                isActive,
             },
         });
         res.status(201).json((0, response_1.successResponse)(formula, "Formula created successfully"));
@@ -80,7 +88,7 @@ exports.createIkuFormula = createIkuFormula;
 const updateIkuFormula = async (req, res, next) => {
     try {
         const id = req.params.id;
-        const { name, description, finalResultKey } = req.body;
+        const { name, description, finalResultKey, isActive } = req.body;
         const existing = await prisma_1.prisma.iKUFormula.findUnique({ where: { id } });
         if (!existing) {
             return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
@@ -91,6 +99,7 @@ const updateIkuFormula = async (req, res, next) => {
                 name,
                 description,
                 finalResultKey,
+                isActive,
             },
         });
         res.json((0, response_1.successResponse)(updated, "Formula updated successfully"));

@@ -37,6 +37,11 @@ __decorate([
     (0, class_validator_1.Length)(1, 100, { message: "Final result key must be at most 100 characters" }),
     __metadata("design:type", String)
 ], IkuFormulaCreateDto.prototype, "finalResultKey", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)({ message: "isActive must be a boolean" }),
+    __metadata("design:type", Boolean)
+], IkuFormulaCreateDto.prototype, "isActive", void 0);
 class IkuFormulaUpdateDto {
 }
 exports.IkuFormulaUpdateDto = IkuFormulaUpdateDto;
@@ -58,3 +63,8 @@ __decorate([
     (0, class_validator_1.Length)(1, 100, { message: "Final result key must be at most 100 characters" }),
     __metadata("design:type", String)
 ], IkuFormulaUpdateDto.prototype, "finalResultKey", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)({ message: "isActive must be a boolean" }),
+    __metadata("design:type", Boolean)
+], IkuFormulaUpdateDto.prototype, "isActive", void 0);

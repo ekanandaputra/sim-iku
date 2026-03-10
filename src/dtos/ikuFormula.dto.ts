@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, Length, IsUUID } from "class-validator";
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, Length, IsUUID } from "class-validator";
 
 export class IkuFormulaCreateDto {
   @IsNotEmpty({ message: "IKU ID is required" })
@@ -19,6 +19,10 @@ export class IkuFormulaCreateDto {
   @IsString({ message: "Final result key must be a string" })
   @Length(1, 100, { message: "Final result key must be at most 100 characters" })
   finalResultKey?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: "isActive must be a boolean" })
+  isActive?: boolean;
 }
 
 export class IkuFormulaUpdateDto {
@@ -36,4 +40,8 @@ export class IkuFormulaUpdateDto {
   @IsString({ message: "Final result key must be a string" })
   @Length(1, 100, { message: "Final result key must be at most 100 characters" })
   finalResultKey?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: "isActive must be a boolean" })
+  isActive?: boolean;
 }
