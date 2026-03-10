@@ -34,6 +34,7 @@ model IKU {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   components  IKUComponent[]
+  @@map("ikus")
 }
 
 model Component {
@@ -46,6 +47,7 @@ model Component {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   ikus        IKUComponent[]
+  @@map("components")
 }
 
 model IKUComponent {
@@ -56,7 +58,7 @@ model IKUComponent {
   componentId String    @db.VarChar(36)
 
   @@unique([ikuId, componentId])
-  @@map("iku_component")
+  @@map("mapping_component_iku")
 }
 
 model User {
@@ -66,4 +68,5 @@ model User {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@map("users")
 }
