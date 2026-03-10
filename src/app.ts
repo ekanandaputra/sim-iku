@@ -6,6 +6,7 @@ import swaggerUi from "swagger-ui-express";
 import authRouter from "./routes/auth.route";
 import ikuRouter from "./routes/iku.route";
 import componentRouter from "./routes/component.route";
+import ikuFormulaRouter from "./routes/ikuFormula.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -20,6 +21,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/ikus", ikuRouter);
 app.use("/api/components", componentRouter);
+app.use("/api/iku-formulas", ikuFormulaRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

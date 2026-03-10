@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserOrderByRelevanceFieldEnum = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.UserScalarFieldEnum = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
+exports.IKUFormulaDetailOrderByRelevanceFieldEnum = exports.IKUFormulaOrderByRelevanceFieldEnum = exports.UserOrderByRelevanceFieldEnum = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.IKUFormulaDetailScalarFieldEnum = exports.IKUFormulaScalarFieldEnum = exports.UserScalarFieldEnum = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.Decimal = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/index-browser"));
 exports.Decimal = runtime.Decimal;
 exports.NullTypes = {
@@ -78,7 +78,9 @@ exports.ModelName = {
     IKU: 'IKU',
     Component: 'Component',
     IKUComponent: 'IKUComponent',
-    User: 'User'
+    User: 'User',
+    IKUFormula: 'IKUFormula',
+    IKUFormulaDetail: 'IKUFormulaDetail'
 };
 /*
  * Enums
@@ -120,6 +122,28 @@ exports.UserScalarFieldEnum = {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 };
+exports.IKUFormulaScalarFieldEnum = {
+    id: 'id',
+    ikuId: 'ikuId',
+    name: 'name',
+    description: 'description',
+    finalResultKey: 'finalResultKey',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
+exports.IKUFormulaDetailScalarFieldEnum = {
+    id: 'id',
+    formulaId: 'formulaId',
+    sequence: 'sequence',
+    leftType: 'leftType',
+    leftValue: 'leftValue',
+    operator: 'operator',
+    rightType: 'rightType',
+    rightValue: 'rightValue',
+    resultKey: 'resultKey',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
 exports.SortOrder = {
     asc: 'asc',
     desc: 'desc'
@@ -150,4 +174,18 @@ exports.UserOrderByRelevanceFieldEnum = {
     email: 'email',
     password: 'password',
     name: 'name'
+};
+exports.IKUFormulaOrderByRelevanceFieldEnum = {
+    id: 'id',
+    ikuId: 'ikuId',
+    name: 'name',
+    description: 'description',
+    finalResultKey: 'finalResultKey'
+};
+exports.IKUFormulaDetailOrderByRelevanceFieldEnum = {
+    id: 'id',
+    formulaId: 'formulaId',
+    leftValue: 'leftValue',
+    rightValue: 'rightValue',
+    resultKey: 'resultKey'
 };

@@ -48,7 +48,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.defineExtension = exports.UserOrderByRelevanceFieldEnum = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.UserScalarFieldEnum = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
+exports.defineExtension = exports.IKUFormulaDetailOrderByRelevanceFieldEnum = exports.IKUFormulaOrderByRelevanceFieldEnum = exports.UserOrderByRelevanceFieldEnum = exports.IKUComponentOrderByRelevanceFieldEnum = exports.ComponentOrderByRelevanceFieldEnum = exports.IKUOrderByRelevanceFieldEnum = exports.NullsOrder = exports.SortOrder = exports.IKUFormulaDetailScalarFieldEnum = exports.IKUFormulaScalarFieldEnum = exports.UserScalarFieldEnum = exports.IKUComponentScalarFieldEnum = exports.ComponentScalarFieldEnum = exports.IKUScalarFieldEnum = exports.TransactionIsolationLevel = exports.ModelName = exports.AnyNull = exports.JsonNull = exports.DbNull = exports.NullTypes = exports.prismaVersion = exports.getExtensionContext = exports.Decimal = exports.Sql = exports.raw = exports.join = exports.empty = exports.sql = exports.PrismaClientValidationError = exports.PrismaClientInitializationError = exports.PrismaClientRustPanicError = exports.PrismaClientUnknownRequestError = exports.PrismaClientKnownRequestError = void 0;
 const runtime = __importStar(require("@prisma/client/runtime/library"));
 /**
  * Prisma Errors
@@ -106,7 +106,9 @@ exports.ModelName = {
     IKU: 'IKU',
     Component: 'Component',
     IKUComponent: 'IKUComponent',
-    User: 'User'
+    User: 'User',
+    IKUFormula: 'IKUFormula',
+    IKUFormulaDetail: 'IKUFormulaDetail'
 };
 /**
  * Enums
@@ -148,6 +150,28 @@ exports.UserScalarFieldEnum = {
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
 };
+exports.IKUFormulaScalarFieldEnum = {
+    id: 'id',
+    ikuId: 'ikuId',
+    name: 'name',
+    description: 'description',
+    finalResultKey: 'finalResultKey',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
+exports.IKUFormulaDetailScalarFieldEnum = {
+    id: 'id',
+    formulaId: 'formulaId',
+    sequence: 'sequence',
+    leftType: 'leftType',
+    leftValue: 'leftValue',
+    operator: 'operator',
+    rightType: 'rightType',
+    rightValue: 'rightValue',
+    resultKey: 'resultKey',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+};
 exports.SortOrder = {
     asc: 'asc',
     desc: 'desc'
@@ -178,5 +202,19 @@ exports.UserOrderByRelevanceFieldEnum = {
     email: 'email',
     password: 'password',
     name: 'name'
+};
+exports.IKUFormulaOrderByRelevanceFieldEnum = {
+    id: 'id',
+    ikuId: 'ikuId',
+    name: 'name',
+    description: 'description',
+    finalResultKey: 'finalResultKey'
+};
+exports.IKUFormulaDetailOrderByRelevanceFieldEnum = {
+    id: 'id',
+    formulaId: 'formulaId',
+    leftValue: 'leftValue',
+    rightValue: 'rightValue',
+    resultKey: 'resultKey'
 };
 exports.defineExtension = runtime.Extensions.defineExtension;

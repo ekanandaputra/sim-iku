@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const ikuFormula_controller_1 = require("../controllers/ikuFormula.controller");
+const validate_1 = require("../middleware/validate");
+const ikuFormula_dto_1 = require("../dtos/ikuFormula.dto");
+const ikuFormulaDetail_dto_1 = require("../dtos/ikuFormulaDetail.dto");
+const router = (0, express_1.Router)();
+router.get("/", ikuFormula_controller_1.listIkuFormulas);
+router.get("/:id", ikuFormula_controller_1.getIkuFormulaById);
+router.post("/", (0, validate_1.validateBody)(ikuFormula_dto_1.IkuFormulaCreateDto), ikuFormula_controller_1.createIkuFormula);
+router.put("/:id", (0, validate_1.validateBody)(ikuFormula_dto_1.IkuFormulaUpdateDto), ikuFormula_controller_1.updateIkuFormula);
+router.delete("/:id", ikuFormula_controller_1.deleteIkuFormula);
+router.get("/:formulaId/steps", ikuFormula_controller_1.listIkuFormulaSteps);
+router.post("/:formulaId/steps", (0, validate_1.validateBody)(ikuFormulaDetail_dto_1.IkuFormulaDetailCreateDto), ikuFormula_controller_1.createIkuFormulaStep);
+router.put("/:formulaId/steps/:id", (0, validate_1.validateBody)(ikuFormulaDetail_dto_1.IkuFormulaDetailUpdateDto), ikuFormula_controller_1.updateIkuFormulaStep);
+router.delete("/:formulaId/steps/:id", ikuFormula_controller_1.deleteIkuFormulaStep);
+exports.default = router;

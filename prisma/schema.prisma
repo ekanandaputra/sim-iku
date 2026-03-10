@@ -34,6 +34,7 @@ model IKU {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   components  IKUComponent[]
+  formulas    IKUFormula[]
   @@map("ikus")
 }
 
@@ -68,5 +69,56 @@ model User {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  @@map("users")
+}
+
+enum FormulaOperandType {
+  component
+  constant
+  temp
+}
+
+enum FormulaOperator {
+  ADD    @map("+")
+  SUB    @map("-")
+  MUL    @map("*")
+  DIV    @map("/")
+}
+
+model IKUFormula {
+  id             String               @id @default(uuid()) @db.VarChar(36)
+  iku            IKU                  @relation(fields: [ikuId], references: [id])
+  ikuId          String               @db.VarChar(36)
+  name           String
+  description    String?
+  finalResultKey String               @default("RESULT")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  details        IKUFormulaDetail[]
+
+  @@map("iku_formula")
+}
+
+model IKUFormulaDetail {
+  id         String             @id @default(uuid()) @db.VarChar(36)
+  formula    IKUFormula         @relation(fields: [formulaId], references: [id])
+  formulaId  String             @db.VarChar(36)
+  sequence   Int
+
+  leftType   FormulaOperandType @map("left_type")
+  leftValue  String             @map("left_value")
+
+  operator   FormulaOperator
+
+  rightType  FormulaOperandType @map("right_type")
+  rightValue String             @map("right_value")
+
+  resultKey  String             @map("result_key")
+
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  @@map("iku_formula_detail")
+  @@index([formulaId])
+  @@index([sequence])
+  @@unique([formulaId, sequence])
 }

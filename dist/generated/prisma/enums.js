@@ -9,7 +9,7 @@
 * 🟢 You can import this file directly.
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ComponentSourceType = exports.ComponentDataType = void 0;
+exports.FormulaOperator = exports.FormulaOperandType = exports.ComponentSourceType = exports.ComponentDataType = void 0;
 exports.ComponentDataType = {
     number: 'number',
     percentage: 'percentage',
@@ -19,4 +19,15 @@ exports.ComponentSourceType = {
     database: 'database',
     api: 'api',
     manual: 'manual'
+};
+exports.FormulaOperandType = {
+    component: 'component',
+    constant: 'constant',
+    temp: 'temp'
+};
+exports.FormulaOperator = {
+    ADD: 'ADD',
+    SUB: 'SUB',
+    MUL: 'MUL',
+    DIV: 'DIV'
 };

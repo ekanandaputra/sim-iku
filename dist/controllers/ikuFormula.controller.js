@@ -1,0 +1,251 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.deleteIkuFormulaStep = exports.updateIkuFormulaStep = exports.createIkuFormulaStep = exports.listIkuFormulaSteps = exports.deleteIkuFormula = exports.updateIkuFormula = exports.createIkuFormula = exports.getIkuFormulaById = exports.listIkuFormulas = void 0;
+const prisma_1 = require("../lib/prisma");
+const response_1 = require("../utils/response");
+/**
+ * LIST IKU FORMULAS
+ * GET /api/iku-formulas
+ */
+const listIkuFormulas = async (req, res, next) => {
+    try {
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+        const skip = (page - 1) * limit;
+        const where = req.query.ikuId ? { ikuId: req.query.ikuId } : undefined;
+        const formulas = await prisma_1.prisma.iKUFormula.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+        });
+        res.json((0, response_1.successResponse)(formulas));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.listIkuFormulas = listIkuFormulas;
+/**
+ * GET IKU FORMULA BY ID
+ * GET /api/iku-formulas/:id
+ */
+const getIkuFormulaById = async (req, res, next) => {
+    try {
+        const id = req.params.id;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({
+            where: { id },
+        });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        res.json((0, response_1.successResponse)(formula));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getIkuFormulaById = getIkuFormulaById;
+/**
+ * CREATE IKU FORMULA
+ * POST /api/iku-formulas
+ */
+const createIkuFormula = async (req, res, next) => {
+    try {
+        const { ikuId, name, description, finalResultKey } = req.body;
+        const iku = await prisma_1.prisma.iKU.findUnique({ where: { id: ikuId } });
+        if (!iku) {
+            return res.status(404).json((0, response_1.errorResponse)("IKU not found"));
+        }
+        const formula = await prisma_1.prisma.iKUFormula.create({
+            data: {
+                ikuId,
+                name,
+                description,
+                finalResultKey,
+            },
+        });
+        res.status(201).json((0, response_1.successResponse)(formula, "Formula created successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.createIkuFormula = createIkuFormula;
+/**
+ * UPDATE IKU FORMULA
+ * PUT /api/iku-formulas/:id
+ */
+const updateIkuFormula = async (req, res, next) => {
+    try {
+        const id = req.params.id;
+        const { name, description, finalResultKey } = req.body;
+        const existing = await prisma_1.prisma.iKUFormula.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const updated = await prisma_1.prisma.iKUFormula.update({
+            where: { id },
+            data: {
+                name,
+                description,
+                finalResultKey,
+            },
+        });
+        res.json((0, response_1.successResponse)(updated, "Formula updated successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.updateIkuFormula = updateIkuFormula;
+/**
+ * DELETE IKU FORMULA
+ * DELETE /api/iku-formulas/:id
+ */
+const deleteIkuFormula = async (req, res, next) => {
+    try {
+        const id = req.params.id;
+        const existing = await prisma_1.prisma.iKUFormula.findUnique({ where: { id } });
+        if (!existing) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        await prisma_1.prisma.iKUFormula.delete({ where: { id } });
+        res.json((0, response_1.successResponse)(null, "Formula deleted successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteIkuFormula = deleteIkuFormula;
+/**
+ * LIST FORMULA STEPS
+ * GET /api/iku-formulas/:formulaId/steps
+ */
+const listIkuFormulaSteps = async (req, res, next) => {
+    try {
+        const formulaId = req.params.formulaId;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const steps = await prisma_1.prisma.iKUFormulaDetail.findMany({
+            where: { formulaId },
+            orderBy: { sequence: "asc" },
+        });
+        res.json((0, response_1.successResponse)(steps));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.listIkuFormulaSteps = listIkuFormulaSteps;
+/**
+ * CREATE FORMULA STEP
+ * POST /api/iku-formulas/:formulaId/steps
+ */
+const createIkuFormulaStep = async (req, res, next) => {
+    try {
+        const formulaId = req.params.formulaId;
+        const { sequence, leftType, leftValue, operator, rightType, rightValue, resultKey } = req.body;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const existingSequence = await prisma_1.prisma.iKUFormulaDetail.findFirst({
+            where: { formulaId, sequence },
+        });
+        if (existingSequence) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("A step with this sequence already exists for the formula"));
+        }
+        const step = await prisma_1.prisma.iKUFormulaDetail.create({
+            data: {
+                formulaId,
+                sequence,
+                leftType,
+                leftValue,
+                operator,
+                rightType,
+                rightValue,
+                resultKey,
+            },
+        });
+        res.status(201).json((0, response_1.successResponse)(step, "Formula step created successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.createIkuFormulaStep = createIkuFormulaStep;
+/**
+ * UPDATE FORMULA STEP
+ * PUT /api/iku-formulas/:formulaId/steps/:id
+ */
+const updateIkuFormulaStep = async (req, res, next) => {
+    try {
+        const formulaId = req.params.formulaId;
+        const id = req.params.id;
+        const { sequence, leftType, leftValue, operator, rightType, rightValue, resultKey } = req.body;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const step = await prisma_1.prisma.iKUFormulaDetail.findUnique({ where: { id } });
+        if (!step || step.formulaId !== formulaId) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula step not found"));
+        }
+        if (sequence !== step.sequence) {
+            const existingSequence = await prisma_1.prisma.iKUFormulaDetail.findFirst({
+                where: { formulaId, sequence },
+            });
+            if (existingSequence) {
+                return res
+                    .status(400)
+                    .json((0, response_1.errorResponse)("A step with this sequence already exists for the formula"));
+            }
+        }
+        const updated = await prisma_1.prisma.iKUFormulaDetail.update({
+            where: { id },
+            data: {
+                sequence,
+                leftType,
+                leftValue,
+                operator,
+                rightType,
+                rightValue,
+                resultKey,
+            },
+        });
+        res.json((0, response_1.successResponse)(updated, "Formula step updated successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.updateIkuFormulaStep = updateIkuFormulaStep;
+/**
+ * DELETE FORMULA STEP
+ * DELETE /api/iku-formulas/:formulaId/steps/:id
+ */
+const deleteIkuFormulaStep = async (req, res, next) => {
+    try {
+        const formulaId = req.params.formulaId;
+        const id = req.params.id;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const step = await prisma_1.prisma.iKUFormulaDetail.findUnique({ where: { id } });
+        if (!step || step.formulaId !== formulaId) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula step not found"));
+        }
+        await prisma_1.prisma.iKUFormulaDetail.delete({ where: { id } });
+        res.json((0, response_1.successResponse)(null, "Formula step deleted successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteIkuFormulaStep = deleteIkuFormulaStep;

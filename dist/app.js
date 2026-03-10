@@ -9,6 +9,7 @@ const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const auth_route_1 = __importDefault(require("./routes/auth.route"));
 const iku_route_1 = __importDefault(require("./routes/iku.route"));
 const component_route_1 = __importDefault(require("./routes/component.route"));
+const ikuFormula_route_1 = __importDefault(require("./routes/ikuFormula.route"));
 const swagger_1 = require("./docs/swagger");
 const errorHandler_1 = require("./middleware/errorHandler");
 const app = (0, express_1.default)();
@@ -19,6 +20,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", auth_route_1.default);
 app.use("/api/ikus", iku_route_1.default);
 app.use("/api/components", component_route_1.default);
+app.use("/api/iku-formulas", ikuFormula_route_1.default);
 app.use("/api/docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swagger_1.swaggerSpec));
 app.use((req, res) => {
     res.status(404).json({ success: false, message: "Not found" });
