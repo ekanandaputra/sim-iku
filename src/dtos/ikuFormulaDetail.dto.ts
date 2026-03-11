@@ -6,7 +6,11 @@ import {
   IsInt,
   Min,
   IsEnum,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
 } from "class-validator";
+import { Type } from "class-transformer";
 import { FormulaOperandType, FormulaOperator } from "../generated/prisma/enums";
 
 export class IkuFormulaDetailCreateDto {
@@ -69,4 +73,26 @@ export class IkuFormulaDetailUpdateDto {
   @IsNotEmpty({ message: "Result key is required" })
   @IsString({ message: "Result key must be a string" })
   resultKey!: string;
+}
+
+export class IkuFormulaDetailUpdateItemDto extends IkuFormulaDetailUpdateDto {
+  @IsNotEmpty({ message: "Step id is required" })
+  @IsUUID(4, { message: "Step id must be a valid UUID" })
+  id!: string;
+}
+
+export class IkuFormulaDetailCreateBatchDto {
+  @IsArray({ message: "Steps must be an array" })
+  @ArrayMinSize(1, { message: "At least one step is required" })
+  @ValidateNested({ each: true })
+  @Type(() => IkuFormulaDetailCreateDto)
+  steps!: IkuFormulaDetailCreateDto[];
+}
+
+export class IkuFormulaDetailUpdateBatchDto {
+  @IsArray({ message: "Steps must be an array" })
+  @ArrayMinSize(1, { message: "At least one step is required" })
+  @ValidateNested({ each: true })
+  @Type(() => IkuFormulaDetailUpdateItemDto)
+  steps!: IkuFormulaDetailUpdateItemDto[];
 }

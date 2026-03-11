@@ -9,8 +9,9 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IkuFormulaDetailUpdateDto = exports.IkuFormulaDetailCreateDto = void 0;
+exports.IkuFormulaDetailUpdateBatchDto = exports.IkuFormulaDetailCreateBatchDto = exports.IkuFormulaDetailUpdateItemDto = exports.IkuFormulaDetailUpdateDto = exports.IkuFormulaDetailCreateDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 const enums_1 = require("../generated/prisma/enums");
 class IkuFormulaDetailCreateDto {
 }
@@ -90,3 +91,31 @@ __decorate([
     (0, class_validator_1.IsString)({ message: "Result key must be a string" }),
     __metadata("design:type", String)
 ], IkuFormulaDetailUpdateDto.prototype, "resultKey", void 0);
+class IkuFormulaDetailUpdateItemDto extends IkuFormulaDetailUpdateDto {
+}
+exports.IkuFormulaDetailUpdateItemDto = IkuFormulaDetailUpdateItemDto;
+__decorate([
+    (0, class_validator_1.IsNotEmpty)({ message: "Step id is required" }),
+    (0, class_validator_1.IsUUID)(4, { message: "Step id must be a valid UUID" }),
+    __metadata("design:type", String)
+], IkuFormulaDetailUpdateItemDto.prototype, "id", void 0);
+class IkuFormulaDetailCreateBatchDto {
+}
+exports.IkuFormulaDetailCreateBatchDto = IkuFormulaDetailCreateBatchDto;
+__decorate([
+    (0, class_validator_1.IsArray)({ message: "Steps must be an array" }),
+    (0, class_validator_1.ArrayMinSize)(1, { message: "At least one step is required" }),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => IkuFormulaDetailCreateDto),
+    __metadata("design:type", Array)
+], IkuFormulaDetailCreateBatchDto.prototype, "steps", void 0);
+class IkuFormulaDetailUpdateBatchDto {
+}
+exports.IkuFormulaDetailUpdateBatchDto = IkuFormulaDetailUpdateBatchDto;
+__decorate([
+    (0, class_validator_1.IsArray)({ message: "Steps must be an array" }),
+    (0, class_validator_1.ArrayMinSize)(1, { message: "At least one step is required" }),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => IkuFormulaDetailUpdateItemDto),
+    __metadata("design:type", Array)
+], IkuFormulaDetailUpdateBatchDto.prototype, "steps", void 0);

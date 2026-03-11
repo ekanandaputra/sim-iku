@@ -296,6 +296,33 @@ const swaggerDefinition = {
         },
         required: ["id", "formulaId", "sequence", "leftType", "leftValue", "operator", "rightType", "rightValue", "resultKey"],
       },
+      IkuFormulaDetailCreate: {
+        type: "object",
+        properties: {
+          sequence: { type: "integer" },
+          leftType: { type: "string", enum: ["component", "constant", "temp"] },
+          leftValue: { type: "string" },
+          operator: { type: "string", enum: ["ADD", "SUB", "MUL", "DIV"] },
+          rightType: { type: "string", enum: ["component", "constant", "temp"] },
+          rightValue: { type: "string" },
+          resultKey: { type: "string" },
+        },
+        required: ["sequence", "leftType", "leftValue", "operator", "rightType", "rightValue", "resultKey"],
+      },
+      IkuFormulaDetailUpdate: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          sequence: { type: "integer" },
+          leftType: { type: "string", enum: ["component", "constant", "temp"] },
+          leftValue: { type: "string" },
+          operator: { type: "string", enum: ["ADD", "SUB", "MUL", "DIV"] },
+          rightType: { type: "string", enum: ["component", "constant", "temp"] },
+          rightValue: { type: "string" },
+          resultKey: { type: "string" },
+        },
+        required: ["id", "sequence", "leftType", "leftValue", "operator", "rightType", "rightValue", "resultKey"],
+      },
       FormulaComponentList: {
         type: "object",
         properties: {
@@ -1307,6 +1334,129 @@ const swaggerDefinition = {
                     success: { type: "boolean", example: true },
                     message: { type: "string", example: "Formula step created successfully" },
                     data: { $ref: "#/components/schemas/IkuFormulaDetail" },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation or business error",
+            content: {
+              "application/json": {
+                schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] },
+              },
+            },
+          },
+          "404": {
+            description: "Formula not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/iku-formulas/{formulaId}/steps/batch": {
+      security: [{ bearerAuth: [] }],
+      post: {
+        tags: ["Formula"],
+        summary: "Create multiple formula steps",
+        parameters: [
+          {
+            name: "formulaId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Formula id",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Formula steps created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Formula steps created successfully" },
+                    data: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/IkuFormulaDetail" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation or business error",
+            content: {
+              "application/json": {
+                schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] },
+              },
+            },
+          },
+          "404": {
+            description: "Formula not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+      put: {
+        tags: ["Formula"],
+        summary: "Update multiple formula steps",
+        parameters: [
+          {
+            name: "formulaId",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Formula id",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "array",
+                items: { $ref: "#/components/schemas/IkuFormulaDetailUpdate" },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Formula steps updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Formula steps updated successfully" },
+                    data: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/IkuFormulaDetail" },
+                    },
                   },
                 },
               },

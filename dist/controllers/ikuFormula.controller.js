@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteIkuFormulaStep = exports.updateIkuFormulaStep = exports.createIkuFormulaStep = exports.testIkuFormula = exports.getFormulaComponents = exports.listIkuFormulaSteps = exports.deleteIkuFormula = exports.updateIkuFormula = exports.createIkuFormula = exports.getIkuFormulaById = exports.listIkuFormulas = void 0;
+exports.deleteIkuFormulaStep = exports.updateIkuFormulaStep = exports.updateIkuFormulaSteps = exports.createIkuFormulaSteps = exports.createIkuFormulaStep = exports.testIkuFormula = exports.getFormulaComponents = exports.listIkuFormulaSteps = exports.deleteIkuFormula = exports.updateIkuFormula = exports.createIkuFormula = exports.getIkuFormulaById = exports.listIkuFormulas = void 0;
 const prisma_1 = require("../lib/prisma");
 const response_1 = require("../utils/response");
 const formula_1 = require("../utils/formula");
@@ -253,6 +253,113 @@ const createIkuFormulaStep = async (req, res, next) => {
     }
 };
 exports.createIkuFormulaStep = createIkuFormulaStep;
+/**
+ * CREATE FORMULA STEPS (BATCH)
+ * POST /api/iku-formulas/:formulaId/steps/batch
+ */
+const createIkuFormulaSteps = async (req, res, next) => {
+    try {
+        const formulaId = req.params.formulaId;
+        const { steps } = req.body;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const sequences = steps.map((step) => step.sequence);
+        const uniqueSequences = new Set(sequences);
+        if (uniqueSequences.size !== sequences.length) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("Duplicate sequence values are not allowed in the batch"));
+        }
+        const existingSequence = await prisma_1.prisma.iKUFormulaDetail.findFirst({
+            where: { formulaId, sequence: { in: sequences } },
+        });
+        if (existingSequence) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("A step with one of the provided sequences already exists for the formula"));
+        }
+        const created = await prisma_1.prisma.$transaction(steps.map((step) => prisma_1.prisma.iKUFormulaDetail.create({
+            data: {
+                formulaId,
+                sequence: step.sequence,
+                leftType: step.leftType,
+                leftValue: step.leftValue,
+                operator: step.operator,
+                rightType: step.rightType,
+                rightValue: step.rightValue,
+                resultKey: step.resultKey,
+            },
+        })));
+        res.status(201).json((0, response_1.successResponse)(created, "Formula steps created successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.createIkuFormulaSteps = createIkuFormulaSteps;
+/**
+ * UPDATE FORMULA STEPS (BATCH)
+ * PUT /api/iku-formulas/:formulaId/steps/batch
+ */
+const updateIkuFormulaSteps = async (req, res, next) => {
+    try {
+        const formulaId = req.params.formulaId;
+        const { steps } = req.body;
+        const formula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: formulaId } });
+        if (!formula) {
+            return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
+        }
+        const ids = steps.map((step) => step.id);
+        const sequences = steps.map((step) => step.sequence);
+        if (new Set(ids).size !== ids.length) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("Duplicate step ids are not allowed in the batch"));
+        }
+        if (new Set(sequences).size !== sequences.length) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("Duplicate sequence values are not allowed in the batch"));
+        }
+        const existingSteps = await prisma_1.prisma.iKUFormulaDetail.findMany({
+            where: { formulaId, id: { in: ids } },
+        });
+        if (existingSteps.length !== ids.length) {
+            return res.status(404).json((0, response_1.errorResponse)("One or more formula steps were not found"));
+        }
+        const conflictingSequence = await prisma_1.prisma.iKUFormulaDetail.findFirst({
+            where: {
+                formulaId,
+                sequence: { in: sequences },
+                id: { notIn: ids },
+            },
+        });
+        if (conflictingSequence) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("A step with one of the provided sequences already exists for the formula"));
+        }
+        const updated = await prisma_1.prisma.$transaction(steps.map((step) => prisma_1.prisma.iKUFormulaDetail.update({
+            where: { id: step.id },
+            data: {
+                sequence: step.sequence,
+                leftType: step.leftType,
+                leftValue: step.leftValue,
+                operator: step.operator,
+                rightType: step.rightType,
+                rightValue: step.rightValue,
+                resultKey: step.resultKey,
+            },
+        })));
+        res.json((0, response_1.successResponse)(updated, "Formula steps updated successfully"));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.updateIkuFormulaSteps = updateIkuFormulaSteps;
 /**
  * UPDATE FORMULA STEP
  * PUT /api/iku-formulas/:formulaId/steps/:id
