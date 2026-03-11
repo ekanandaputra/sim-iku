@@ -9,7 +9,11 @@ const enums_1 = require("../generated/prisma/enums");
  * Steps are executed using the provided component values and intermediate results are
  * stored using the `resultKey` defined on each step.
  */
-async function evaluateFormula(formulaId, componentValues) {
+async function evaluateFormula(formulaId, componentValues, visited = new Set()) {
+    if (visited.has(formulaId)) {
+        throw new Error(`Circular formula dependency detected for '${formulaId}'`);
+    }
+    visited.add(formulaId);
     const formula = await prisma_1.prisma.iKUFormula.findUnique({
         where: { id: formulaId },
         include: {
@@ -23,8 +27,27 @@ async function evaluateFormula(formulaId, componentValues) {
     }
     const tempResults = {};
     const steps = [];
-    const resolveOperand = (type, value) => {
+    const resolveOperand = async (type, value) => {
         if (type === enums_1.FormulaOperandType.component) {
+            // Support chaining formulas via special component key: "formula:<idOrName>"
+            if (value.startsWith("formula:")) {
+                const ref = value.slice("formula:".length).trim();
+                if (!ref) {
+                    throw new Error("Formula reference must include an id or name after 'formula:'");
+                }
+                // Attempt to resolve by UUID first, otherwise fall back to name within the same IKU
+                let refFormula = await prisma_1.prisma.iKUFormula.findUnique({ where: { id: ref } });
+                if (!refFormula) {
+                    refFormula = await prisma_1.prisma.iKUFormula.findFirst({
+                        where: { name: ref, ikuId: formula.ikuId },
+                    });
+                }
+                if (!refFormula) {
+                    throw new Error(`Formula reference '${ref}' not found`);
+                }
+                const evaluation = await evaluateFormula(refFormula.id, componentValues, visited);
+                return evaluation.result;
+            }
             if (!(value in componentValues)) {
                 throw new Error(`Component value not provided for key '${value}'`);
             }
@@ -60,8 +83,8 @@ async function evaluateFormula(formulaId, componentValues) {
         }
     };
     for (const step of formula.details) {
-        const left = resolveOperand(step.leftType, step.leftValue);
-        const right = resolveOperand(step.rightType, step.rightValue);
+        const left = await resolveOperand(step.leftType, step.leftValue);
+        const right = await resolveOperand(step.rightType, step.rightValue);
         let result;
         switch (step.operator) {
             case enums_1.FormulaOperator.ADD:

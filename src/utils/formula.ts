@@ -22,8 +22,14 @@ export type FormulaEvaluationResult = {
  */
 export async function evaluateFormula(
   formulaId: string,
-  componentValues: ComponentValues
+  componentValues: ComponentValues,
+  visited: Set<string> = new Set()
 ): Promise<FormulaEvaluationResult> {
+  if (visited.has(formulaId)) {
+    throw new Error(`Circular formula dependency detected for '${formulaId}'`);
+  }
+  visited.add(formulaId);
+
   const formula = await prisma.iKUFormula.findUnique({
     where: { id: formulaId },
     include: {
@@ -40,8 +46,31 @@ export async function evaluateFormula(
   const tempResults: Record<string, number> = {};
   const steps: FormulaEvaluationStep[] = [];
 
-  const resolveOperand = (type: FormulaOperandType, value: string): number => {
+  const resolveOperand = async (type: FormulaOperandType, value: string): Promise<number> => {
     if (type === FormulaOperandType.component) {
+      // Support chaining formulas via special component key: "formula:<idOrName>"
+      if (value.startsWith("formula:")) {
+        const ref = value.slice("formula:".length).trim();
+        if (!ref) {
+          throw new Error("Formula reference must include an id or name after 'formula:'");
+        }
+
+        // Attempt to resolve by UUID first, otherwise fall back to name within the same IKU
+        let refFormula = await prisma.iKUFormula.findUnique({ where: { id: ref } });
+        if (!refFormula) {
+          refFormula = await prisma.iKUFormula.findFirst({
+            where: { name: ref, ikuId: formula.ikuId },
+          });
+        }
+
+        if (!refFormula) {
+          throw new Error(`Formula reference '${ref}' not found`);
+        }
+
+        const evaluation = await evaluateFormula(refFormula.id, componentValues, visited);
+        return evaluation.result;
+      }
+
       if (!(value in componentValues)) {
         throw new Error(`Component value not provided for key '${value}'`);
       }
@@ -82,8 +111,8 @@ export async function evaluateFormula(
   };
 
   for (const step of formula.details) {
-    const left = resolveOperand(step.leftType, step.leftValue);
-    const right = resolveOperand(step.rightType, step.rightValue);
+    const left = await resolveOperand(step.leftType, step.leftValue);
+    const right = await resolveOperand(step.rightType, step.rightValue);
 
     let result: number;
 
