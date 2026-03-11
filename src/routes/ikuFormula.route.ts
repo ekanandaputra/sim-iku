@@ -22,8 +22,6 @@ import {
 import {
   IkuFormulaDetailCreateDto,
   IkuFormulaDetailUpdateDto,
-  IkuFormulaDetailCreateBatchDto,
-  IkuFormulaDetailUpdateBatchDto,
 } from "../dtos/ikuFormulaDetail.dto";
 
 const router = Router();
@@ -42,16 +40,8 @@ router.post(
   validateBody(IkuFormulaDetailCreateDto),
   createIkuFormulaStep
 );
-router.post(
-  "/:formulaId/steps/batch",
-  validateBody(IkuFormulaDetailCreateBatchDto),
-  createIkuFormulaSteps
-);
-router.put(
-  "/:formulaId/steps/batch",
-  validateBody(IkuFormulaDetailUpdateBatchDto),
-  updateIkuFormulaSteps
-);
+router.post("/:formulaId/steps/batch", createIkuFormulaSteps);
+router.put("/:formulaId/steps/batch", updateIkuFormulaSteps);
 router.put(
   "/:formulaId/steps/:id",
   validateBody(IkuFormulaDetailUpdateDto),

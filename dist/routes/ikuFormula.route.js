@@ -15,8 +15,8 @@ router.put("/:id", (0, validate_1.validateBody)(ikuFormula_dto_1.IkuFormulaUpdat
 router.delete("/:id", ikuFormula_controller_1.deleteIkuFormula);
 router.get("/:formulaId/steps", ikuFormula_controller_1.listIkuFormulaSteps);
 router.post("/:formulaId/steps", (0, validate_1.validateBody)(ikuFormulaDetail_dto_1.IkuFormulaDetailCreateDto), ikuFormula_controller_1.createIkuFormulaStep);
-router.post("/:formulaId/steps/batch", (0, validate_1.validateBody)(ikuFormulaDetail_dto_1.IkuFormulaDetailCreateBatchDto), ikuFormula_controller_1.createIkuFormulaSteps);
-router.put("/:formulaId/steps/batch", (0, validate_1.validateBody)(ikuFormulaDetail_dto_1.IkuFormulaDetailUpdateBatchDto), ikuFormula_controller_1.updateIkuFormulaSteps);
+router.post("/:formulaId/steps/batch", ikuFormula_controller_1.createIkuFormulaSteps);
+router.put("/:formulaId/steps/batch", ikuFormula_controller_1.updateIkuFormulaSteps);
 router.put("/:formulaId/steps/:id", (0, validate_1.validateBody)(ikuFormulaDetail_dto_1.IkuFormulaDetailUpdateDto), ikuFormula_controller_1.updateIkuFormulaStep);
 router.delete("/:formulaId/steps/:id", ikuFormula_controller_1.deleteIkuFormulaStep);
 exports.default = router;

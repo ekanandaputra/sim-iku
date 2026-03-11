@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from "express";
+import { plainToInstance } from "class-transformer";
+import { validate, ValidationError } from "class-validator";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { evaluateFormula } from "../utils/formula";
+import { IkuFormulaDetailCreateDto, IkuFormulaDetailUpdateItemDto } from "../dtos/ikuFormulaDetail.dto";
 
 type PaginationQuery = {
   page?: string;
@@ -247,6 +250,24 @@ export const getFormulaComponents = async (
  * TEST FORMULA CALCULATION
  * POST /api/iku-formulas/:id/test
  */
+function formatErrors(errors: ValidationError[]): Record<string, string> {
+  const formatted: Record<string, string> = {};
+
+  for (const error of errors) {
+    if (error.children && error.children.length > 0) {
+      Object.assign(formatted, formatErrors(error.children));
+      continue;
+    }
+
+    if (error.constraints) {
+      const [first] = Object.values(error.constraints);
+      formatted[error.property] = first;
+    }
+  }
+
+  return formatted;
+}
+
 export const testIkuFormula = async (
   req: Request<FormulaParams>,
   res: Response,
@@ -341,7 +362,27 @@ export const createIkuFormulaSteps = async (
 ) => {
   try {
     const formulaId = req.params.formulaId;
-    const { steps } = req.body as { steps: Array<Record<string, any>> };
+
+    if (!Array.isArray(req.body)) {
+      return res.status(400).json(errorResponse("Request body must be an array of steps"));
+    }
+
+    const steps = plainToInstance(IkuFormulaDetailCreateDto, req.body);
+    const validationResults = await Promise.all(
+      steps.map((step) => validate(step, { whitelist: true, forbidNonWhitelisted: true }))
+    );
+
+    const errors = validationResults
+      .map((result, idx) => ({ idx, errors: result }))
+      .filter((x) => x.errors.length > 0);
+
+    if (errors.length > 0) {
+      const formatted: Record<string, any> = {};
+      for (const { idx, errors: validationErrors } of errors) {
+        formatted[idx] = formatErrors(validationErrors);
+      }
+      return res.status(400).json(errorResponse("Validation failed", formatted));
+    }
 
     const formula = await prisma.iKUFormula.findUnique({ where: { id: formulaId } });
     if (!formula) {
@@ -400,7 +441,27 @@ export const updateIkuFormulaSteps = async (
 ) => {
   try {
     const formulaId = req.params.formulaId;
-    const { steps } = req.body as { steps: Array<Record<string, any>> };
+
+    if (!Array.isArray(req.body)) {
+      return res.status(400).json(errorResponse("Request body must be an array of steps"));
+    }
+
+    const steps = plainToInstance(IkuFormulaDetailUpdateItemDto, req.body);
+    const validationResults = await Promise.all(
+      steps.map((step) => validate(step, { whitelist: true, forbidNonWhitelisted: true }))
+    );
+
+    const errors = validationResults
+      .map((result, idx) => ({ idx, errors: result }))
+      .filter((x) => x.errors.length > 0);
+
+    if (errors.length > 0) {
+      const formatted: Record<string, any> = {};
+      for (const { idx, errors: validationErrors } of errors) {
+        formatted[idx] = formatErrors(validationErrors);
+      }
+      return res.status(400).json(errorResponse("Validation failed", formatted));
+    }
 
     const formula = await prisma.iKUFormula.findUnique({ where: { id: formulaId } });
     if (!formula) {
