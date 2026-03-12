@@ -239,10 +239,11 @@ const swaggerDefinition = {
                     description: { type: "string", nullable: true },
                     finalResultKey: { type: "string" },
                     isActive: { type: "boolean" },
+                    version: { type: "integer" },
                     createdAt: { type: "string", format: "date-time" },
                     updatedAt: { type: "string", format: "date-time" },
                 },
-                required: ["id", "ikuId", "name", "finalResultKey", "isActive"],
+                required: ["id", "ikuId", "name", "finalResultKey", "isActive", "version"],
             },
             SuccessResponseSingleFormula: {
                 type: "object",
@@ -270,8 +271,12 @@ const swaggerDefinition = {
                     description: { type: "string", maxLength: 500 },
                     finalResultKey: { type: "string", maxLength: 100 },
                     isActive: { type: "boolean" },
+                    steps: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
+                    },
                 },
-                required: ["ikuId", "name"],
+                required: ["ikuId", "name", "steps"],
             },
             IkuFormulaUpdate: {
                 type: "object",
@@ -280,6 +285,10 @@ const swaggerDefinition = {
                     description: { type: "string", maxLength: 500 },
                     finalResultKey: { type: "string", maxLength: 100 },
                     isActive: { type: "boolean" },
+                    steps: {
+                        type: "array",
+                        items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
+                    },
                 },
                 required: ["name"],
             },

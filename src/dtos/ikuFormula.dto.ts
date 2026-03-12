@@ -1,4 +1,6 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, Length, IsUUID } from "class-validator";
+import { IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, Length, IsUUID, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
+import { IkuFormulaDetailCreateDto } from "./ikuFormulaDetail.dto";
 
 export class IkuFormulaCreateDto {
   @IsNotEmpty({ message: "IKU ID is required" })
@@ -23,6 +25,12 @@ export class IkuFormulaCreateDto {
   @IsOptional()
   @IsBoolean({ message: "isActive must be a boolean" })
   isActive?: boolean;
+
+  @IsOptional()
+  @IsArray({ message: "Steps must be an array" })
+  @ValidateNested({ each: true })
+  @Type(() => IkuFormulaDetailCreateDto)
+  steps?: IkuFormulaDetailCreateDto[];
 }
 
 export class IkuFormulaUpdateDto {
@@ -44,4 +52,10 @@ export class IkuFormulaUpdateDto {
   @IsOptional()
   @IsBoolean({ message: "isActive must be a boolean" })
   isActive?: boolean;
+
+  @IsOptional()
+  @IsArray({ message: "Steps must be an array" })
+  @ValidateNested({ each: true })
+  @Type(() => IkuFormulaDetailCreateDto)
+  steps?: IkuFormulaDetailCreateDto[];
 }

@@ -63,20 +63,65 @@ exports.getIkuFormulaById = getIkuFormulaById;
  */
 const createIkuFormula = async (req, res, next) => {
     try {
-        const { ikuId, name, description, finalResultKey, isActive } = req.body;
+        const { ikuId, name, description, finalResultKey, steps } = req.body;
         const iku = await prisma_1.prisma.iKU.findUnique({ where: { id: ikuId } });
         if (!iku) {
             return res.status(404).json((0, response_1.errorResponse)("IKU not found"));
         }
-        const formula = await prisma_1.prisma.iKUFormula.create({
-            data: {
-                ikuId,
-                name,
-                description,
-                finalResultKey,
-                isActive,
-            },
+        if (!Array.isArray(steps) || steps.length === 0) {
+            return res.status(400).json((0, response_1.errorResponse)("At least one formula step is required"));
+        }
+        const parsedSteps = (0, class_transformer_1.plainToInstance)(ikuFormulaDetail_dto_1.IkuFormulaDetailCreateDto, steps);
+        const validationResults = await Promise.all(parsedSteps.map((step) => (0, class_validator_1.validate)(step, { whitelist: true, forbidNonWhitelisted: true })));
+        const errors = validationResults.filter((result) => result.length > 0);
+        if (errors.length > 0) {
+            const formatted = {};
+            for (const [idx, validationErrors] of errors.entries()) {
+                formatted[idx] = formatErrors(validationErrors);
+            }
+            return res.status(400).json((0, response_1.errorResponse)("Validation failed", formatted));
+        }
+        const sequences = parsedSteps.map((step) => step.sequence);
+        if (new Set(sequences).size !== sequences.length) {
+            return res
+                .status(400)
+                .json((0, response_1.errorResponse)("Duplicate sequence values are not allowed in the steps"));
+        }
+        const lastVersion = await prisma_1.prisma.iKUFormula.findFirst({
+            where: { ikuId },
+            orderBy: { version: "desc" },
+            select: { version: true },
         });
+        const nextVersion = (lastVersion?.version ?? 0) + 1;
+        const created = await prisma_1.prisma.$transaction([
+            prisma_1.prisma.iKUFormula.updateMany({
+                where: { ikuId, isActive: true },
+                data: { isActive: false },
+            }),
+            prisma_1.prisma.iKUFormula.create({
+                data: {
+                    ikuId,
+                    name,
+                    description,
+                    finalResultKey,
+                    isActive: true,
+                    version: nextVersion,
+                    details: {
+                        create: parsedSteps.map((step) => ({
+                            sequence: step.sequence,
+                            leftType: step.leftType,
+                            leftValue: step.leftValue,
+                            operator: step.operator,
+                            rightType: step.rightType,
+                            rightValue: step.rightValue,
+                            resultKey: step.resultKey,
+                        })),
+                    },
+                },
+            }),
+        ]);
+        // the create call is the second item in the transaction array
+        const formula = created[1];
         res.status(201).json((0, response_1.successResponse)(formula, "Formula created successfully"));
     }
     catch (error) {
@@ -91,21 +136,83 @@ exports.createIkuFormula = createIkuFormula;
 const updateIkuFormula = async (req, res, next) => {
     try {
         const id = req.params.id;
-        const { name, description, finalResultKey, isActive } = req.body;
+        const { name, description, finalResultKey, steps } = req.body;
         const existing = await prisma_1.prisma.iKUFormula.findUnique({ where: { id } });
         if (!existing) {
             return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
         }
-        const updated = await prisma_1.prisma.iKUFormula.update({
-            where: { id },
-            data: {
-                name,
-                description,
-                finalResultKey,
-                isActive,
-            },
+        const ikuId = existing.ikuId;
+        let createSteps = [];
+        if (Array.isArray(steps) && steps.length > 0) {
+            const parsedSteps = (0, class_transformer_1.plainToInstance)(ikuFormulaDetail_dto_1.IkuFormulaDetailCreateDto, steps);
+            const validationResults = await Promise.all(parsedSteps.map((step) => (0, class_validator_1.validate)(step, { whitelist: true, forbidNonWhitelisted: true })));
+            const errors = validationResults.filter((result) => result.length > 0);
+            if (errors.length > 0) {
+                const formatted = {};
+                for (const [idx, validationErrors] of errors.entries()) {
+                    formatted[idx] = formatErrors(validationErrors);
+                }
+                return res.status(400).json((0, response_1.errorResponse)("Validation failed", formatted));
+            }
+            const sequences = parsedSteps.map((step) => step.sequence);
+            if (new Set(sequences).size !== sequences.length) {
+                return res
+                    .status(400)
+                    .json((0, response_1.errorResponse)("Duplicate sequence values are not allowed in the steps"));
+            }
+            createSteps = parsedSteps.map((step) => ({
+                sequence: step.sequence,
+                leftType: step.leftType,
+                leftValue: step.leftValue,
+                operator: step.operator,
+                rightType: step.rightType,
+                rightValue: step.rightValue,
+                resultKey: step.resultKey,
+            }));
+        }
+        else {
+            const existingSteps = await prisma_1.prisma.iKUFormulaDetail.findMany({
+                where: { formulaId: id },
+                orderBy: { sequence: "asc" },
+            });
+            createSteps = existingSteps.map((step) => ({
+                sequence: step.sequence,
+                leftType: step.leftType,
+                leftValue: step.leftValue,
+                operator: step.operator,
+                rightType: step.rightType,
+                rightValue: step.rightValue,
+                resultKey: step.resultKey,
+            }));
+        }
+        if (createSteps.length === 0) {
+            return res.status(400).json((0, response_1.errorResponse)("At least one formula step is required"));
+        }
+        const lastVersion = await prisma_1.prisma.iKUFormula.findFirst({
+            where: { ikuId },
+            orderBy: { version: "desc" },
+            select: { version: true },
         });
-        res.json((0, response_1.successResponse)(updated, "Formula updated successfully"));
+        const nextVersion = (lastVersion?.version ?? 0) + 1;
+        const created = await prisma_1.prisma.$transaction([
+            prisma_1.prisma.iKUFormula.updateMany({
+                where: { ikuId, isActive: true },
+                data: { isActive: false },
+            }),
+            prisma_1.prisma.iKUFormula.create({
+                data: {
+                    ikuId,
+                    name,
+                    description,
+                    finalResultKey,
+                    isActive: true,
+                    version: nextVersion,
+                    details: { create: createSteps },
+                },
+            }),
+        ]);
+        const formula = created[1];
+        res.json((0, response_1.successResponse)(formula, "Formula updated successfully"));
     }
     catch (error) {
         next(error);

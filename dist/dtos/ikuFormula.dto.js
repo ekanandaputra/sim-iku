@@ -11,6 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IkuFormulaUpdateDto = exports.IkuFormulaCreateDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
+const ikuFormulaDetail_dto_1 = require("./ikuFormulaDetail.dto");
 class IkuFormulaCreateDto {
 }
 exports.IkuFormulaCreateDto = IkuFormulaCreateDto;
@@ -42,6 +44,13 @@ __decorate([
     (0, class_validator_1.IsBoolean)({ message: "isActive must be a boolean" }),
     __metadata("design:type", Boolean)
 ], IkuFormulaCreateDto.prototype, "isActive", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)({ message: "Steps must be an array" }),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ikuFormulaDetail_dto_1.IkuFormulaDetailCreateDto),
+    __metadata("design:type", Array)
+], IkuFormulaCreateDto.prototype, "steps", void 0);
 class IkuFormulaUpdateDto {
 }
 exports.IkuFormulaUpdateDto = IkuFormulaUpdateDto;
@@ -68,3 +77,10 @@ __decorate([
     (0, class_validator_1.IsBoolean)({ message: "isActive must be a boolean" }),
     __metadata("design:type", Boolean)
 ], IkuFormulaUpdateDto.prototype, "isActive", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)({ message: "Steps must be an array" }),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => ikuFormulaDetail_dto_1.IkuFormulaDetailCreateDto),
+    __metadata("design:type", Array)
+], IkuFormulaUpdateDto.prototype, "steps", void 0);
