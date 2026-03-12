@@ -74,13 +74,21 @@ export const getIkuFormulaById = async (
 
     const formula = await prisma.iKUFormula.findUnique({
       where: { id },
+      include: {
+        details: {
+          orderBy: { sequence: "asc" },
+        },
+      },
     });
 
     if (!formula || !formula.isActive) {
       return res.status(404).json(errorResponse("Formula not found"));
     }
 
-    res.json(successResponse(formula));
+    // Expose the formula steps as `steps` in the response for easier consumption
+    const { details: steps, ...formulaData } = formula;
+
+    res.json(successResponse({ ...formulaData, steps }));
   } catch (error) {
     next(error);
   }

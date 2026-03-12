@@ -179,7 +179,14 @@ export const listIkuComponents = async (
       return res.status(404).json(errorResponse("IKU not found"));
     }
 
-    const components = iku.components.map((c) => c.component);
+    const components = iku.components.map((c) => ({
+      id: c.component.id,
+      code: c.component.code,
+      name: c.component.name,
+      description: c.component.description,
+      dataType: c.component.dataType,
+      sourceType: c.component.sourceType,
+    }));
 
     res.json(successResponse(components));
   } catch (error) {
