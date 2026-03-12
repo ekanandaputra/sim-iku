@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteIku = exports.unmapComponentFromIku = exports.mapComponentToIku = exports.listIkuComponents = exports.updateIku = exports.createIku = exports.getIkuById = exports.listIkus = void 0;
+exports.deleteIku = exports.unmapComponentFromIku = exports.mapComponentToIku = exports.listIkuFormulasByIku = exports.listIkuComponents = exports.updateIku = exports.createIku = exports.getIkuById = exports.listIkus = void 0;
 const prisma_1 = require("../lib/prisma");
 const response_1 = require("../utils/response");
 /**
@@ -140,6 +140,37 @@ const listIkuComponents = async (req, res, next) => {
     }
 };
 exports.listIkuComponents = listIkuComponents;
+/**
+ * LIST IKU FORMULAS
+ * GET /api/ikus/:id/formulas
+ */
+const listIkuFormulasByIku = async (req, res, next) => {
+    try {
+        const id = req.params.id;
+        const iku = await prisma_1.prisma.iKU.findUnique({ where: { id } });
+        if (!iku) {
+            return res.status(404).json((0, response_1.errorResponse)("IKU not found"));
+        }
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+        const skip = (page - 1) * limit;
+        const includeInactive = req.query.includeInactive === "true";
+        const formulas = await prisma_1.prisma.iKUFormula.findMany({
+            where: {
+                ikuId: id,
+                ...(includeInactive ? {} : { isActive: true }),
+            },
+            skip,
+            take: limit,
+            orderBy: { createdAt: "desc" },
+        });
+        res.json((0, response_1.successResponse)(formulas));
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.listIkuFormulasByIku = listIkuFormulasByIku;
 /**
  * MAP COMPONENT TO IKU
  * POST /api/ikus/:id/components

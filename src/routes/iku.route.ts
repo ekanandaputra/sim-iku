@@ -6,6 +6,7 @@ import {
   updateIku,
   deleteIku,
   listIkuComponents,
+  listIkuFormulasByIku,
   mapComponentToIku,
   unmapComponentFromIku,
 } from "../controllers/iku.controller";
@@ -21,6 +22,7 @@ const router = Router();
 router.get("/", listIkus);
 router.get("/:id", getIkuById);
 router.get("/:id/components", listIkuComponents);
+router.get("/:id/formulas", listIkuFormulasByIku);
 router.post("/:id/components", validateBody(IkuComponentMappingDto), mapComponentToIku);
 router.delete("/:id/components/:componentId", unmapComponentFromIku);
 

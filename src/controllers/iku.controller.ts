@@ -9,6 +9,7 @@ type IkuParams = {
 type PaginationQuery = {
   page?: string;
   limit?: string;
+  includeInactive?: string;
 };
 
 /**
@@ -181,6 +182,45 @@ export const listIkuComponents = async (
     const components = iku.components.map((c) => c.component);
 
     res.json(successResponse(components));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * LIST IKU FORMULAS
+ * GET /api/ikus/:id/formulas
+ */
+export const listIkuFormulasByIku = async (
+  req: Request<IkuParams, {}, {}, PaginationQuery>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const id = req.params.id;
+
+    const iku = await prisma.iKU.findUnique({ where: { id } });
+    if (!iku) {
+      return res.status(404).json(errorResponse("IKU not found"));
+    }
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const includeInactive = req.query.includeInactive === "true";
+
+    const formulas = await prisma.iKUFormula.findMany({
+      where: {
+        ikuId: id,
+        ...(includeInactive ? {} : { isActive: true }),
+      },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(successResponse(formulas));
   } catch (error) {
     next(error);
   }

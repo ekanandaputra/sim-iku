@@ -10,6 +10,7 @@ const router = (0, express_1.Router)();
 router.get("/", iku_controller_1.listIkus);
 router.get("/:id", iku_controller_1.getIkuById);
 router.get("/:id/components", iku_controller_1.listIkuComponents);
+router.get("/:id/formulas", iku_controller_1.listIkuFormulasByIku);
 router.post("/:id/components", (0, validate_1.validateBody)(iku_dto_1.IkuComponentMappingDto), iku_controller_1.mapComponentToIku);
 router.delete("/:id/components/:componentId", iku_controller_1.unmapComponentFromIku);
 router.post("/", (0, validate_1.validateBody)(iku_dto_1.IkuCreateDto), iku_controller_1.createIku);

@@ -640,6 +640,58 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/ikus/{id}/formulas": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["IKU"],
+        summary: "List formulas for a given IKU",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "IKU id",
+          },
+          {
+            name: "page",
+            in: "query",
+            schema: { type: "integer", minimum: 1, default: 1 },
+            description: "Page number (1-based)",
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            description: "Number of items per page",
+          },
+          {
+            name: "includeInactive",
+            in: "query",
+            schema: { type: "boolean" },
+            description: "Include inactive formulas",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "List of formulas for the IKU",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponseListFormula" },
+              },
+            },
+          },
+          "404": {
+            description: "IKU not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/ikus/{id}/components": {
       security: [{ bearerAuth: [] }],
       get: {
