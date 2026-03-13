@@ -379,7 +379,7 @@ export const getFormulaComponents = async (
       where: { code: { in: Array.from(codes) } },
     });
 
-    res.json(successResponse({ formulaId, components }));
+    res.json(successResponse({ formulaId, steps }));
   } catch (error) {
     next(error);
   }
