@@ -362,24 +362,32 @@ export const getFormulaComponents = async (
       orderBy: { sequence: "asc" },
     });
 
-    console.log(steps);
+    // Filter steps where left or right type is 'component'
+    const componentSteps = steps.filter(
+      (step) => step.leftType === "component" || step.rightType === "component"
+    );
 
-    const codes = new Set<string>();
-    for (const step of steps) {
+    // Collect unique component codes
+    const componentCodes = new Set<string>();
+    componentSteps.forEach((step) => {
       if (step.leftType === "component") {
-        codes.add(step.leftValue);
+        componentCodes.add(step.leftValue);
       }
       if (step.rightType === "component") {
-        codes.add(step.rightValue);
+        componentCodes.add(step.rightValue);
       }
-    }
-
-    // load full component records for each unique code found in the formula steps
-    const components = await prisma.component.findMany({
-      where: { code: { in: Array.from(codes) } },
     });
 
-    res.json(successResponse({ formulaId, steps }));
+    // Query components
+    const components = await prisma.component.findMany({
+      where: {
+        code: {
+          in: Array.from(componentCodes),
+        },
+      },
+    });
+
+    res.json(successResponse({ formulaId, components }));
   } catch (error) {
     next(error);
   }
