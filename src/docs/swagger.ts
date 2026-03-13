@@ -338,10 +338,7 @@ const swaggerDefinition = {
           formulaId: { type: "string", format: "uuid" },
           components: {
             type: "array",
-            items: {
-              type: "object",
-              properties: { code: { type: "string" } },
-            },
+            items: { $ref: "#/components/schemas/Component" },
           },
         },
         required: ["formulaId", "components"],
@@ -1242,7 +1239,8 @@ const swaggerDefinition = {
       security: [{ bearerAuth: [] }],
       get: {
         tags: ["Formula"],
-        summary: "List component codes used by a formula",
+        summary: "List components used by a formula",
+        description: "Returns full component records referenced by the formula steps",
         parameters: [
           {
             name: "id",
@@ -1254,7 +1252,7 @@ const swaggerDefinition = {
         ],
         responses: {
           "200": {
-            description: "Component codes used by the formula",
+            description: "Components used by the formula",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/FormulaComponentList" },
