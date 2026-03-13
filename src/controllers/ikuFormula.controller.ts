@@ -362,6 +362,8 @@ export const getFormulaComponents = async (
       orderBy: { sequence: "asc" },
     });
 
+    console.log(steps);
+
     const codes = new Set<string>();
     for (const step of steps) {
       if (step.leftType === "component") {
