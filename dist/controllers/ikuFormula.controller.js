@@ -46,11 +46,18 @@ const getIkuFormulaById = async (req, res, next) => {
         const id = req.params.id;
         const formula = await prisma_1.prisma.iKUFormula.findUnique({
             where: { id },
+            include: {
+                details: {
+                    orderBy: { sequence: "asc" },
+                },
+            },
         });
         if (!formula || !formula.isActive) {
             return res.status(404).json((0, response_1.errorResponse)("Formula not found"));
         }
-        res.json((0, response_1.successResponse)(formula));
+        // Expose the formula steps as `steps` in the response for easier consumption
+        const { details: steps, ...formulaData } = formula;
+        res.json((0, response_1.successResponse)({ ...formulaData, steps }));
     }
     catch (error) {
         next(error);
@@ -284,7 +291,10 @@ const getFormulaComponents = async (req, res, next) => {
                 codes.add(step.rightValue);
             }
         }
-        const components = Array.from(codes).map((code) => ({ code }));
+        // load full component records for each unique code found in the formula steps
+        const components = await prisma_1.prisma.component.findMany({
+            where: { code: { in: Array.from(codes) } },
+        });
         res.json((0, response_1.successResponse)({ formulaId, components }));
     }
     catch (error) {

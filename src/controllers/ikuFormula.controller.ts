@@ -372,7 +372,10 @@ export const getFormulaComponents = async (
       }
     }
 
-    const components = Array.from(codes).map((code) => ({ code }));
+    // load full component records for each unique code found in the formula steps
+    const components = await prisma.component.findMany({
+      where: { code: { in: Array.from(codes) } },
+    });
 
     res.json(successResponse({ formulaId, components }));
   } catch (error) {

@@ -132,7 +132,14 @@ const listIkuComponents = async (req, res, next) => {
         if (!iku) {
             return res.status(404).json((0, response_1.errorResponse)("IKU not found"));
         }
-        const components = iku.components.map((c) => c.component);
+        const components = iku.components.map((c) => ({
+            id: c.component.id,
+            code: c.component.code,
+            name: c.component.name,
+            description: c.component.description,
+            dataType: c.component.dataType,
+            sourceType: c.component.sourceType,
+        }));
         res.json((0, response_1.successResponse)(components));
     }
     catch (error) {
