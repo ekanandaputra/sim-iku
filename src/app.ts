@@ -9,6 +9,9 @@ import authRouter from "./routes/auth.route";
 import ikuRouter from "./routes/iku.route";
 import componentRouter from "./routes/component.route";
 import ikuFormulaRouter from "./routes/ikuFormula.route";
+import periodRouter from "./routes/period.route";
+import componentRealizationRouter from "./routes/componentRealization.route";
+import ikuResultRouter from "./routes/ikuResult.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -24,6 +27,9 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/ikus", ikuRouter);
 app.use("/api/components", componentRouter);
+app.use("/api/periods", periodRouter);
+app.use("/api/component-realizations", componentRealizationRouter);
+app.use("/api/iku-results", ikuResultRouter);
 app.use("/api/iku-formulas", ikuFormulaRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));

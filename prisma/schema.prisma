@@ -35,6 +35,7 @@ model IKU {
   updatedAt   DateTime        @updatedAt @map("updated_at")
   components  IKUComponent[]
   formulas    IKUFormula[]
+  iku_results IkuResult[]
   @@map("ikus")
 }
 
@@ -48,6 +49,7 @@ model Component {
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   ikus        IKUComponent[]
+  realizations ComponentRealization[]
   @@map("components")
 }
 
@@ -123,4 +125,64 @@ model IKUFormulaDetail {
   @@index([formulaId])
   @@index([sequence])
   @@unique([formulaId, sequence])
+}
+
+model Period {
+  id_period      Int                 @id @default(autoincrement())
+  year           Int
+  period_type    PeriodType
+  period_value   Int
+  period_name    String
+  level          Int
+  parent_id      Int?
+  parent         Period?             @relation("PeriodChildren", fields: [parent_id], references: [id_period])
+  children       Period[]            @relation("PeriodChildren")
+  realizations   ComponentRealization[]
+  iku_results    IkuResult[]
+
+  @@map("periods")
+  @@unique([year, period_type, period_value])
+  @@index([parent_id])
+}
+
+model ComponentRealization {
+  id_realization Int      @id @default(autoincrement())
+  id_component   String
+  id_period      Int
+  value          Decimal  @db.Decimal(18, 4)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  period    Period    @relation(fields: [id_period], references: [id_period])
+  component Component @relation(fields: [id_component], references: [id])
+
+  @@map("component_realizations")
+  @@unique([id_component, id_period])
+  @@index([id_period])
+  @@index([id_component])
+}
+
+model IkuResult {
+  id_result       Int      @id @default(autoincrement())
+  id_iku          String
+  id_period       Int
+  calculated_value Decimal @db.Decimal(18, 4)
+  formula_version String?
+  calculated_at   DateTime @default(now())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  iku    IKU   @relation(fields: [id_iku], references: [id])
+  period Period @relation(fields: [id_period], references: [id_period])
+
+  @@map("iku_results")
+  @@unique([id_iku, id_period])
+  @@index([id_iku])
+  @@index([id_period])
+}
+
+enum PeriodType {
+  year
+  semester
+  quarter
 }
