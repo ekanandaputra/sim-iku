@@ -1754,6 +1754,183 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/periods": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["Period"],
+        summary: "List periods",
+        parameters: [
+          { name: "year", in: "query", schema: { type: "integer" }, description: "Filter by year" },
+          { name: "type", in: "query", schema: { type: "string" }, description: "Filter by period type" },
+          { name: "level", in: "query", schema: { type: "integer" }, description: "Filter by level" },
+          { name: "parentId", in: "query", schema: { type: "integer" }, description: "Filter by parent period id" },
+        ],
+        responses: {
+          "200": {
+            description: "List periods",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: { type: "array", items: { $ref: "#/components/schemas/Period" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Period"],
+        summary: "Create a period",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/PeriodCreate" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Period created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    message: { type: "string" },
+                    data: { $ref: "#/components/schemas/Period" },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation or business error",
+            content: {
+              "application/json": {
+                schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/periods/{id}": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["Period"],
+        summary: "Get period by ID",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        responses: {
+          "200": { description: "Period details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Period" } } } } } },
+          "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+      put: {
+        tags: ["Period"],
+        summary: "Update a period",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/PeriodUpdate" } } } },
+        responses: {
+          "200": { description: "Period updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/Period" } } } } } },
+          "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+      delete: {
+        tags: ["Period"],
+        summary: "Delete a period",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        responses: {
+          "200": { description: "Period deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } },
+          "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+    "/api/component-realizations": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["ComponentRealization"],
+        summary: "List component realizations",
+        parameters: [
+          { name: "idComponent", in: "query", schema: { type: "string" } },
+          { name: "idPeriod", in: "query", schema: { type: "integer" } },
+        ],
+        responses: { "200": { description: "List records", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/ComponentRealization" } } } } } } } },
+      },
+      post: {
+        tags: ["ComponentRealization"],
+        summary: "Create or update a component realization",
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationCreate" } } } },
+        responses: { "201": { description: "Created or updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "400": { description: "Validation or business error", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } } },
+      },
+    },
+    "/api/component-realizations/{id}": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["ComponentRealization"],
+        summary: "Get component realization by ID",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        responses: { "200": { description: "Details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+      put: {
+        tags: ["ComponentRealization"],
+        summary: "Update component realization value",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationUpdate" } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+      delete: {
+        tags: ["ComponentRealization"],
+        summary: "Delete component realization",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+    },
+    "/api/iku-results": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["IKUResult"],
+        summary: "List IKU results",
+        parameters: [
+          { name: "idIku", in: "query", schema: { type: "string" } },
+          { name: "idPeriod", in: "query", schema: { type: "integer" } },
+        ],
+        responses: { "200": { description: "List results", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/IkuResult" } } } } } } } },
+      },
+      post: {
+        tags: ["IKUResult"],
+        summary: "Create or update an IKU result",
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/IkuResultCreate" } } } },
+        responses: { "201": { description: "Created or updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "400": { description: "Validation or business error", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } } },
+      },
+    },
+    "/api/iku-results/{id}": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["IKUResult"],
+        summary: "Get IKU result by ID",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        responses: { "200": { description: "Details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+      put: {
+        tags: ["IKUResult"],
+        summary: "Update IKU result",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/IkuResultUpdate" } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+      delete: {
+        tags: ["IKUResult"],
+        summary: "Delete IKU result",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
+        responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+    },
   },
 };
 
