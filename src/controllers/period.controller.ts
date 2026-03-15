@@ -22,18 +22,18 @@ export const listPeriods = async (
       where.year = Number(req.query.year);
     }
     if (req.query.type) {
-      where.period_type = req.query.type;
+      where.periodType = req.query.type;
     }
     if (req.query.level) {
       where.level = Number(req.query.level);
     }
     if (req.query.parentId) {
-      where.parent_id = Number(req.query.parentId);
+      where.parentId = req.query.parentId;
     }
 
     const records = await prisma.period.findMany({
       where,
-      orderBy: [{ year: "desc" }, { level: "asc" }, { period_value: "asc" }],
+      orderBy: [{ year: "desc" }, { level: "asc" }, { periodValue: "asc" }],
       include: { children: true },
     });
     res.json(successResponse(records));
@@ -48,9 +48,9 @@ export const getPeriodById = async (
   next: NextFunction
 ) => {
   try {
-    const id = Number(req.params.id);
+    const id = req.params.id;
     const period = await prisma.period.findUnique({
-      where: { id_period: id },
+      where: { idPeriod: id },
       include: { parent: true, children: true },
     });
     if (!period) {
@@ -70,13 +70,11 @@ export const createPeriod = async (
   try {
     const { year, periodType, periodValue, periodName, level, parentId } = req.body;
 
-    const existing = await prisma.period.findUnique({
+    const existing = await prisma.period.findFirst({
       where: {
-        year_period_type_period_value: {
-          year,
-          period_type: periodType,
-          period_value: periodValue,
-        },
+        year,
+        periodType,
+        periodValue,
       },
     });
 
@@ -87,11 +85,11 @@ export const createPeriod = async (
     const period = await prisma.period.create({
       data: {
         year,
-        period_type: periodType,
-        period_value: periodValue,
-        period_name: periodName,
+        periodType,
+        periodValue,
+        periodName,
         level,
-        parent_id: parentId ?? null,
+        parentId: parentId ?? null,
       },
     });
 
@@ -107,23 +105,23 @@ export const updatePeriod = async (
   next: NextFunction
 ) => {
   try {
-    const id = Number(req.params.id);
+    const id = req.params.id;
     const { year, periodType, periodValue, periodName, level, parentId } = req.body;
 
-    const period = await prisma.period.findUnique({ where: { id_period: id } });
+    const period = await prisma.period.findUnique({ where: { idPeriod: id } });
     if (!period) {
       return res.status(404).json(errorResponse("Period not found"));
     }
 
     const updated = await prisma.period.update({
-      where: { id_period: id },
+      where: { idPeriod: id },
       data: {
         year: year ?? period.year,
-        period_type: periodType ?? period.period_type,
-        period_value: periodValue ?? period.period_value,
-        period_name: periodName ?? period.period_name,
+        periodType: periodType ?? period.periodType,
+        periodValue: periodValue ?? period.periodValue,
+        periodName: periodName ?? period.periodName,
         level: level ?? period.level,
-        parent_id: parentId ?? period.parent_id,
+        parentId: parentId ?? period.parentId,
       },
     });
 
@@ -139,14 +137,14 @@ export const deletePeriod = async (
   next: NextFunction
 ) => {
   try {
-    const id = Number(req.params.id);
-    const period = await prisma.period.findUnique({ where: { id_period: id } });
+    const id = req.params.id;
+    const period = await prisma.period.findUnique({ where: { idPeriod: id } });
 
     if (!period) {
       return res.status(404).json(errorResponse("Period not found"));
     }
 
-    await prisma.period.delete({ where: { id_period: id } });
+    await prisma.period.delete({ where: { idPeriod: id } });
     res.json(successResponse(null, "Period deleted successfully"));
   } catch (error) {
     next(error);

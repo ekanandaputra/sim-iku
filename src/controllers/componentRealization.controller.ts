@@ -16,12 +16,12 @@ export const listComponentRealizations = async (
 ) => {
   try {
     const where: any = {};
-    if (req.query.idComponent) where.id_component = req.query.idComponent;
-    if (req.query.idPeriod) where.id_period = Number(req.query.idPeriod);
+    if (req.query.idComponent) where.idComponent = req.query.idComponent;
+    if (req.query.idPeriod) where.idPeriod = req.query.idPeriod;
 
     const records = await prisma.componentRealization.findMany({
       where,
-      orderBy: [{ created_at: "desc" }],
+      orderBy: [{ createdAt: "desc" }],
       include: { period: true, component: true },
     });
     res.json(successResponse(records));
@@ -38,7 +38,7 @@ export const getComponentRealizationById = async (
   try {
     const id = Number(req.params.id);
     const record = await prisma.componentRealization.findUnique({
-      where: { id_realization: id },
+      where: { idRealization: id },
       include: { period: true, component: true },
     });
 
@@ -61,14 +61,14 @@ export const createComponentRealization = async (
 
     const record = await prisma.componentRealization.upsert({
       where: {
-        id_component_id_period: {
-          id_component: idComponent,
-          id_period: idPeriod,
+        idComponent_idPeriod: {
+          idComponent,
+          idPeriod,
         },
       },
       create: {
-        id_component: idComponent,
-        id_period: idPeriod,
+        idComponent,
+        idPeriod,
         value,
       },
       update: {
@@ -93,13 +93,13 @@ export const updateComponentRealization = async (
     const id = Number(req.params.id);
     const { value } = req.body;
 
-    const existing = await prisma.componentRealization.findUnique({ where: { id_realization: id } });
+    const existing = await prisma.componentRealization.findUnique({ where: { idRealization: id } });
     if (!existing) {
       return res.status(404).json(errorResponse("Component realization not found"));
     }
 
     const updated = await prisma.componentRealization.update({
-      where: { id_realization: id },
+      where: { idRealization: id },
       data: { value },
     });
 
@@ -116,11 +116,11 @@ export const deleteComponentRealization = async (
 ) => {
   try {
     const id = Number(req.params.id);
-    const existing = await prisma.componentRealization.findUnique({ where: { id_realization: id } });
+    const existing = await prisma.componentRealization.findUnique({ where: { idRealization: id } });
     if (!existing) {
       return res.status(404).json(errorResponse("Component realization not found"));
     }
-    await prisma.componentRealization.delete({ where: { id_realization: id } });
+    await prisma.componentRealization.delete({ where: { idRealization: id } });
     res.json(successResponse(null, "Component realization deleted successfully"));
   } catch (error) {
     next(error);

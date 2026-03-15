@@ -26,8 +26,8 @@ export class PeriodCreateDto {
   level!: number;
 
   @IsOptional()
-  @IsInt({ message: "parentId must be an integer" })
-  parentId?: number;
+  @IsString({ message: "parentId must be a string" })
+  parentId?: string;
 }
 
 export class PeriodUpdateDto {
@@ -55,6 +55,6 @@ export class PeriodUpdateDto {
   level?: number;
 
   @IsOptional()
-  @IsInt({ message: "parentId must be an integer" })
-  parentId?: number;
+  @IsString({ message: "parentId must be a string" })
+  parentId?: string;
 }

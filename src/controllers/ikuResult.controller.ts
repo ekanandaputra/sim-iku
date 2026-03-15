@@ -16,13 +16,13 @@ export const listIkuResults = async (
 ) => {
   try {
     const where: any = {};
-    if (req.query.idIku) where.id_iku = req.query.idIku;
-    if (req.query.idPeriod) where.id_period = Number(req.query.idPeriod);
+    if (req.query.idIku) where.idIku = req.query.idIku;
+    if (req.query.idPeriod) where.idPeriod = req.query.idPeriod;
 
     const results = await prisma.ikuResult.findMany({
       where,
       include: { iku: true, period: true },
-      orderBy: [{ created_at: "desc" }],
+      orderBy: [{ createdAt: "desc" }],
     });
     res.json(successResponse(results));
   } catch (error) {
@@ -38,7 +38,7 @@ export const getIkuResultById = async (
   try {
     const id = Number(req.params.id);
     const result = await prisma.ikuResult.findUnique({
-      where: { id_result: id },
+      where: { idResult: id },
       include: { iku: true, period: true },
     });
     if (!result) {
@@ -63,29 +63,29 @@ export const createIkuResult = async (
       return res.status(404).json(errorResponse("IKU not found"));
     }
 
-    const period = await prisma.period.findUnique({ where: { id_period: idPeriod } });
+    const period = await prisma.period.findUnique({ where: { idPeriod: idPeriod } });
     if (!period) {
       return res.status(404).json(errorResponse("Period not found"));
     }
 
     const record = await prisma.ikuResult.upsert({
       where: {
-        id_iku_id_period: {
-          id_iku: idIku,
-          id_period: idPeriod,
+        idIku_idPeriod: {
+          idIku: idIku,
+          idPeriod: idPeriod,
         },
       },
       create: {
-        id_iku: idIku,
-        id_period: idPeriod,
-        calculated_value: calculatedValue,
-        formula_version: formulaVersion ?? null,
-        calculated_at: calculatedAt ? new Date(calculatedAt) : new Date(),
+        idIku: idIku,
+        idPeriod: idPeriod,
+        calculatedValue: calculatedValue,
+        formulaVersion: formulaVersion ?? null,
+        calculatedAt: calculatedAt ? new Date(calculatedAt) : new Date(),
       },
       update: {
-        calculated_value: calculatedValue,
-        formula_version: formulaVersion ?? undefined,
-        calculated_at: calculatedAt ? new Date(calculatedAt) : undefined,
+        calculatedValue: calculatedValue,
+        formulaVersion: formulaVersion ?? undefined,
+        calculatedAt: calculatedAt ? new Date(calculatedAt) : undefined,
       },
       include: { iku: true, period: true },
     });
@@ -105,17 +105,17 @@ export const updateIkuResult = async (
     const id = Number(req.params.id);
     const { calculatedValue, formulaVersion, calculatedAt } = req.body;
 
-    const existing = await prisma.ikuResult.findUnique({ where: { id_result: id } });
+    const existing = await prisma.ikuResult.findUnique({ where: { idResult: id } });
     if (!existing) {
       return res.status(404).json(errorResponse("IKU result not found"));
     }
 
     const updated = await prisma.ikuResult.update({
-      where: { id_result: id },
+      where: { idResult: id },
       data: {
-        calculated_value: calculatedValue ?? existing.calculated_value,
-        formula_version: formulaVersion ?? existing.formula_version,
-        calculated_at: calculatedAt ? new Date(calculatedAt) : existing.calculated_at,
+        calculatedValue: calculatedValue ?? existing.calculatedValue,
+        formulaVersion: formulaVersion ?? existing.formulaVersion,
+        calculatedAt: calculatedAt ? new Date(calculatedAt) : existing.calculatedAt,
       },
     });
 
@@ -132,11 +132,11 @@ export const deleteIkuResult = async (
 ) => {
   try {
     const id = Number(req.params.id);
-    const existing = await prisma.ikuResult.findUnique({ where: { id_result: id } });
+    const existing = await prisma.ikuResult.findUnique({ where: { idResult: id } });
     if (!existing) {
       return res.status(404).json(errorResponse("IKU result not found"));
     }
-    await prisma.ikuResult.delete({ where: { id_result: id } });
+    await prisma.ikuResult.delete({ where: { idResult: id } });
     res.json(successResponse(null, "IKU result deleted successfully"));
   } catch (error) {
     next(error);

@@ -128,57 +128,57 @@ model IKUFormulaDetail {
 }
 
 model Period {
-  id_period      Int                 @id @default(autoincrement())
-  year           Int
-  period_type    PeriodType
-  period_value   Int
-  period_name    String
-  level          Int
-  parent_id      Int?
-  parent         Period?             @relation("PeriodChildren", fields: [parent_id], references: [id_period])
-  children       Period[]            @relation("PeriodChildren")
-  realizations   ComponentRealization[]
-  iku_results    IkuResult[]
+  idPeriod      String           @id @default(uuid()) @db.VarChar(36) @map("id")
+  year          Int
+  periodType    PeriodType       @map("period_type")
+  periodValue   Int              @map("period_value")
+  periodName    String           @map("period_name")
+  level         Int
+  parentId      String?          @db.VarChar(36) @map("parent_id")
+  parent        Period?          @relation("PeriodChildren", fields: [parentId], references: [idPeriod])
+  children      Period[]         @relation("PeriodChildren")
+  realizations  ComponentRealization[]
+  ikuResults    IkuResult[]
 
   @@map("periods")
-  @@unique([year, period_type, period_value])
-  @@index([parent_id])
+  @@unique([year, periodType, periodValue])
+  @@index([parentId])
 }
 
 model ComponentRealization {
-  id_realization Int      @id @default(autoincrement())
-  id_component   String
-  id_period      Int
-  value          Decimal  @db.Decimal(18, 4)
-  created_at     DateTime @default(now())
-  updated_at     DateTime @updatedAt
+  idRealization Int      @id @default(autoincrement()) @map("id")
+  idComponent   String   @map("id_component")
+  idPeriod      String   @db.VarChar(36) @map("id_period")
+  value         Decimal  @db.Decimal(18, 4)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  period    Period    @relation(fields: [id_period], references: [id_period])
-  component Component @relation(fields: [id_component], references: [id])
+  period    Period    @relation(fields: [idPeriod], references: [idPeriod])
+  component Component @relation(fields: [idComponent], references: [id])
 
   @@map("component_realizations")
-  @@unique([id_component, id_period])
-  @@index([id_period])
-  @@index([id_component])
+  @@unique([idComponent, idPeriod])
+  @@index([idPeriod])
+  @@index([idComponent])
 }
 
 model IkuResult {
-  id_result       Int      @id @default(autoincrement())
-  id_iku          String
-  id_period       Int
-  calculated_value Decimal @db.Decimal(18, 4)
-  formula_version String?
-  calculated_at   DateTime @default(now())
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  idResult        Int      @id @default(autoincrement()) @map("id")
+  idIku           String   @map("id_iku")
+  idPeriod        String   @db.VarChar(36) @map("id_period")
+  calculatedValue Decimal  @db.Decimal(18, 4) @map("calculated_value")
+  formulaVersion  String?  @map("formula_version")
+  calculatedAt    DateTime @default(now()) @map("calculated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  iku    IKU   @relation(fields: [id_iku], references: [id])
-  period Period @relation(fields: [id_period], references: [id_period])
+  iku    IKU   @relation(fields: [idIku], references: [id])
+  period Period @relation(fields: [idPeriod], references: [idPeriod])
 
   @@map("iku_results")
-  @@unique([id_iku, id_period])
-  @@index([id_iku])
-  @@index([id_period])
+  @@unique([idIku, idPeriod])
+  @@index([idIku])
+  @@index([idPeriod])
 }
 
 enum PeriodType {

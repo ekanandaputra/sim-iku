@@ -1,4 +1,4 @@
-import { IsDecimal, IsInt, IsNotEmpty, IsNumber, Min } from "class-validator";
+import { IsDecimal, IsInt, IsNotEmpty, IsNumber, Min, IsString } from "class-validator";
 
 export class ComponentRealizationCreateDto {
   @IsNotEmpty({ message: "idComponent is required" })
@@ -6,8 +6,8 @@ export class ComponentRealizationCreateDto {
   idComponent!: string;
 
   @IsNotEmpty({ message: "idPeriod is required" })
-  @IsInt({ message: "idPeriod must be an integer" })
-  idPeriod!: number;
+  @IsString({ message: "idPeriod must be a UUID string" })
+  idPeriod!: string;
 
   @IsNotEmpty({ message: "value is required" })
   @IsNumber({}, { message: "value must be a numeric value" })
