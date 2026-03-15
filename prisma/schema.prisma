@@ -146,7 +146,7 @@ model Period {
 }
 
 model ComponentRealization {
-  idRealization Int      @id @default(autoincrement()) @map("id")
+  idRealization String   @id @default(uuid()) @db.VarChar(36) @map("id")
   idComponent   String   @map("id_component")
   idPeriod      String   @db.VarChar(36) @map("id_period")
   value         Decimal  @db.Decimal(18, 4)
@@ -163,7 +163,7 @@ model ComponentRealization {
 }
 
 model IkuResult {
-  idResult        Int      @id @default(autoincrement()) @map("id")
+  idResult        String   @id @default(uuid()) @db.VarChar(36) @map("id")
   idIku           String   @map("id_iku")
   idPeriod        String   @db.VarChar(36) @map("id_period")
   calculatedValue Decimal  @db.Decimal(18, 4) @map("calculated_value")

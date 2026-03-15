@@ -36,7 +36,7 @@ export const getIkuResultById = async (
   next: NextFunction
 ) => {
   try {
-    const id = Number(req.params.id);
+    const id = req.params.id;
     const result = await prisma.ikuResult.findUnique({
       where: { idResult: id },
       include: { iku: true, period: true },
@@ -102,7 +102,7 @@ export const updateIkuResult = async (
   next: NextFunction
 ) => {
   try {
-    const id = Number(req.params.id);
+    const id = req.params.id;
     const { calculatedValue, formulaVersion, calculatedAt } = req.body;
 
     const existing = await prisma.ikuResult.findUnique({ where: { idResult: id } });
@@ -131,7 +131,7 @@ export const deleteIkuResult = async (
   next: NextFunction
 ) => {
   try {
-    const id = Number(req.params.id);
+    const id = req.params.id;
     const existing = await prisma.ikuResult.findUnique({ where: { idResult: id } });
     if (!existing) {
       return res.status(404).json(errorResponse("IKU result not found"));
