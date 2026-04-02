@@ -282,18 +282,25 @@ const getFormulaComponents = async (req, res, next) => {
             where: { formulaId },
             orderBy: { sequence: "asc" },
         });
-        const codes = new Set();
-        for (const step of steps) {
+        // Filter steps where left or right type is 'component'
+        const componentSteps = steps.filter((step) => step.leftType === "component" || step.rightType === "component");
+        // Collect unique component codes
+        const componentCodes = new Set();
+        componentSteps.forEach((step) => {
             if (step.leftType === "component") {
-                codes.add(step.leftValue);
+                componentCodes.add(step.leftValue);
             }
             if (step.rightType === "component") {
-                codes.add(step.rightValue);
+                componentCodes.add(step.rightValue);
             }
-        }
-        // load full component records for each unique code found in the formula steps
+        });
+        // Query components
         const components = await prisma_1.prisma.component.findMany({
-            where: { code: { in: Array.from(codes) } },
+            where: {
+                code: {
+                    in: Array.from(componentCodes),
+                },
+            },
         });
         res.json((0, response_1.successResponse)({ formulaId, components }));
     }

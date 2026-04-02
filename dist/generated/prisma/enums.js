@@ -9,7 +9,7 @@
 * 🟢 You can import this file directly.
 */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FormulaOperator = exports.FormulaOperandType = exports.ComponentSourceType = exports.ComponentDataType = void 0;
+exports.PeriodType = exports.FormulaOperator = exports.FormulaOperandType = exports.ComponentSourceType = exports.ComponentDataType = void 0;
 exports.ComponentDataType = {
     number: 'number',
     percentage: 'percentage',
@@ -30,4 +30,9 @@ exports.FormulaOperator = {
     SUB: 'SUB',
     MUL: 'MUL',
     DIV: 'DIV'
+};
+exports.PeriodType = {
+    year: 'year',
+    semester: 'semester',
+    quarter: 'quarter'
 };

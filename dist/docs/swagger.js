@@ -23,6 +23,9 @@ const swaggerDefinition = {
         { name: "IKU", description: "IKU management endpoints" },
         { name: "Component", description: "Component management endpoints" },
         { name: "Formula", description: "IKU formula calculation and management" },
+        { name: "Period", description: "Period management endpoints" },
+        { name: "ComponentRealization", description: "Component realization endpoints" },
+        { name: "IKUResult", description: "IKU result endpoints" },
     ],
     security: [{ bearerAuth: [] }],
     components: {
@@ -342,10 +345,7 @@ const swaggerDefinition = {
                     formulaId: { type: "string", format: "uuid" },
                     components: {
                         type: "array",
-                        items: {
-                            type: "object",
-                            properties: { code: { type: "string" } },
-                        },
+                        items: { $ref: "#/components/schemas/Component" },
                     },
                 },
                 required: ["formulaId", "components"],
@@ -384,6 +384,108 @@ const swaggerDefinition = {
                         },
                         required: ["result", "steps"],
                     },
+                },
+            },
+            Period: {
+                type: "object",
+                properties: {
+                    idPeriod: { type: "string", format: "uuid" },
+                    year: { type: "integer" },
+                    periodType: { type: "string" },
+                    periodValue: { type: "integer" },
+                    periodName: { type: "string" },
+                    level: { type: "integer" },
+                    parentId: { type: ["string", "null"], format: "uuid" },
+                    createdAt: { type: "string", format: "date-time" },
+                    updatedAt: { type: "string", format: "date-time" },
+                },
+                required: ["idPeriod", "year", "periodType", "periodValue", "periodName", "level"],
+            },
+            PeriodCreate: {
+                type: "object",
+                properties: {
+                    year: { type: "integer" },
+                    periodType: { type: "string" },
+                    periodValue: { type: "integer" },
+                    periodName: { type: "string" },
+                    level: { type: "integer" },
+                    parentId: { type: "integer" },
+                },
+                required: ["year", "periodType", "periodValue", "periodName", "level"],
+            },
+            PeriodUpdate: {
+                type: "object",
+                properties: {
+                    year: { type: "integer" },
+                    periodType: { type: "string" },
+                    periodValue: { type: "integer" },
+                    periodName: { type: "string" },
+                    level: { type: "integer" },
+                    parentId: { type: "integer" },
+                },
+            },
+            ComponentRealization: {
+                type: "object",
+                properties: {
+                    idRealization: { type: "integer" },
+                    idComponent: { type: "string" },
+                    idPeriod: { type: "string", format: "uuid" },
+                    value: { type: "number" },
+                    createdAt: { type: "string", format: "date-time" },
+                    updatedAt: { type: "string", format: "date-time" },
+                    component: { type: "object" },
+                    period: { type: "object" },
+                },
+                required: ["idRealization", "idComponent", "idPeriod", "value"],
+            },
+            ComponentRealizationCreate: {
+                type: "object",
+                properties: {
+                    idComponent: { type: "string" },
+                    idPeriod: { type: "string", format: "uuid" },
+                    value: { type: "number" },
+                },
+                required: ["idComponent", "idPeriod", "value"],
+            },
+            ComponentRealizationUpdate: {
+                type: "object",
+                properties: {
+                    value: { type: "number" },
+                },
+                required: ["value"],
+            },
+            IkuResult: {
+                type: "object",
+                properties: {
+                    idResult: { type: "integer" },
+                    idIku: { type: "string" },
+                    idPeriod: { type: "string", format: "uuid" },
+                    calculatedValue: { type: "number" },
+                    formulaVersion: { type: ["string", "null"] },
+                    calculatedAt: { type: "string", format: "date-time" },
+                    createdAt: { type: "string", format: "date-time" },
+                    updatedAt: { type: "string", format: "date-time" },
+                    iku: { type: "object" },
+                    period: { type: "object" },
+                },
+                required: ["idResult", "idIku", "idPeriod", "calculatedValue", "calculatedAt"],
+            },
+            IkuResultCreate: {
+                type: "object",
+                properties: {
+                    idIku: { type: "string" },
+                    idPeriod: { type: "string", format: "uuid" },
+                    calculatedValue: { type: "number" }, formulaVersion: { type: "string" },
+                    calculatedAt: { type: "string", format: "date-time" },
+                },
+                required: ["idIku", "idPeriod", "calculatedValue"],
+            },
+            IkuResultUpdate: {
+                type: "object",
+                properties: {
+                    calculatedValue: { type: "number" },
+                    formulaVersion: { type: "string" },
+                    calculatedAt: { type: "string", format: "date-time" },
                 },
             },
         },
@@ -1246,7 +1348,8 @@ const swaggerDefinition = {
             security: [{ bearerAuth: [] }],
             get: {
                 tags: ["Formula"],
-                summary: "List component codes used by a formula",
+                summary: "List components used by a formula",
+                description: "Returns full component records referenced by the formula steps",
                 parameters: [
                     {
                         name: "id",
@@ -1258,7 +1361,7 @@ const swaggerDefinition = {
                 ],
                 responses: {
                     "200": {
-                        description: "Component codes used by the formula",
+                        description: "Components used by the formula",
                         content: {
                             "application/json": {
                                 schema: { $ref: "#/components/schemas/FormulaComponentList" },
@@ -1652,6 +1755,183 @@ const swaggerDefinition = {
                         },
                     },
                 },
+            },
+        },
+        "/api/periods": {
+            security: [{ bearerAuth: [] }],
+            get: {
+                tags: ["Period"],
+                summary: "List periods",
+                parameters: [
+                    { name: "year", in: "query", schema: { type: "integer" }, description: "Filter by year" },
+                    { name: "type", in: "query", schema: { type: "string" }, description: "Filter by period type" },
+                    { name: "level", in: "query", schema: { type: "integer" }, description: "Filter by level" },
+                    { name: "parentId", in: "query", schema: { type: "integer" }, description: "Filter by parent period id" },
+                ],
+                responses: {
+                    "200": {
+                        description: "List periods",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        success: { type: "boolean" },
+                                        data: { type: "array", items: { $ref: "#/components/schemas/Period" } },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            post: {
+                tags: ["Period"],
+                summary: "Create a period",
+                requestBody: {
+                    required: true,
+                    content: {
+                        "application/json": {
+                            schema: { $ref: "#/components/schemas/PeriodCreate" },
+                        },
+                    },
+                },
+                responses: {
+                    "201": {
+                        description: "Period created successfully",
+                        content: {
+                            "application/json": {
+                                schema: {
+                                    type: "object",
+                                    properties: {
+                                        success: { type: "boolean" },
+                                        message: { type: "string" },
+                                        data: { $ref: "#/components/schemas/Period" },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    "400": {
+                        description: "Validation or business error",
+                        content: {
+                            "application/json": {
+                                schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        "/api/periods/{id}": {
+            security: [{ bearerAuth: [] }],
+            get: {
+                tags: ["Period"],
+                summary: "Get period by ID",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                responses: {
+                    "200": { description: "Period details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Period" } } } } } },
+                    "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+                },
+            },
+            put: {
+                tags: ["Period"],
+                summary: "Update a period",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/PeriodUpdate" } } } },
+                responses: {
+                    "200": { description: "Period updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/Period" } } } } } },
+                    "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+                },
+            },
+            delete: {
+                tags: ["Period"],
+                summary: "Delete a period",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                responses: {
+                    "200": { description: "Period deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } },
+                    "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+                },
+            },
+        },
+        "/api/component-realizations": {
+            security: [{ bearerAuth: [] }],
+            get: {
+                tags: ["ComponentRealization"],
+                summary: "List component realizations",
+                parameters: [
+                    { name: "idComponent", in: "query", schema: { type: "string" } },
+                    { name: "idPeriod", in: "query", schema: { type: "string", format: "uuid" } },
+                ],
+                responses: { "200": { description: "List records", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/ComponentRealization" } } } } } } } },
+            },
+            post: {
+                tags: ["ComponentRealization"],
+                summary: "Create or update a component realization",
+                requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationCreate" } } } },
+                responses: { "201": { description: "Created or updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "400": { description: "Validation or business error", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } } },
+            },
+        },
+        "/api/component-realizations/{id}": {
+            security: [{ bearerAuth: [] }],
+            get: {
+                tags: ["ComponentRealization"],
+                summary: "Get component realization by ID",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                responses: { "200": { description: "Details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+            },
+            put: {
+                tags: ["ComponentRealization"],
+                summary: "Update component realization value",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationUpdate" } } } },
+                responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+            },
+            delete: {
+                tags: ["ComponentRealization"],
+                summary: "Delete component realization",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+            },
+        },
+        "/api/iku-results": {
+            security: [{ bearerAuth: [] }],
+            get: {
+                tags: ["IKUResult"],
+                summary: "List IKU results",
+                parameters: [
+                    { name: "idIku", in: "query", schema: { type: "string" } },
+                    { name: "idPeriod", in: "query", schema: { type: "string", format: "uuid" } },
+                ],
+                responses: { "200": { description: "List results", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/IkuResult" } } } } } } } },
+            },
+            post: {
+                tags: ["IKUResult"],
+                summary: "Create or update an IKU result",
+                requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/IkuResultCreate" } } } },
+                responses: { "201": { description: "Created or updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "400": { description: "Validation or business error", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } } },
+            },
+        },
+        "/api/iku-results/{id}": {
+            security: [{ bearerAuth: [] }],
+            get: {
+                tags: ["IKUResult"],
+                summary: "Get IKU result by ID",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                responses: { "200": { description: "Details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+            },
+            put: {
+                tags: ["IKUResult"],
+                summary: "Update IKU result",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/IkuResultUpdate" } } } },
+                responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+            },
+            delete: {
+                tags: ["IKUResult"],
+                summary: "Delete IKU result",
+                parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+                responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
             },
         },
     },
