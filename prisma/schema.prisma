@@ -36,8 +36,10 @@ model IKU {
   components  IKUComponent[]
   formulas    IKUFormula[]
   iku_results IkuResult[]
+  targets     IkuTarget[]
   @@map("ikus")
 }
+
 
 model Component {
   id          String          @id @default(uuid()) @db.VarChar(36)
@@ -50,6 +52,7 @@ model Component {
   updatedAt   DateTime        @updatedAt @map("updated_at")
   ikus        IKUComponent[]
   realizations ComponentRealization[]
+  targets     ComponentTarget[]
   @@map("components")
 }
 
@@ -185,4 +188,40 @@ enum PeriodType {
   year
   semester
   quarter
+}
+
+model IkuTarget {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  ikuId      String   @db.VarChar(36) @map("iku_id")
+  year       Int
+  targetQ1   Decimal? @db.Decimal(18, 4) @map("target_q1")
+  targetQ2   Decimal? @db.Decimal(18, 4) @map("target_q2")
+  targetQ3   Decimal? @db.Decimal(18, 4) @map("target_q3")
+  targetQ4   Decimal? @db.Decimal(18, 4) @map("target_q4")
+  targetYear Decimal? @db.Decimal(18, 4) @map("target_year")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  iku        IKU      @relation(fields: [ikuId], references: [id])
+
+  @@unique([ikuId, year])
+  @@map("iku_targets")
+}
+
+model ComponentTarget {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  componentId String    @db.VarChar(36) @map("component_id")
+  year        Int
+  targetQ1    Decimal?  @db.Decimal(18, 4) @map("target_q1")
+  targetQ2    Decimal?  @db.Decimal(18, 4) @map("target_q2")
+  targetQ3    Decimal?  @db.Decimal(18, 4) @map("target_q3")
+  targetQ4    Decimal?  @db.Decimal(18, 4) @map("target_q4")
+  targetYear  Decimal?  @db.Decimal(18, 4) @map("target_year")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  component   Component @relation(fields: [componentId], references: [id])
+
+  @@unique([componentId, year])
+  @@map("component_targets")
 }
