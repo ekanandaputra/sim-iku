@@ -26,6 +26,13 @@ enum ComponentSourceType {
   manual
 }
 
+enum ComponentPeriodType {
+  monthly
+  quarter
+  semester
+  yearly
+}
+
 model IKU {
   id          String          @id @default(uuid()) @db.VarChar(36)
   code        String          @unique
@@ -48,6 +55,7 @@ model Component {
   description String?
   dataType    ComponentDataType @map("data_type")
   sourceType  ComponentSourceType @map("source_type")
+  periodType  ComponentPeriodType @default(yearly) @map("period_type")
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")
   ikus        IKUComponent[]
@@ -140,7 +148,6 @@ model Period {
   parentId      String?          @db.VarChar(36) @map("parent_id")
   parent        Period?          @relation("PeriodChildren", fields: [parentId], references: [idPeriod])
   children      Period[]         @relation("PeriodChildren")
-  realizations  ComponentRealization[]
   ikuResults    IkuResult[]
 
   @@map("periods")
@@ -151,17 +158,16 @@ model Period {
 model ComponentRealization {
   idRealization String   @id @default(uuid()) @db.VarChar(36) @map("id")
   idComponent   String   @map("id_component")
-  idPeriod      String   @db.VarChar(36) @map("id_period")
+  month         Int
+  year          Int
   value         Decimal  @db.Decimal(18, 4)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  period    Period    @relation(fields: [idPeriod], references: [idPeriod])
   component Component @relation(fields: [idComponent], references: [id])
 
   @@map("component_realizations")
-  @@unique([idComponent, idPeriod])
-  @@index([idPeriod])
+  @@unique([idComponent, month, year])
   @@index([idComponent])
 }
 

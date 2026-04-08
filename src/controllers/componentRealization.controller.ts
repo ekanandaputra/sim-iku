@@ -7,11 +7,13 @@ type RealizationParams = { id: string };
 
 type RealizationQuery = {
   idComponent?: string;
-  idPeriod?: string;
+  month?: string;
+  year?: string;
 };
 
-async function calculateIkuResultsForComponentRealization(idComponent: string, idPeriod: string) {
-  console.log("Calculating IKU results for component realization", { idComponent, idPeriod });
+async function calculateIkuResultsForComponentRealization(idComponent: string, month: number, year: number) {
+  const quarter = Math.ceil(month / 3);
+  console.log("Calculating IKU results for component realization", { idComponent, month, year, quarter });
   const component = await prisma.component.findUnique({ where: { id: idComponent } });
   if (!component) {
     return;
@@ -41,6 +43,17 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, i
     return;
   }
 
+  const period = await prisma.period.findFirst({
+    where: { year, periodType: "quarter", periodValue: quarter }
+  });
+
+  if (!period) {
+    console.log(`No target period quarter found for year ${year} and quarter ${quarter}`);
+    return;
+  }
+
+  const idPeriod = period.idPeriod;
+
   for (const formula of activeFormulas) {
     const componentCodes = new Set<string>();
     for (const detail of formula.details) {
@@ -66,9 +79,14 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, i
       components.forEach((c) => codeToId.set(c.code, c.id));
 
       const componentIds = components.map((c) => c.id);
+      
+      const startMonth = (quarter - 1) * 3 + 1;
+      const endMonth = quarter * 3;
+
       const realizations = await prisma.componentRealization.findMany({
         where: {
-          idPeriod,
+          month: { gte: startMonth, lte: endMonth },
+          year,
           idComponent: { in: componentIds },
         },
       });
@@ -77,7 +95,7 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, i
       for (const realization of realizations) {
         const found = components.find((c) => c.id === realization.idComponent);
         if (found) {
-          componentValues[found.code] = Number(realization.value);
+          componentValues[found.code] = (componentValues[found.code] || 0) + Number(realization.value);
         }
       }
 
@@ -125,12 +143,13 @@ export const listComponentRealizations = async (
   try {
     const where: any = {};
     if (req.query.idComponent) where.idComponent = req.query.idComponent;
-    if (req.query.idPeriod) where.idPeriod = req.query.idPeriod;
+    if (req.query.month) where.month = parseInt(req.query.month);
+    if (req.query.year) where.year = parseInt(req.query.year);
 
     const records = await prisma.componentRealization.findMany({
       where,
-      orderBy: [{ createdAt: "desc" }],
-      include: { period: true, component: true },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      include: { component: true },
     });
     res.json(successResponse(records));
   } catch (error) {
@@ -147,7 +166,7 @@ export const getComponentRealizationById = async (
     const id = req.params.id;
     const record = await prisma.componentRealization.findUnique({
       where: { idRealization: id },
-      include: { period: true, component: true },
+      include: { component: true },
     });
 
     if (!record) {
@@ -165,27 +184,29 @@ export const createComponentRealization = async (
   next: NextFunction
 ) => {
   try {
-    const { idComponent, idPeriod, value } = req.body;
+    const { idComponent, month, year, value } = req.body;
 
     const record = await prisma.componentRealization.upsert({
       where: {
-        idComponent_idPeriod: {
+        idComponent_month_year: {
           idComponent,
-          idPeriod,
+          month,
+          year,
         },
       },
       create: {
         idComponent,
-        idPeriod,
+        month,
+        year,
         value,
       },
       update: {
         value,
       },
-      include: { period: true, component: true },
+      include: { component: true },
     });
 
-    await calculateIkuResultsForComponentRealization(idComponent, idPeriod);
+    await calculateIkuResultsForComponentRealization(idComponent, month, year);
 
     res.status(201).json(successResponse(record, "Component realization created or updated successfully"));
   } catch (error) {
@@ -212,7 +233,7 @@ export const updateComponentRealization = async (
       data: { value },
     });
 
-    await calculateIkuResultsForComponentRealization(updated.idComponent, updated.idPeriod);
+    await calculateIkuResultsForComponentRealization(updated.idComponent, updated.month, updated.year);
 
     res.json(successResponse(updated, "Component realization updated successfully"));
   } catch (error) {

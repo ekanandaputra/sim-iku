@@ -73,7 +73,7 @@ export const createComponent = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, dataType, sourceType } = req.body;
+    const { code, name, description, dataType, sourceType, periodType } = req.body;
 
     const existing = await prisma.component.findUnique({
       where: { code },
@@ -90,6 +90,7 @@ export const createComponent = async (
         description,
         dataType,
         sourceType,
+        periodType,
       },
     });
 
@@ -110,7 +111,7 @@ export const updateComponent = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, dataType, sourceType } = req.body;
+    const { code, name, description, dataType, sourceType, periodType } = req.body;
 
     const existing = await prisma.component.findUnique({
       where: { id },
@@ -138,6 +139,7 @@ export const updateComponent = async (
         description,
         dataType,
         sourceType,
+        periodType,
       },
     });
 
