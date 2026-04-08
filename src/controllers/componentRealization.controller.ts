@@ -184,7 +184,7 @@ export const createComponentRealization = async (
   next: NextFunction
 ) => {
   try {
-    const { idComponent, month, year, value } = req.body;
+    const { idComponent, month, year, value, documentIds } = req.body;
 
     const record = await prisma.componentRealization.upsert({
       where: {
@@ -206,6 +206,24 @@ export const createComponentRealization = async (
       include: { component: true },
     });
 
+    if (documentIds && Array.isArray(documentIds)) {
+      for (const docId of documentIds) {
+        await prisma.componentDocument.upsert({
+          where: {
+            componentId_documentId: {
+              componentId: idComponent,
+              documentId: docId
+            }
+          },
+          create: {
+            componentId: idComponent,
+            documentId: docId
+          },
+          update: {}
+        });
+      }
+    }
+
     await calculateIkuResultsForComponentRealization(idComponent, month, year);
 
     res.status(201).json(successResponse(record, "Component realization created or updated successfully"));
@@ -221,7 +239,7 @@ export const updateComponentRealization = async (
 ) => {
   try {
     const id = req.params.id;
-    const { value } = req.body;
+    const { value, documentIds } = req.body;
 
     const existing = await prisma.componentRealization.findUnique({ where: { idRealization: id } });
     if (!existing) {
@@ -232,6 +250,24 @@ export const updateComponentRealization = async (
       where: { idRealization: id },
       data: { value },
     });
+
+    if (documentIds && Array.isArray(documentIds)) {
+      for (const docId of documentIds) {
+        await prisma.componentDocument.upsert({
+          where: {
+            componentId_documentId: {
+              componentId: updated.idComponent,
+              documentId: docId
+            }
+          },
+          create: {
+            componentId: updated.idComponent,
+            documentId: docId
+          },
+          update: {}
+        });
+      }
+    }
 
     await calculateIkuResultsForComponentRealization(updated.idComponent, updated.month, updated.year);
 

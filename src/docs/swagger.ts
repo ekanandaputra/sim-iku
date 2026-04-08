@@ -24,6 +24,7 @@ const swaggerDefinition = {
     { name: "IKUTarget", description: "IKU target endpoints" },
     { name: "ComponentTarget", description: "Component target endpoints" },
     { name: "Dashboard", description: "Dashboard visualization endpoints" },
+    { name: "Document", description: "Document upload and tagging endpoints" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -444,6 +445,7 @@ const swaggerDefinition = {
           month: { type: "integer" },
           year: { type: "integer" },
           value: { type: "number" },
+          documentIds: { type: "array", items: { type: "string", format: "uuid" } },
         },
         required: ["idComponent", "month", "year", "value"],
       },
@@ -451,8 +453,23 @@ const swaggerDefinition = {
         type: "object",
         properties: {
           value: { type: "number" },
+          documentIds: { type: "array", items: { type: "string", format: "uuid" } },
         },
         required: ["value"],
+      },
+      Document: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          originalName: { type: "string" },
+          filename: { type: "string" },
+          url: { type: "string" },
+          mimeType: { type: "string", nullable: true },
+          size: { type: "integer", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "originalName", "filename", "url"],
       },
       IkuResult: {
         type: "object",
@@ -632,6 +649,79 @@ const swaggerDefinition = {
           },
         },
       },
+    },
+    "/api/documents/upload": {
+      post: {
+        tags: ["Document"],
+        summary: "Upload multiple documents",
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                properties: {
+                  files: {
+                    type: "array",
+                    items: { type: "string", format: "binary" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Documents uploaded successfully",
+            content: {
+              "application/json": {
+                schema: { 
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    message: { type: "string" },
+                    data: { type: "array", items: { $ref: "#/components/schemas/Document" } },
+                  }
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/documents": {
+      get: {
+        tags: ["Document"],
+        summary: "List all uploaded documents",
+        responses: {
+          "200": {
+            description: "List of documents",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: { type: "array", items: { $ref: "#/components/schemas/Document" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/documents/{id}": {
+      delete: {
+        tags: ["Document"],
+        summary: "Delete a document",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }
+        ],
+        responses: {
+          "200": { description: "Document deleted" }
+        }
+      }
     },
     "/api/auth/register": {
       post: {

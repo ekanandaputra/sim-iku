@@ -61,6 +61,7 @@ model Component {
   ikus        IKUComponent[]
   realizations ComponentRealization[]
   targets     ComponentTarget[]
+  documents   ComponentDocument[]
   @@map("components")
 }
 
@@ -230,4 +231,32 @@ model ComponentTarget {
 
   @@unique([componentId, year])
   @@map("component_targets")
+}
+
+model Document {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  filename     String
+  originalName String
+  url          String
+  mimeType     String?
+  size         Int?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  components   ComponentDocument[]
+
+  @@map("documents")
+}
+
+model ComponentDocument {
+  id          String    @id @default(uuid()) @db.VarChar(36)
+  componentId String    @db.VarChar(36) @map("component_id")
+  documentId  String    @db.VarChar(36) @map("document_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  component   Component @relation(fields: [componentId], references: [id])
+  document    Document  @relation(fields: [documentId], references: [id])
+
+  @@unique([componentId, documentId])
+  @@map("component_documents")
 }

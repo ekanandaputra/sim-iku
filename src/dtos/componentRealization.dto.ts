@@ -1,4 +1,4 @@
-import { IsDecimal, IsInt, IsNotEmpty, IsNumber, Min, Max, IsString } from "class-validator";
+import { IsDecimal, IsInt, IsNotEmpty, IsNumber, Min, Max, IsString, IsArray, IsOptional } from "class-validator";
 
 export class ComponentRealizationCreateDto {
   @IsNotEmpty({ message: "idComponent is required" })
@@ -19,10 +19,20 @@ export class ComponentRealizationCreateDto {
   @IsNotEmpty({ message: "value is required" })
   @IsNumber({}, { message: "value must be a numeric value" })
   value!: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  documentIds?: string[];
 }
 
 export class ComponentRealizationUpdateDto {
   @IsNotEmpty({ message: "value is required" })
   @IsNumber({}, { message: "value must be a numeric value" })
   value!: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  documentIds?: string[];
 }
