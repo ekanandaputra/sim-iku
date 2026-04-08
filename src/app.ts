@@ -14,6 +14,7 @@ import componentRealizationRouter from "./routes/componentRealization.route";
 import ikuResultRouter from "./routes/ikuResult.route";
 import ikuTargetRouter from "./routes/ikuTarget.route";
 import componentTargetRouter from "./routes/componentTarget.route";
+import dashboardRouter from "./routes/dashboard.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -35,6 +36,7 @@ app.use("/api/iku-results", ikuResultRouter);
 app.use("/api/iku-formulas", ikuFormulaRouter);
 app.use("/api/iku-targets", ikuTargetRouter);
 app.use("/api/component-targets", componentTargetRouter);
+app.use("/api/dashboard", dashboardRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

@@ -23,6 +23,7 @@ const swaggerDefinition = {
     { name: "IKUResult", description: "IKU result endpoints" },
     { name: "IKUTarget", description: "IKU target endpoints" },
     { name: "ComponentTarget", description: "Component target endpoints" },
+    { name: "Dashboard", description: "Dashboard visualization endpoints" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -570,6 +571,68 @@ const swaggerDefinition = {
     },
   },
   paths: {
+    "/api/dashboard/iku": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["Dashboard"],
+        summary: "Get IKU Dashboard Data (Target vs Realization)",
+        description: "Returns dashboard data suitable for charts (1 graphic per IKU) grouped by Year/Quarter.",
+        parameters: [
+          {
+            name: "year",
+            in: "query",
+            required: true,
+            schema: { type: "integer" },
+            description: "Year to fetch the dashboard data for",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Dashboard Data",
+            content: {
+              "application/json": {
+                schema: { 
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          ikuId: { type: "string" },
+                          ikuCode: { type: "string" },
+                          ikuName: { type: "string" },
+                          chartData: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                period: { type: "string" },
+                                target: { type: "number", nullable: true },
+                                realization: { type: "number", nullable: true },
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation error",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/auth/register": {
       post: {
         tags: ["Auth"],
