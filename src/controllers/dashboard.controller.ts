@@ -182,7 +182,9 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
       };
     });
 
-    res.json(successResponse(dashboardData));
+    const responseData = componentId ? dashboardData[0] : dashboardData;
+
+    res.json(successResponse(responseData));
   } catch (error) {
     next(error);
   }

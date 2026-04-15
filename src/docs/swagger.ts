@@ -640,33 +640,56 @@ const swaggerDefinition = {
             description: "Dashboard Data",
             content: {
               "application/json": {
-                schema: { 
+                schema: {
                   type: "object",
                   properties: {
                     success: { type: "boolean", example: true },
                     data: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          componentId: { type: "string" },
-                          componentCode: { type: "string" },
-                          componentName: { type: "string" },
-                          chartData: {
-                            type: "array",
-                            items: {
-                              type: "object",
-                              properties: {
-                                period: { type: "string" },
-                                target: { type: "number", nullable: true },
-                                realization: { type: "number", nullable: true },
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
+                      oneOf: [
+                        {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              componentId: { type: "string" },
+                              componentCode: { type: "string" },
+                              componentName: { type: "string" },
+                              chartData: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    period: { type: "string" },
+                                    target: { type: "number", nullable: true },
+                                    realization: { type: "number", nullable: true },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                        {
+                          type: "object",
+                          properties: {
+                            componentId: { type: "string" },
+                            componentCode: { type: "string" },
+                            componentName: { type: "string" },
+                            chartData: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  period: { type: "string" },
+                                  target: { type: "number", nullable: true },
+                                  realization: { type: "number", nullable: true },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      ],
+                    },
+                  },
                 },
               },
             },
