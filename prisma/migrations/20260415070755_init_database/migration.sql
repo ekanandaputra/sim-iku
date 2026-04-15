@@ -86,21 +86,6 @@ CREATE TABLE `iku_formula_detail` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `periods` (
-    `id` VARCHAR(36) NOT NULL,
-    `year` INTEGER NOT NULL,
-    `period_type` ENUM('year', 'semester', 'quarter') NOT NULL,
-    `period_value` INTEGER NOT NULL,
-    `period_name` VARCHAR(191) NOT NULL,
-    `level` INTEGER NOT NULL,
-    `parent_id` VARCHAR(36) NULL,
-
-    INDEX `periods_parent_id_idx`(`parent_id`),
-    UNIQUE INDEX `periods_year_period_type_period_value_key`(`year`, `period_type`, `period_value`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
 CREATE TABLE `component_realizations` (
     `id` VARCHAR(36) NOT NULL,
     `id_component` VARCHAR(191) NOT NULL,
@@ -119,7 +104,8 @@ CREATE TABLE `component_realizations` (
 CREATE TABLE `iku_results` (
     `id` VARCHAR(36) NOT NULL,
     `id_iku` VARCHAR(191) NOT NULL,
-    `id_period` VARCHAR(36) NOT NULL,
+    `month` INTEGER NOT NULL,
+    `year` INTEGER NOT NULL,
     `calculated_value` DECIMAL(18, 4) NOT NULL,
     `formula_version` VARCHAR(191) NULL,
     `calculated_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -127,8 +113,9 @@ CREATE TABLE `iku_results` (
     `updated_at` DATETIME(3) NOT NULL,
 
     INDEX `iku_results_id_iku_idx`(`id_iku`),
-    INDEX `iku_results_id_period_idx`(`id_period`),
-    UNIQUE INDEX `iku_results_id_iku_id_period_key`(`id_iku`, `id_period`),
+    INDEX `iku_results_year_idx`(`year`),
+    INDEX `iku_results_month_idx`(`month`),
+    UNIQUE INDEX `iku_results_id_iku_month_year_key`(`id_iku`, `month`, `year`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -204,16 +191,10 @@ ALTER TABLE `iku_formula` ADD CONSTRAINT `iku_formula_ikuId_fkey` FOREIGN KEY (`
 ALTER TABLE `iku_formula_detail` ADD CONSTRAINT `iku_formula_detail_formulaId_fkey` FOREIGN KEY (`formulaId`) REFERENCES `iku_formula`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `periods` ADD CONSTRAINT `periods_parent_id_fkey` FOREIGN KEY (`parent_id`) REFERENCES `periods`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `component_realizations` ADD CONSTRAINT `component_realizations_id_component_fkey` FOREIGN KEY (`id_component`) REFERENCES `components`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `iku_results` ADD CONSTRAINT `iku_results_id_iku_fkey` FOREIGN KEY (`id_iku`) REFERENCES `ikus`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `iku_results` ADD CONSTRAINT `iku_results_id_period_fkey` FOREIGN KEY (`id_period`) REFERENCES `periods`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `iku_targets` ADD CONSTRAINT `iku_targets_iku_id_fkey` FOREIGN KEY (`iku_id`) REFERENCES `ikus`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
