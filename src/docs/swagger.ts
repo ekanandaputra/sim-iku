@@ -613,6 +613,83 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/dashboard/component": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["Dashboard"],
+        summary: "Get Component Dashboard Data (Target vs Realization)",
+        description: "Returns dashboard data suitable for charts for components, filtered by year and optionally by component ID.",
+        parameters: [
+          {
+            name: "year",
+            in: "query",
+            required: true,
+            schema: { type: "integer" },
+            description: "Year to fetch the dashboard data for",
+          },
+          {
+            name: "component_id",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "uuid" },
+            description: "Optional component ID to filter the dashboard data",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Dashboard Data",
+            content: {
+              "application/json": {
+                schema: { 
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          componentId: { type: "string" },
+                          componentCode: { type: "string" },
+                          componentName: { type: "string" },
+                          chartData: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                period: { type: "string" },
+                                target: { type: "number", nullable: true },
+                                realization: { type: "number", nullable: true },
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation error",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "Component not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/documents/upload": {
       post: {
         tags: ["Document"],

@@ -92,6 +92,7 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
 export const getComponentDashboard = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const yearStr = req.query.year as string;
+    const componentId = (req.query.componentId as string) || (req.query.component_id as string);
     if (!yearStr) {
       return res.status(400).json(errorResponse("Year is required in query params"));
     }
@@ -100,9 +101,29 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
       return res.status(400).json(errorResponse("Invalid year format"));
     }
 
-    const components = await prisma.component.findMany({ orderBy: { code: "asc" } });
-    const targets = await prisma.componentTarget.findMany({ where: { year } });
-    const realizations = await prisma.componentRealization.findMany({ where: { year } });
+    const componentFilter: any = {};
+    if (componentId) {
+      componentFilter.id = componentId;
+    }
+
+    const components = await prisma.component.findMany({
+      where: componentFilter,
+      orderBy: { code: "asc" },
+    });
+
+    if (componentId && components.length === 0) {
+      return res.status(404).json(errorResponse("Component not found"));
+    }
+
+    const targetWhere: any = { year };
+    const realizationWhere: any = { year };
+    if (componentId) {
+      targetWhere.componentId = componentId;
+      realizationWhere.idComponent = componentId;
+    }
+
+    const targets = await prisma.componentTarget.findMany({ where: targetWhere });
+    const realizations = await prisma.componentRealization.findMany({ where: realizationWhere });
 
     const targetMap = new Map(targets.map((t) => [t.componentId, t]));
     const realizationMap = new Map<string, any[]>();
