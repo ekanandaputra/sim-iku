@@ -235,7 +235,9 @@ export const createComponentRealization = async (
       }
     }
 
-    await calculateIkuResultsForComponentRealization(idComponent, month, year);
+    if (month != null) {
+      await calculateIkuResultsForComponentRealization(idComponent, month, year);
+    }
 
     res.status(201).json(successResponse(record, "Component realization created or updated successfully"));
   } catch (error) {
@@ -280,7 +282,9 @@ export const updateComponentRealization = async (
       }
     }
 
-    await calculateIkuResultsForComponentRealization(updated.idComponent, updated.month, updated.year);
+    if (updated.month != null) {
+      await calculateIkuResultsForComponentRealization(updated.idComponent, updated.month, updated.year);
+    }
 
     res.json(successResponse(updated, "Component realization updated successfully"));
   } catch (error) {

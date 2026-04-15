@@ -390,14 +390,14 @@ const swaggerDefinition = {
         properties: {
           idRealization: { type: "integer" },
           idComponent: { type: "string" },
-          month: { type: "integer" },
+          month: { type: "integer", nullable: true },
           year: { type: "integer" },
           value: { type: "number" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           component: { type: "object" },
         },
-        required: ["idRealization", "idComponent", "month", "year", "value"],
+        required: ["idRealization", "idComponent", "year", "value"],
       },
       ComponentRealizationCreate: {
         type: "object",
@@ -408,7 +408,7 @@ const swaggerDefinition = {
           value: { type: "number" },
           documentIds: { type: "array", items: { type: "string", format: "uuid" } },
         },
-        required: ["idComponent", "month", "year", "value"],
+        required: ["idComponent", "year", "value"],
       },
       ComponentRealizationUpdate: {
         type: "object",

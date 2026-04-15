@@ -142,7 +142,7 @@ model IKUFormulaDetail {
 model ComponentRealization {
   idRealization String   @id @default(uuid()) @db.VarChar(36) @map("id")
   idComponent   String   @map("id_component")
-  month         Int
+  month         Int?
   year          Int
   value         Decimal  @db.Decimal(18, 4)
   createdAt     DateTime @default(now()) @map("created_at")

@@ -5,11 +5,11 @@ export class ComponentRealizationCreateDto {
   @IsString()
   idComponent!: string;
 
-  @IsNotEmpty({ message: "month is required" })
+  @IsOptional()
   @IsInt({ message: "month must be an integer" })
   @Min(1)
   @Max(12)
-  month!: number;
+  month?: number;
 
   @IsNotEmpty({ message: "year is required" })
   @IsInt({ message: "year must be an integer" })
