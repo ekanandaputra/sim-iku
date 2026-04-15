@@ -1,13 +1,17 @@
-import { IsDateString, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString } from "class-validator";
+import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
 
 export class IkuResultCreateDto {
   @IsNotEmpty({ message: "idIku is required" })
   @IsString({ message: "idIku must be a string" })
   idIku!: string;
 
-  @IsNotEmpty({ message: "idPeriod is required" })
-  @IsString({ message: "idPeriod must be a UUID string" })
-  idPeriod!: string;
+  @IsNotEmpty({ message: "month is required" })
+  @IsInt({ message: "month must be an integer" })
+  month!: number;
+
+  @IsNotEmpty({ message: "year is required" })
+  @IsInt({ message: "year must be an integer" })
+  year!: number;
 
   @IsNotEmpty({ message: "calculatedValue is required" })
   @IsNumber({}, { message: "calculatedValue must be numeric" })

@@ -12,8 +12,7 @@ type RealizationQuery = {
 };
 
 async function calculateIkuResultsForComponentRealization(idComponent: string, month: number, year: number) {
-  const quarter = Math.ceil(month / 3);
-  console.log("Calculating IKU results for component realization", { idComponent, month, year, quarter });
+  console.log("Calculating IKU results for component realization", { idComponent, month, year });
   const component = await prisma.component.findUnique({ where: { id: idComponent } });
   if (!component) {
     return;
@@ -43,82 +42,94 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     return;
   }
 
-  const period = await prisma.period.findFirst({
-    where: { year, periodType: "quarter", periodValue: quarter }
-  });
-
-  if (!period) {
-    console.log(`No target period quarter found for year ${year} and quarter ${quarter}`);
-    return;
-  }
-
-  const idPeriod = period.idPeriod;
-
+  const requiredCodes = new Set<string>();
   for (const formula of activeFormulas) {
-    const componentCodes = new Set<string>();
     for (const detail of formula.details) {
       if (detail.leftType === "component") {
-        componentCodes.add(detail.leftValue);
+        requiredCodes.add(detail.leftValue);
       }
       if (detail.rightType === "component") {
-        componentCodes.add(detail.rightValue);
+        requiredCodes.add(detail.rightValue);
+      }
+    }
+  }
+
+  const components = requiredCodes.size > 0
+    ? await prisma.component.findMany({ where: { code: { in: Array.from(requiredCodes) } } })
+    : [];
+
+  const codeToComponent = new Map<string, { id: string; code: string; periodType: string }>();
+  components.forEach((c) => codeToComponent.set(c.code, { id: c.id, code: c.code, periodType: c.periodType }));
+
+  const realizationsByComponentId = new Map<string, any[]>();
+  if (components.length > 0) {
+    const realizations = await prisma.componentRealization.findMany({
+      where: {
+        idComponent: { in: components.map((c) => c.id) },
+        year,
+      },
+    });
+
+    for (const realization of realizations) {
+      const items = realizationsByComponentId.get(realization.idComponent) || [];
+      items.push(realization);
+      realizationsByComponentId.set(realization.idComponent, items);
+    }
+  }
+
+  for (const formula of activeFormulas) {
+    const formulaCodes = new Set<string>();
+    for (const detail of formula.details) {
+      if (detail.leftType === "component") {
+        formulaCodes.add(detail.leftValue);
+      }
+      if (detail.rightType === "component") {
+        formulaCodes.add(detail.rightValue);
       }
     }
 
-    const requiredCodes = Array.from(componentCodes);
     const componentValues: ComponentValues = {};
+    let missingData = false;
 
-    if (requiredCodes.length > 0) {
-      const components = await prisma.component.findMany({
-        where: {
-          code: { in: requiredCodes },
-        },
-      });
-
-      const codeToId = new Map<string, string>();
-      components.forEach((c) => codeToId.set(c.code, c.id));
-
-      const componentIds = components.map((c) => c.id);
-      
-      const startMonth = (quarter - 1) * 3 + 1;
-      const endMonth = quarter * 3;
-
-      const realizations = await prisma.componentRealization.findMany({
-        where: {
-          month: { gte: startMonth, lte: endMonth },
-          year,
-          idComponent: { in: componentIds },
-        },
-      });
-
-      // Map back code -> value
-      for (const realization of realizations) {
-        const found = components.find((c) => c.id === realization.idComponent);
-        if (found) {
-          componentValues[found.code] = (componentValues[found.code] || 0) + Number(realization.value);
-        }
+    for (const code of formulaCodes) {
+      const targetComponent = codeToComponent.get(code);
+      if (!targetComponent) {
+        missingData = true;
+        break;
       }
 
-      const missingCodes = requiredCodes.filter((code) => !(code in componentValues));
-      if (missingCodes.length > 0) {
-        continue;
+      const componentReals = realizationsByComponentId.get(targetComponent.id) || [];
+      const selectedValues = targetComponent.periodType === "yearly"
+        ? componentReals
+        : componentReals.filter((realization) => realization.month === month);
+
+      if (!selectedValues.length) {
+        missingData = true;
+        break;
       }
+
+      componentValues[code] = selectedValues.reduce((sum, realization) => sum + Number(realization.value), 0);
+    }
+
+    if (missingData) {
+      continue;
     }
 
     console.log("Evaluating formula", { formulaId: formula.id, componentValues });
-    // Evaluate formula and upsert result
     try {
       const evaluation = await evaluateFormula(formula.id, componentValues);
       await prisma.ikuResult.upsert({
         where: {
-          idIku_idPeriod: {
+          idIku_month_year: {
             idIku: formula.ikuId,
-            idPeriod,
+            month,
+            year,
           },
         },
         create: {
           idIku: formula.ikuId,
-          idPeriod,
+          month,
+          year,
           calculatedValue: evaluation.result,
           formulaVersion: formula.version.toString(),
           calculatedAt: new Date(),

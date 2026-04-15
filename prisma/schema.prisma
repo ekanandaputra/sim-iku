@@ -149,7 +149,6 @@ model Period {
   parentId      String?          @db.VarChar(36) @map("parent_id")
   parent        Period?          @relation("PeriodChildren", fields: [parentId], references: [idPeriod])
   children      Period[]         @relation("PeriodChildren")
-  ikuResults    IkuResult[]
 
   @@map("periods")
   @@unique([year, periodType, periodValue])
@@ -175,7 +174,8 @@ model ComponentRealization {
 model IkuResult {
   idResult        String   @id @default(uuid()) @db.VarChar(36) @map("id")
   idIku           String   @map("id_iku")
-  idPeriod        String   @db.VarChar(36) @map("id_period")
+  month           Int
+  year            Int
   calculatedValue Decimal  @db.Decimal(18, 4) @map("calculated_value")
   formulaVersion  String?  @map("formula_version")
   calculatedAt    DateTime @default(now()) @map("calculated_at")
@@ -183,12 +183,12 @@ model IkuResult {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   iku    IKU   @relation(fields: [idIku], references: [id])
-  period Period @relation(fields: [idPeriod], references: [idPeriod])
 
   @@map("iku_results")
-  @@unique([idIku, idPeriod])
+  @@unique([idIku, month, year])
   @@index([idIku])
-  @@index([idPeriod])
+  @@index([year])
+  @@index([month])
 }
 
 enum PeriodType {

@@ -6,7 +6,8 @@ type IkuResultParams = { id: string };
 
 type IkuResultQuery = {
   idIku?: string;
-  idPeriod?: string;
+  month?: string;
+  year?: string;
 };
 
 export const listIkuResults = async (
@@ -17,11 +18,12 @@ export const listIkuResults = async (
   try {
     const where: any = {};
     if (req.query.idIku) where.idIku = req.query.idIku;
-    if (req.query.idPeriod) where.idPeriod = req.query.idPeriod;
+    if (req.query.month) where.month = Number(req.query.month);
+    if (req.query.year) where.year = Number(req.query.year);
 
     const results = await prisma.ikuResult.findMany({
       where,
-      include: { iku: true, period: true },
+      include: { iku: true },
       orderBy: [{ createdAt: "desc" }],
     });
     res.json(successResponse(results));
@@ -39,7 +41,7 @@ export const getIkuResultById = async (
     const id = req.params.id;
     const result = await prisma.ikuResult.findUnique({
       where: { idResult: id },
-      include: { iku: true, period: true },
+      include: { iku: true },
     });
     if (!result) {
       return res.status(404).json(errorResponse("IKU result not found"));
@@ -56,38 +58,35 @@ export const createIkuResult = async (
   next: NextFunction
 ) => {
   try {
-    const { idIku, idPeriod, calculatedValue, formulaVersion, calculatedAt } = req.body;
+    const { idIku, month, year, calculatedValue, formulaVersion, calculatedAt } = req.body;
 
     const iku = await prisma.iKU.findUnique({ where: { id: idIku } });
     if (!iku) {
       return res.status(404).json(errorResponse("IKU not found"));
     }
 
-    const period = await prisma.period.findUnique({ where: { idPeriod: idPeriod } });
-    if (!period) {
-      return res.status(404).json(errorResponse("Period not found"));
-    }
-
     const record = await prisma.ikuResult.upsert({
       where: {
-        idIku_idPeriod: {
-          idIku: idIku,
-          idPeriod: idPeriod,
+        idIku_month_year: {
+          idIku,
+          month,
+          year,
         },
       },
       create: {
-        idIku: idIku,
-        idPeriod: idPeriod,
-        calculatedValue: calculatedValue,
+        idIku,
+        month,
+        year,
+        calculatedValue,
         formulaVersion: formulaVersion ?? null,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : new Date(),
       },
       update: {
-        calculatedValue: calculatedValue,
+        calculatedValue,
         formulaVersion: formulaVersion ?? undefined,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : undefined,
       },
-      include: { iku: true, period: true },
+      include: { iku: true },
     });
 
     res.status(201).json(successResponse(record, "IKU result created or updated successfully"));
