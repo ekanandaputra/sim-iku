@@ -18,7 +18,6 @@ const swaggerDefinition = {
     { name: "IKU", description: "IKU management endpoints" },
     { name: "Component", description: "Component management endpoints" },
     { name: "Formula", description: "IKU formula calculation and management" },
-    { name: "Period", description: "Period management endpoints" },
     { name: "ComponentRealization", description: "Component realization endpoints" },
     { name: "IKUResult", description: "IKU result endpoints" },
     { name: "IKUTarget", description: "IKU target endpoints" },
@@ -384,44 +383,6 @@ const swaggerDefinition = {
             },
             required: ["result", "steps"],
           },
-        },
-      },
-      Period: {
-        type: "object",
-        properties: {
-          idPeriod: { type: "string", format: "uuid" },
-          year: { type: "integer" },
-          periodType: { type: "string" },
-          periodValue: { type: "integer" },
-          periodName: { type: "string" },
-          level: { type: "integer" },
-          parentId: { type: ["string", "null"], format: "uuid" },
-          createdAt: { type: "string", format: "date-time" },
-          updatedAt: { type: "string", format: "date-time" },
-        },
-        required: ["idPeriod", "year", "periodType", "periodValue", "periodName", "level"],
-      },
-      PeriodCreate: {
-        type: "object",
-        properties: {
-          year: { type: "integer" },
-          periodType: { type: "string" },
-          periodValue: { type: "integer" },
-          periodName: { type: "string" },
-          level: { type: "integer" },
-          parentId: { type: "integer" },
-        },
-        required: ["year", "periodType", "periodValue", "periodName", "level"],
-      },
-      PeriodUpdate: {
-        type: "object",
-        properties: {
-          year: { type: "integer" },
-          periodType: { type: "string" },
-          periodValue: { type: "integer" },
-          periodName: { type: "string" },
-          level: { type: "integer" },
-          parentId: { type: "integer" },
         },
       },
       ComponentRealization: {
@@ -1988,103 +1949,6 @@ const swaggerDefinition = {
               },
             },
           },
-        },
-      },
-    },
-    "/api/periods": {
-      security: [{ bearerAuth: [] }],
-      get: {
-        tags: ["Period"],
-        summary: "List periods",
-        parameters: [
-          { name: "year", in: "query", schema: { type: "integer" }, description: "Filter by year" },
-          { name: "type", in: "query", schema: { type: "string" }, description: "Filter by period type" },
-          { name: "level", in: "query", schema: { type: "integer" }, description: "Filter by level" },
-          { name: "parentId", in: "query", schema: { type: "integer" }, description: "Filter by parent period id" },
-        ],
-        responses: {
-          "200": {
-            description: "List periods",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    success: { type: "boolean" },
-                    data: { type: "array", items: { $ref: "#/components/schemas/Period" } },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      post: {
-        tags: ["Period"],
-        summary: "Create a period",
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: { $ref: "#/components/schemas/PeriodCreate" },
-            },
-          },
-        },
-        responses: {
-          "201": {
-            description: "Period created successfully",
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    success: { type: "boolean" },
-                    message: { type: "string" },
-                    data: { $ref: "#/components/schemas/Period" },
-                  },
-                },
-              },
-            },
-          },
-          "400": {
-            description: "Validation or business error",
-            content: {
-              "application/json": {
-                schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] },
-              },
-            },
-          },
-        },
-      },
-    },
-    "/api/periods/{id}": {
-      security: [{ bearerAuth: [] }],
-      get: {
-        tags: ["Period"],
-        summary: "Get period by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
-        responses: {
-          "200": { description: "Period details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Period" } } } } } },
-          "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
-        },
-      },
-      put: {
-        tags: ["Period"],
-        summary: "Update a period",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
-        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/PeriodUpdate" } } } },
-        responses: {
-          "200": { description: "Period updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/Period" } } } } } },
-          "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
-        },
-      },
-      delete: {
-        tags: ["Period"],
-        summary: "Delete a period",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
-        responses: {
-          "200": { description: "Period deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } },
-          "404": { description: "Period not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
         },
       },
     },

@@ -139,22 +139,6 @@ model IKUFormulaDetail {
   @@unique([formulaId, sequence])
 }
 
-model Period {
-  idPeriod      String           @id @default(uuid()) @db.VarChar(36) @map("id")
-  year          Int
-  periodType    PeriodType       @map("period_type")
-  periodValue   Int              @map("period_value")
-  periodName    String           @map("period_name")
-  level         Int
-  parentId      String?          @db.VarChar(36) @map("parent_id")
-  parent        Period?          @relation("PeriodChildren", fields: [parentId], references: [idPeriod])
-  children      Period[]         @relation("PeriodChildren")
-
-  @@map("periods")
-  @@unique([year, periodType, periodValue])
-  @@index([parentId])
-}
-
 model ComponentRealization {
   idRealization String   @id @default(uuid()) @db.VarChar(36) @map("id")
   idComponent   String   @map("id_component")
@@ -189,12 +173,6 @@ model IkuResult {
   @@index([idIku])
   @@index([year])
   @@index([month])
-}
-
-enum PeriodType {
-  year
-  semester
-  quarter
 }
 
 model IkuTarget {
