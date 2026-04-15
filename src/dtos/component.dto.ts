@@ -17,13 +17,13 @@ export class ComponentCreateDto {
   @Length(0, 500, { message: "Description must be at most 500 characters" })
   description?: string;
 
-  @IsNotEmpty({ message: "Data type is required" })
+  @IsOptional()
   @IsEnum(ComponentDataType, { message: "Data type must be one of: number, percentage, integer" })
-  dataType!: ComponentDataType;
+  dataType?: ComponentDataType;
 
-  @IsNotEmpty({ message: "Source type is required" })
+  @IsOptional()
   @IsEnum(ComponentSourceType, { message: "Source type must be one of: database, api, manual" })
-  sourceType!: ComponentSourceType;
+  sourceType?: ComponentSourceType;
 }
 
 export class ComponentUpdateDto {
@@ -42,11 +42,11 @@ export class ComponentUpdateDto {
   @Length(0, 500, { message: "Description must be at most 500 characters" })
   description?: string;
 
-  @IsNotEmpty({ message: "Data type is required" })
+  @IsOptional()
   @IsEnum(ComponentDataType, { message: "Data type must be one of: number, percentage, integer" })
-  dataType!: ComponentDataType;
+  dataType?: ComponentDataType;
 
-  @IsNotEmpty({ message: "Source type is required" })
+  @IsOptional()
   @IsEnum(ComponentSourceType, { message: "Source type must be one of: database, api, manual" })
-  sourceType!: ComponentSourceType;
+  sourceType?: ComponentSourceType;
 }

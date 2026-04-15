@@ -53,8 +53,8 @@ model Component {
   code        String          @unique
   name        String
   description String?
-  dataType    ComponentDataType @map("data_type")
-  sourceType  ComponentSourceType @map("source_type")
+  dataType    ComponentDataType? @map("data_type")
+  sourceType  ComponentSourceType? @map("source_type")
   periodType  ComponentPeriodType @default(yearly) @map("period_type")
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @updatedAt @map("updated_at")

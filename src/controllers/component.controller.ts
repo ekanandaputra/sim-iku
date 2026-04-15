@@ -83,15 +83,23 @@ export const createComponent = async (
       return res.status(400).json(errorResponse("Component code already exists"));
     }
 
+    const componentData: any = {
+      code,
+      name,
+      description,
+      periodType,
+    };
+
+    if (dataType !== undefined) {
+      componentData.dataType = dataType;
+    }
+
+    if (sourceType !== undefined) {
+      componentData.sourceType = sourceType;
+    }
+
     const component = await prisma.component.create({
-      data: {
-        code,
-        name,
-        description,
-        dataType,
-        sourceType,
-        periodType,
-      },
+      data: componentData,
     });
 
     res.status(201).json(successResponse(component, "Component created successfully"));
@@ -131,16 +139,24 @@ export const updateComponent = async (
       }
     }
 
+    const updateData: any = {
+      code,
+      name,
+      description,
+      periodType,
+    };
+
+    if (dataType !== undefined) {
+      updateData.dataType = dataType;
+    }
+
+    if (sourceType !== undefined) {
+      updateData.sourceType = sourceType;
+    }
+
     const updated = await prisma.component.update({
       where: { id },
-      data: {
-        code,
-        name,
-        description,
-        dataType,
-        sourceType,
-        periodType,
-      },
+      data: updateData,
     });
 
     res.json(successResponse(updated, "Component updated successfully"));

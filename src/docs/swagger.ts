@@ -77,7 +77,7 @@ const swaggerDefinition = {
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
-        required: ["id", "code", "name", "dataType", "sourceType"],
+        required: ["id", "code", "name"],
       },
       ComponentCreate: {
         type: "object",
@@ -88,7 +88,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
         },
-        required: ["code", "name", "dataType", "sourceType"],
+        required: ["code", "name"],
       },
       ComponentUpdate: {
         type: "object",
@@ -99,7 +99,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
         },
-        required: ["code", "name", "dataType", "sourceType"],
+        required: ["code", "name"],
       },
       SuccessResponseSingleComponent: {
         type: "object",
