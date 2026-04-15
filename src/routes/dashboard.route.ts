@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { getIkuDashboard } from "../controllers/dashboard.controller";
+import { getIkuDashboard, getComponentDashboard } from "../controllers/dashboard.controller";
 
 const router = Router();
 
 router.get("/iku", getIkuDashboard);
+router.get("/component", getComponentDashboard);
 
 export default router;
