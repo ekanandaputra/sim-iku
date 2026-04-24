@@ -9,6 +9,8 @@ type RealizationQuery = {
   idComponent?: string;
   month?: string;
   year?: string;
+  page?: string;
+  limit?: string;
 };
 
 async function calculateIkuResultsForComponentRealization(idComponent: string, month: number, year: number) {

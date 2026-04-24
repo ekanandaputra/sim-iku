@@ -8,6 +8,8 @@ type IkuResultQuery = {
   idIku?: string;
   month?: string;
   year?: string;
+  page?: string;
+  limit?: string;
 };
 
 export const listIkuResults = async (
@@ -21,12 +23,30 @@ export const listIkuResults = async (
     if (req.query.month) where.month = Number(req.query.month);
     if (req.query.year) where.year = Number(req.query.year);
 
-    const results = await prisma.ikuResult.findMany({
-      where,
-      include: { iku: true },
-      orderBy: [{ createdAt: "desc" }],
-    });
-    res.json(successResponse(results));
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [results, total] = await Promise.all([
+      prisma.ikuResult.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { iku: true },
+        orderBy: [{ createdAt: "desc" }],
+      }),
+      prisma.ikuResult.count({ where }),
+    ]);
+
+    res.json(successResponse({
+      data: results,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }));
   } catch (error) {
     next(error);
   }

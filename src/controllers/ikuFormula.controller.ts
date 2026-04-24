@@ -47,14 +47,25 @@ export const listIkuFormulas = async (
       delete where.ikuId;
     }
 
-    const formulas = await prisma.iKUFormula.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-    });
+    const [formulas, total] = await Promise.all([
+      prisma.iKUFormula.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.iKUFormula.count({ where }),
+    ]);
 
-    res.json(successResponse(formulas));
+    res.json(successResponse({
+      data: formulas,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }));
   } catch (error) {
     next(error);
   }

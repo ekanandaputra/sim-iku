@@ -3,23 +3,39 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 
 type TargetParams = { id: string };
-type TargetQuery = { componentId?: string; year?: string };
+type TargetQuery = { componentId?: string; year?: string; page?: string; limit?: string };
 
 export const getAllComponentTargets = async (req: Request<{}, {}, {}, TargetQuery>, res: Response, next: NextFunction) => {
   try {
     const { componentId, year } = req.query;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
     const where: any = {};
     if (componentId) where.componentId = String(componentId);
     if (year) where.year = Number(year);
 
-    const componentTargets = await prisma.componentTarget.findMany({
-      where,
-      orderBy: [{ year: "desc" }, { createdAt: "desc" }],
-      include: {
-        component: true,
+    const [componentTargets, total] = await Promise.all([
+      prisma.componentTarget.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ year: "desc" }, { createdAt: "desc" }],
+        include: { component: true },
+      }),
+      prisma.componentTarget.count({ where }),
+    ]);
+
+    res.json(successResponse({
+      data: componentTargets,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-    });
-    res.json(successResponse(componentTargets));
+    }));
   } catch (error) {
     next(error);
   }

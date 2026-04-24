@@ -33,11 +33,29 @@ export const uploadDocuments = async (req: Request, res: Response, next: NextFun
 
 export const listDocuments = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const documents = await prisma.document.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { components: { include: { component: true } } }
-    });
-    res.json(successResponse(documents));
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: { components: { include: { component: true } } }
+      }),
+      prisma.document.count(),
+    ]);
+
+    res.json(successResponse({
+      data: documents,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }));
   } catch (error) {
     next(error);
   }

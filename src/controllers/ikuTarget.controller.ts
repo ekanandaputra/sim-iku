@@ -3,23 +3,39 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 
 type TargetParams = { id: string };
-type TargetQuery = { ikuId?: string; year?: string };
+type TargetQuery = { ikuId?: string; year?: string; page?: string; limit?: string };
 
 export const getAllIkuTargets = async (req: Request<{}, {}, {}, TargetQuery>, res: Response, next: NextFunction) => {
   try {
     const { ikuId, year } = req.query;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
     const where: any = {};
     if (ikuId) where.ikuId = String(ikuId);
     if (year) where.year = Number(year);
 
-    const ikuTargets = await prisma.ikuTarget.findMany({
-      where,
-      orderBy: [{ year: "desc" }, { createdAt: "desc" }],
-      include: {
-        iku: true,
+    const [ikuTargets, total] = await Promise.all([
+      prisma.ikuTarget.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ year: "desc" }, { createdAt: "desc" }],
+        include: { iku: true },
+      }),
+      prisma.ikuTarget.count({ where }),
+    ]);
+
+    res.json(successResponse({
+      data: ikuTargets,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-    });
-    res.json(successResponse(ikuTargets));
+    }));
   } catch (error) {
     next(error);
   }

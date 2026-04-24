@@ -26,13 +26,24 @@ export const listIkus = async (
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const ikus = await prisma.iKU.findMany({
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-    });
+    const [ikus, total] = await Promise.all([
+      prisma.iKU.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.iKU.count(),
+    ]);
 
-    res.json(successResponse(ikus));
+    res.json(successResponse({
+      data: ikus,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }));
   } catch (error) {
     next(error);
   }

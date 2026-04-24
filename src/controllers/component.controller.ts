@@ -25,13 +25,24 @@ export const listComponents = async (
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const components = await prisma.component.findMany({
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-    });
+    const [components, total] = await Promise.all([
+      prisma.component.findMany({
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.component.count(),
+    ]);
 
-    res.json(successResponse(components));
+    res.json(successResponse({
+      data: components,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    }));
   } catch (error) {
     next(error);
   }
