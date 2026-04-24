@@ -115,7 +115,7 @@ export const createIkuFormula = async (
   next: NextFunction
 ) => {
   try {
-    const { ikuId, name, description, finalResultKey, steps } = req.body;
+    const { ikuId, name, description, finalResultKey, isFinal, steps } = req.body;
 
     const iku = await prisma.iKU.findUnique({ where: { id: ikuId } });
     if (!iku) {
@@ -154,11 +154,19 @@ export const createIkuFormula = async (
     });
     const nextVersion = (lastVersion?.version ?? 0) + 1;
 
-    const created = await prisma.$transaction([
-      prisma.iKUFormula.updateMany({
-        where: { ikuId, isActive: true },
-        data: { isActive: false },
-      }),
+    // Build transaction operations based on isFinal flag
+    const transactionOps: any[] = [];
+
+    if (isFinal === true) {
+      transactionOps.push(
+        prisma.iKUFormula.updateMany({
+          where: { ikuId, isFinal: true },
+          data: { isFinal: false },
+        })
+      );
+    }
+
+    transactionOps.push(
       prisma.iKUFormula.create({
         data: {
           ikuId,
@@ -166,6 +174,7 @@ export const createIkuFormula = async (
           description,
           finalResultKey,
           isActive: true,
+          isFinal: isFinal ?? false,
           version: nextVersion,
           details: {
             create: parsedSteps.map((step) => ({
@@ -179,11 +188,13 @@ export const createIkuFormula = async (
             })),
           },
         },
-      }),
-    ]);
+      })
+    );
 
-    // the create call is the second item in the transaction array
-    const formula = created[1];
+    const created = await prisma.$transaction(transactionOps);
+
+    // the create call is the last item in the transaction array
+    const formula = created[created.length - 1];
 
     res.status(201).json(successResponse(formula, "Formula created successfully"));
   } catch (error) {
@@ -202,7 +213,7 @@ export const updateIkuFormula = async (
 ) => {
   try {
     const id = req.params.id;
-    const { name, description, finalResultKey, steps } = req.body;
+    const { name, description, finalResultKey, isFinal, steps } = req.body;
 
     const existing = await prisma.iKUFormula.findUnique({ where: { id } });
     if (!existing) {
@@ -272,11 +283,19 @@ export const updateIkuFormula = async (
     });
     const nextVersion = (lastVersion?.version ?? 0) + 1;
 
-    const created = await prisma.$transaction([
-      prisma.iKUFormula.updateMany({
-        where: { ikuId, isActive: true },
-        data: { isActive: false },
-      }),
+    // Build transaction operations based on isFinal flag
+    const transactionOps: any[] = [];
+
+    if (isFinal === true) {
+      transactionOps.push(
+        prisma.iKUFormula.updateMany({
+          where: { ikuId, isFinal: true },
+          data: { isFinal: false },
+        })
+      );
+    }
+
+    transactionOps.push(
       prisma.iKUFormula.create({
         data: {
           ikuId,
@@ -284,13 +303,17 @@ export const updateIkuFormula = async (
           description,
           finalResultKey,
           isActive: true,
+          isFinal: isFinal ?? false,
           version: nextVersion,
           details: { create: createSteps },
         },
-      }),
-    ]);
+      })
+    );
 
-    const formula = created[1];
+    const created = await prisma.$transaction(transactionOps);
+
+    // the create call is the last item in the transaction array
+    const formula = created[created.length - 1];
 
     res.json(successResponse(formula, "Formula updated successfully"));
   } catch (error) {

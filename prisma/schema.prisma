@@ -89,6 +89,7 @@ enum FormulaOperandType {
   component
   constant
   temp
+  formula_ref
 }
 
 enum FormulaOperator {
@@ -106,6 +107,7 @@ model IKUFormula {
   description    String?
   finalResultKey String               @default("RESULT")
   isActive       Boolean              @default(true) @map("is_active")
+  isFinal        Boolean              @default(false) @map("is_final")
   version        Int                  @default(1)
   createdAt      DateTime             @default(now()) @map("created_at")
   updatedAt      DateTime             @updatedAt @map("updated_at")

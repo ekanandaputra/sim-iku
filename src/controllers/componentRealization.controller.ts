@@ -20,9 +20,10 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     return;
   }
 
-  const activeFormulas = await prisma.iKUFormula.findMany({
+  // First, check if there are any isFinal formulas that use this component
+  const finalFormulas = await prisma.iKUFormula.findMany({
     where: {
-      isActive: true,
+      isFinal: true,
       details: {
         some: {
           OR: [
@@ -39,13 +40,40 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     },
   });
 
-  console.log("Active formulas found", { count: activeFormulas.length });
-  if (!activeFormulas.length) {
+  // Determine which formulas to calculate
+  let formulasToCalculate = finalFormulas;
+
+  // If no final formulas found, fall back to all active formulas
+  if (finalFormulas.length === 0) {
+    console.log("No final formulas found, falling back to active formulas");
+    formulasToCalculate = await prisma.iKUFormula.findMany({
+      where: {
+        isActive: true,
+        details: {
+          some: {
+            OR: [
+              { leftType: "component", leftValue: component.code },
+              { rightType: "component", rightValue: component.code },
+            ],
+          },
+        },
+      },
+      include: {
+        details: {
+          orderBy: { sequence: "asc" },
+        },
+      },
+    });
+  } else {
+    console.log("Final formulas found, using only those for KPI calculation", { count: finalFormulas.length });
+  }
+
+  if (!formulasToCalculate.length) {
     return;
   }
 
   const requiredCodes = new Set<string>();
-  for (const formula of activeFormulas) {
+  for (const formula of formulasToCalculate) {
     for (const detail of formula.details) {
       if (detail.leftType === "component") {
         requiredCodes.add(detail.leftValue);
@@ -79,7 +107,7 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     }
   }
 
-  for (const formula of activeFormulas) {
+  for (const formula of formulasToCalculate) {
     const formulaCodes = new Set<string>();
     for (const detail of formula.details) {
       if (detail.leftType === "component") {
@@ -117,7 +145,7 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
       continue;
     }
 
-    console.log("Evaluating formula", { formulaId: formula.id, componentValues });
+    console.log("Evaluating formula", { formulaId: formula.id, isFinal: formula.isFinal, componentValues });
     try {
       const evaluation = await evaluateFormula(formula.id, componentValues);
       await prisma.ikuResult.upsert({

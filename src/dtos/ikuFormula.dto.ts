@@ -27,6 +27,10 @@ export class IkuFormulaCreateDto {
   isActive?: boolean;
 
   @IsOptional()
+  @IsBoolean({ message: "isFinal must be a boolean" })
+  isFinal?: boolean;
+
+  @IsOptional()
   @IsArray({ message: "Steps must be an array" })
   @ValidateNested({ each: true })
   @Type(() => IkuFormulaDetailCreateDto)
@@ -52,6 +56,10 @@ export class IkuFormulaUpdateDto {
   @IsOptional()
   @IsBoolean({ message: "isActive must be a boolean" })
   isActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: "isFinal must be a boolean" })
+  isFinal?: boolean;
 
   @IsOptional()
   @IsArray({ message: "Steps must be an array" })
