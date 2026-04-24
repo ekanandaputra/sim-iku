@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
-import { evaluateFormula, ComponentValues } from "../utils/formula";
+import { evaluateFormula, ComponentValues, getFormulaRequiredComponentCodes } from "../utils/formula";
 
 type RealizationParams = { id: string };
 
@@ -20,10 +20,9 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     return;
   }
 
-  // First, check if there are any isFinal formulas that use this component
-  const finalFormulas = await prisma.iKUFormula.findMany({
+  const affectedFormulas = await prisma.iKUFormula.findMany({
     where: {
-      isFinal: true,
+      isActive: true,
       details: {
         some: {
           OR: [
@@ -33,30 +32,23 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
         },
       },
     },
-    include: {
-      details: {
-        orderBy: { sequence: "asc" },
-      },
-    },
+    select: { ikuId: true },
   });
 
-  // Determine which formulas to calculate
-  let formulasToCalculate = finalFormulas;
+  const affectedIkuIds = Array.from(new Set(affectedFormulas.map(f => f.ikuId)));
 
-  // If no final formulas found, fall back to all active formulas
-  if (finalFormulas.length === 0) {
-    console.log("No final formulas found, falling back to active formulas");
-    formulasToCalculate = await prisma.iKUFormula.findMany({
+  if (affectedIkuIds.length === 0) {
+    console.log("No active formulas found using this component directly");
+    return;
+  }
+
+  const formulasToCalculate = [];
+  for (const ikuId of affectedIkuIds) {
+    let finalFormula = await prisma.iKUFormula.findFirst({
       where: {
+        ikuId,
+        isFinal: true,
         isActive: true,
-        details: {
-          some: {
-            OR: [
-              { leftType: "component", leftValue: component.code },
-              { rightType: "component", rightValue: component.code },
-            ],
-          },
-        },
       },
       include: {
         details: {
@@ -64,58 +56,60 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
         },
       },
     });
-  } else {
-    console.log("Final formulas found, using only those for KPI calculation", { count: finalFormulas.length });
-  }
 
-  if (!formulasToCalculate.length) {
-    return;
-  }
+    if (!finalFormula) {
+      console.log(`No active isFinal=true formula found for IKU ${ikuId}, falling back to last active formula`);
+      finalFormula = await prisma.iKUFormula.findFirst({
+        where: {
+          ikuId,
+          isActive: true,
+        },
+        orderBy: { version: "desc" },
+        include: {
+          details: {
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
+    }
 
-  const requiredCodes = new Set<string>();
-  for (const formula of formulasToCalculate) {
-    for (const detail of formula.details) {
-      if (detail.leftType === "component") {
-        requiredCodes.add(detail.leftValue);
-      }
-      if (detail.rightType === "component") {
-        requiredCodes.add(detail.rightValue);
-      }
+    if (finalFormula) {
+      formulasToCalculate.push(finalFormula);
     }
   }
 
-  const components = requiredCodes.size > 0
-    ? await prisma.component.findMany({ where: { code: { in: Array.from(requiredCodes) } } })
-    : [];
+  if (formulasToCalculate.length === 0) {
+    return;
+  }
 
-  const codeToComponent = new Map<string, { id: string; code: string; periodType: string }>();
-  components.forEach((c) => codeToComponent.set(c.code, { id: c.id, code: c.code, periodType: c.periodType }));
+  for (const formula of formulasToCalculate) {
+    const requiredCodesSet = await getFormulaRequiredComponentCodes(formula.id);
+    const formulaCodes = Array.from(requiredCodesSet);
 
-  const realizationsByComponentId = new Map<string, any[]>();
-  if (components.length > 0) {
+    if (formulaCodes.length === 0) {
+      continue;
+    }
+
+    const components = await prisma.component.findMany({
+      where: { code: { in: formulaCodes } }
+    });
+
+    const codeToComponent = new Map<string, { id: string; code: string; periodType: string }>();
+    components.forEach((c) => codeToComponent.set(c.code, { id: c.id, code: c.code, periodType: c.periodType }));
+
+    const componentIds = components.map(c => c.id);
     const realizations = await prisma.componentRealization.findMany({
       where: {
-        idComponent: { in: components.map((c) => c.id) },
+        idComponent: { in: componentIds },
         year,
       },
     });
 
+    const realizationsByComponentId = new Map<string, any[]>();
     for (const realization of realizations) {
       const items = realizationsByComponentId.get(realization.idComponent) || [];
       items.push(realization);
       realizationsByComponentId.set(realization.idComponent, items);
-    }
-  }
-
-  for (const formula of formulasToCalculate) {
-    const formulaCodes = new Set<string>();
-    for (const detail of formula.details) {
-      if (detail.leftType === "component") {
-        formulaCodes.add(detail.leftValue);
-      }
-      if (detail.rightType === "component") {
-        formulaCodes.add(detail.rightValue);
-      }
     }
 
     const componentValues: ComponentValues = {};
@@ -142,6 +136,7 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     }
 
     if (missingData) {
+      console.log(`Missing data for formula ${formula.id}, skipping evaluation.`);
       continue;
     }
 

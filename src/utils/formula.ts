@@ -77,6 +77,27 @@ export async function evaluateFormula(
       return componentValues[value];
     }
 
+    if (type === FormulaOperandType.formula_ref) {
+      const ref = value.trim();
+      if (!ref) {
+        throw new Error("Formula reference must include an id or name");
+      }
+
+      let refFormula = await prisma.iKUFormula.findUnique({ where: { id: ref } });
+      if (!refFormula) {
+        refFormula = await prisma.iKUFormula.findFirst({
+          where: { name: ref, ikuId: formula.ikuId },
+        });
+      }
+
+      if (!refFormula) {
+        throw new Error(`Formula reference '${ref}' not found`);
+      }
+
+      const evaluation = await evaluateFormula(refFormula.id, componentValues, visited);
+      return evaluation.result;
+    }
+
     if (type === FormulaOperandType.constant) {
       const parsed = Number(value);
       if (Number.isNaN(parsed)) {
@@ -154,4 +175,67 @@ export async function evaluateFormula(
     result: tempResults[finalKey],
     steps,
   };
+}
+
+export async function getFormulaRequiredComponentCodes(
+  formulaId: string,
+  visited: Set<string> = new Set()
+): Promise<Set<string>> {
+  if (visited.has(formulaId)) return new Set();
+  visited.add(formulaId);
+
+  const formula = await prisma.iKUFormula.findUnique({
+    where: { id: formulaId },
+    include: { details: true },
+  });
+
+  if (!formula || !formula.isActive) return new Set();
+
+  const codes = new Set<string>();
+
+  for (const step of formula.details) {
+    if (step.leftType === FormulaOperandType.component) {
+      if (step.leftValue.startsWith("formula:")) {
+        const ref = step.leftValue.slice("formula:".length).trim();
+        let refFormula = await prisma.iKUFormula.findUnique({ where: { id: ref } });
+        if (!refFormula) refFormula = await prisma.iKUFormula.findFirst({ where: { name: ref, ikuId: formula.ikuId } });
+        if (refFormula) {
+          const subCodes = await getFormulaRequiredComponentCodes(refFormula.id, visited);
+          subCodes.forEach(c => codes.add(c));
+        }
+      } else {
+        codes.add(step.leftValue);
+      }
+    } else if (step.leftType === FormulaOperandType.formula_ref) {
+      let refFormula = await prisma.iKUFormula.findUnique({ where: { id: step.leftValue } });
+      if (!refFormula) refFormula = await prisma.iKUFormula.findFirst({ where: { name: step.leftValue, ikuId: formula.ikuId } });
+      if (refFormula) {
+        const subCodes = await getFormulaRequiredComponentCodes(refFormula.id, visited);
+        subCodes.forEach(c => codes.add(c));
+      }
+    }
+
+    if (step.rightType === FormulaOperandType.component) {
+      if (step.rightValue.startsWith("formula:")) {
+        const ref = step.rightValue.slice("formula:".length).trim();
+        let refFormula = await prisma.iKUFormula.findUnique({ where: { id: ref } });
+        if (!refFormula) refFormula = await prisma.iKUFormula.findFirst({ where: { name: ref, ikuId: formula.ikuId } });
+        if (refFormula) {
+          const subCodes = await getFormulaRequiredComponentCodes(refFormula.id, visited);
+          subCodes.forEach(c => codes.add(c));
+        }
+      } else {
+        codes.add(step.rightValue);
+      }
+    } else if (step.rightType === FormulaOperandType.formula_ref) {
+      let refFormula = await prisma.iKUFormula.findUnique({ where: { id: step.rightValue } });
+      if (!refFormula) refFormula = await prisma.iKUFormula.findFirst({ where: { name: step.rightValue, ikuId: formula.ikuId } });
+      if (refFormula) {
+        const subCodes = await getFormulaRequiredComponentCodes(refFormula.id, visited);
+        subCodes.forEach(c => codes.add(c));
+      }
+    }
+  }
+
+  return codes;
 }
