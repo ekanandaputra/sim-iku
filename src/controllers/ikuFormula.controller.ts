@@ -3,7 +3,7 @@ import { plainToInstance } from "class-transformer";
 import { validate, ValidationError } from "class-validator";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
-import { evaluateFormula } from "../utils/formula";
+import { evaluateFormula, getFormulaRequiredComponentCodes } from "../utils/formula";
 import { IkuFormulaDetailCreateDto, IkuFormulaDetailUpdateItemDto } from "../dtos/ikuFormulaDetail.dto";
 
 type PaginationQuery = {
@@ -391,32 +391,15 @@ export const getFormulaComponents = async (
       return res.status(404).json(errorResponse("Formula not found"));
     }
 
-    const steps = await prisma.iKUFormulaDetail.findMany({
-      where: { formulaId },
-      orderBy: { sequence: "asc" },
-    });
-
-    // Filter steps where left or right type is 'component'
-    const componentSteps = steps.filter(
-      (step) => step.leftType === "component" || step.rightType === "component"
-    );
-
-    // Collect unique component codes
-    const componentCodes = new Set<string>();
-    componentSteps.forEach((step) => {
-      if (step.leftType === "component") {
-        componentCodes.add(step.leftValue);
-      }
-      if (step.rightType === "component") {
-        componentCodes.add(step.rightValue);
-      }
-    });
-
+    // Use the utility function to recursively get all required component codes
+    // This handles both direct components and components nested inside formula_refs
+    const componentCodesSet = await getFormulaRequiredComponentCodes(formulaId);
+    
     // Query components
     const components = await prisma.component.findMany({
       where: {
         code: {
-          in: Array.from(componentCodes),
+          in: Array.from(componentCodesSet),
         },
       },
     });

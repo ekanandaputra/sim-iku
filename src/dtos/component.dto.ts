@@ -1,5 +1,5 @@
 import { IsEnum, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
-import { ComponentDataType, ComponentSourceType } from "../generated/prisma/enums";
+import { ComponentDataType, ComponentSourceType, ComponentPeriodType } from "../generated/prisma/enums";
 
 export class ComponentCreateDto {
   @IsNotEmpty({ message: "Code is required" })
@@ -24,6 +24,10 @@ export class ComponentCreateDto {
   @IsOptional()
   @IsEnum(ComponentSourceType, { message: "Source type must be one of: database, api, manual" })
   sourceType?: ComponentSourceType;
+
+  @IsOptional()
+  @IsEnum(ComponentPeriodType, { message: "Period type must be one of: monthly, quarter, semester, yearly" })
+  periodType?: ComponentPeriodType;
 }
 
 export class ComponentUpdateDto {
@@ -49,4 +53,8 @@ export class ComponentUpdateDto {
   @IsOptional()
   @IsEnum(ComponentSourceType, { message: "Source type must be one of: database, api, manual" })
   sourceType?: ComponentSourceType;
+
+  @IsOptional()
+  @IsEnum(ComponentPeriodType, { message: "Period type must be one of: monthly, quarter, semester, yearly" })
+  periodType?: ComponentPeriodType;
 }
