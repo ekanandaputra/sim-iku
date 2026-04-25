@@ -58,19 +58,7 @@ async function calculateIkuResultsForComponentRealization(idComponent: string, m
     });
 
     if (!finalFormula) {
-      console.log(`No active isFinal=true formula found for IKU ${ikuId}, falling back to last active formula`);
-      finalFormula = await prisma.iKUFormula.findFirst({
-        where: {
-          ikuId,
-          isActive: true,
-        },
-        orderBy: { version: "desc" },
-        include: {
-          details: {
-            orderBy: { sequence: "asc" },
-          },
-        },
-      });
+      throw new Error(`Tidak ada formula aktif dengan isFinal=true untuk IKU ${ikuId}`);
     }
 
     if (finalFormula) {

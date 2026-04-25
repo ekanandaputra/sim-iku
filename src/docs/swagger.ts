@@ -2073,7 +2073,7 @@ const swaggerDefinition = {
         tags: ["ComponentRealization"],
         summary: "Create or update a component realization",
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationCreate" } } } },
-        responses: { "201": { description: "Created or updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "400": { description: "Validation or business error", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } } },
+        responses: { "201": { description: "Created or updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "400": { description: "Validation error, or no isFinal formula found for IKU", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } } },
       },
     },
     "/api/component-realizations/{id}": {
@@ -2089,7 +2089,7 @@ const swaggerDefinition = {
         summary: "Update component realization value",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }}],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationUpdate" } } } },
-        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "400": { description: "Validation error, or no isFinal formula found for IKU", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
       delete: {
         tags: ["ComponentRealization"],
