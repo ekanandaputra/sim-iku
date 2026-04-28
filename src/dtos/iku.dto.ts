@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, Length, IsUUID } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, Length, IsUUID, IsBoolean, IsEnum } from "class-validator";
 
 export class IkuCreateDto {
   @IsNotEmpty({ message: "Code is required" })
@@ -15,6 +15,14 @@ export class IkuCreateDto {
   @IsString({ message: "Description must be a string" })
   @Length(0, 500, { message: "Description must be at most 500 characters" })
   description?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: "isDirectInput must be a boolean" })
+  isDirectInput?: boolean;
+
+  @IsOptional()
+  @IsEnum(["percentage", "text", "number", "file"], { message: "Unit must be one of: percentage, text, number, file" })
+  unit?: string;
 }
 
 export class IkuUpdateDto {
@@ -32,6 +40,14 @@ export class IkuUpdateDto {
   @IsString({ message: "Description must be a string" })
   @Length(0, 500, { message: "Description must be at most 500 characters" })
   description?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: "isDirectInput must be a boolean" })
+  isDirectInput?: boolean;
+
+  @IsOptional()
+  @IsEnum(["percentage", "text", "number", "file"], { message: "Unit must be one of: percentage, text, number, file" })
+  unit?: string;
 }
 
 export class IkuComponentMappingDto {

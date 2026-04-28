@@ -43,6 +43,8 @@ const swaggerDefinition = {
           code: { type: "string" },
           name: { type: "string" },
           description: { type: "string", nullable: true },
+          isDirectInput: { type: "boolean", default: false },
+          unit: { type: "string", enum: ["percentage", "text", "number", "file"], default: "percentage" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -54,6 +56,8 @@ const swaggerDefinition = {
           code: { type: "string", maxLength: 50 },
           name: { type: "string", maxLength: 200 },
           description: { type: "string", maxLength: 500 },
+          isDirectInput: { type: "boolean", default: false },
+          unit: { type: "string", enum: ["percentage", "text", "number", "file"], default: "percentage" },
         },
         required: ["code", "name"],
       },
@@ -63,6 +67,8 @@ const swaggerDefinition = {
           code: { type: "string", maxLength: 50 },
           name: { type: "string", maxLength: 200 },
           description: { type: "string", maxLength: 500 },
+          isDirectInput: { type: "boolean" },
+          unit: { type: "string", enum: ["percentage", "text", "number", "file"] },
         },
         required: ["code", "name"],
       },
@@ -649,9 +655,90 @@ const swaggerDefinition = {
           targetYear: { type: "number" },
         },
       },
+      RealizationMetric: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          type: { type: "string", enum: ["IKU", "COMPONENT"] },
+          code: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string", nullable: true },
+          unit: { type: "string", enum: ["percentage", "text", "number", "file"] },
+          isDirectInput: { type: "boolean" },
+          dataType: { type: "string", enum: ["number", "percentage", "integer"] },
+          sourceType: { type: "string", enum: ["database", "api", "manual"] },
+          periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        }
+      },
+      SuccessResponseListRealizationMetrics: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RealizationMetric" },
+          },
+          pagination: {
+            type: "object",
+            properties: {
+              page: { type: "integer" },
+              limit: { type: "integer" },
+              total: { type: "integer" },
+              totalPages: { type: "integer" },
+            }
+          }
+        }
+      },
     },
   },
   paths: {
+    "/api/realizations/metrics": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["ComponentRealization"],
+        summary: "List metrics (IKU & Component) available for realization",
+        description: "Returns a paginated, unified list of IKUs (where isDirectInput=true) and Components. Filter by name and tag (tag only applies to Components).",
+        parameters: [
+          {
+            name: "page",
+            in: "query",
+            schema: { type: "integer", minimum: 1, default: 1 },
+            description: "Page number (1-based)",
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            description: "Number of items per page",
+          },
+          {
+            name: "name",
+            in: "query",
+            schema: { type: "string" },
+            description: "Filter metrics by name (substring match)",
+          },
+          {
+            name: "tag",
+            in: "query",
+            schema: { type: "string" },
+            description: "Filter Components by tag name (substring match). IKUs will not be returned if tag is provided.",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Unified list of Realization Metrics",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponseListRealizationMetrics" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/dashboard/iku": {
       security: [{ bearerAuth: [] }],
       get: {
@@ -1002,7 +1089,7 @@ const swaggerDefinition = {
               schema: { $ref: "#/components/schemas/IkuCreate" },
               examples: {
                 sample: {
-                  value: { code: "IKU001", name: "Water Quality Index", description: "Indicator for measuring water quality" },
+                  value: { code: "IKU001", name: "Water Quality Index", description: "Indicator for measuring water quality", isDirectInput: false, unit: "percentage" },
                 },
               },
             },
@@ -1080,7 +1167,7 @@ const swaggerDefinition = {
               schema: { $ref: "#/components/schemas/IkuUpdate" },
               examples: {
                 sample: {
-                  value: { code: "IKU001", name: "Updated name", description: "Updated description" },
+                  value: { code: "IKU001", name: "Updated name", description: "Updated description", isDirectInput: true, unit: "file" },
                 },
               },
             },

@@ -85,7 +85,7 @@ export const createIku = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description } = req.body;
+    const { code, name, description, isDirectInput, unit } = req.body;
 
     const existing = await prisma.iKU.findUnique({
       where: { code },
@@ -95,12 +95,22 @@ export const createIku = async (
       return res.status(400).json(errorResponse("IKU code already exists"));
     }
 
+    const ikuData: any = {
+      code,
+      name,
+      description,
+    };
+
+    if (isDirectInput !== undefined) {
+      ikuData.isDirectInput = isDirectInput;
+    }
+
+    if (unit !== undefined) {
+      ikuData.unit = unit;
+    }
+
     const iku = await prisma.iKU.create({
-      data: {
-        code,
-        name,
-        description,
-      },
+      data: ikuData,
     });
 
     res.status(201).json(successResponse(iku, "IKU created successfully"));
@@ -120,7 +130,7 @@ export const updateIku = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description } = req.body;
+    const { code, name, description, isDirectInput, unit } = req.body;
 
     const existing = await prisma.iKU.findUnique({
       where: { id },
@@ -140,13 +150,23 @@ export const updateIku = async (
       }
     }
 
+    const updateData: any = {
+      code,
+      name,
+      description,
+    };
+
+    if (isDirectInput !== undefined) {
+      updateData.isDirectInput = isDirectInput;
+    }
+
+    if (unit !== undefined) {
+      updateData.unit = unit;
+    }
+
     const updated = await prisma.iKU.update({
       where: { id },
-      data: {
-        code,
-        name,
-        description,
-      },
+      data: updateData,
     });
 
     res.json(successResponse(updated, "IKU updated successfully"));

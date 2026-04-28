@@ -33,17 +33,26 @@ enum ComponentPeriodType {
   yearly
 }
 
+enum IkuUnitType {
+  percentage
+  text
+  number
+  file
+}
+
 model IKU {
-  id          String          @id @default(uuid()) @db.VarChar(36)
-  code        String          @unique
-  name        String
-  description String?
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  components  IKUComponent[]
-  formulas    IKUFormula[]
-  iku_results IkuResult[]
-  targets     IkuTarget[]
+  id            String          @id @default(uuid()) @db.VarChar(36)
+  code          String          @unique
+  name          String
+  description   String?
+  isDirectInput Boolean         @default(false) @map("is_direct_input")
+  unit          IkuUnitType     @default(percentage)
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  components    IKUComponent[]
+  formulas      IKUFormula[]
+  iku_results   IkuResult[]
+  targets       IkuTarget[]
   @@map("ikus")
 }
 
