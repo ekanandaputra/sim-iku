@@ -368,20 +368,22 @@ const MONTH_NAMES = [
 //   semester → month = 6, 12        (akhir semester)
 //   monthly  → month = 1 – 12
 
+const YEARS_RANGE = 6; // tahun ini + 5 tahun sebelumnya
+
 type RealizationViewQuery = { year?: string };
 
 /**
  * GET COMPONENT REALIZATION VIEW
  * GET /api/components/:id/realization?year=2024
  *
- * Baris realisasi disesuaikan dengan periodType komponen:
- *   - yearly   → 1 baris (year, value)
- *   - quarter  → 4 baris (Q1–Q4 dengan month konvensi akhir kuartal)
- *   - semester → 2 baris (S1–S2 dengan month konvensi akhir semester)
- *   - monthly  → 12 baris (per bulan)
+ * Mengembalikan data untuk 6 tahun (tahun yang dipilih + 5 tahun sebelumnya).
+ * Semua target dan realisasi di-fetch dalam batch tunggal lalu di-group per tahun.
  *
- * id null pada baris = belum ada data → frontend kirim POST
- * id ada            = sudah ada data  → frontend kirim PUT
+ * Baris realisasi disesuaikan dengan periodType:
+ *   - yearly   → 1 baris per tahun
+ *   - quarter  → 4 baris per tahun (Q1–Q4, konvensi akhir kuartal)
+ *   - semester → 2 baris per tahun (S1–S2, konvensi akhir semester)
+ *   - monthly  → 12 baris per tahun
  */
 export const getComponentRealizationView = async (
   req: Request<ComponentParams, {}, {}, RealizationViewQuery>,
@@ -390,7 +392,8 @@ export const getComponentRealizationView = async (
 ) => {
   try {
     const { id } = req.params;
-    const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
+    const baseYear = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
+    const years = Array.from({ length: YEARS_RANGE }, (_, i) => baseYear - i); // [2024, 2023, ..., 2019]
 
     const component = await prisma.component.findUnique({
       where: { id },
@@ -404,20 +407,28 @@ export const getComponentRealizationView = async (
       return res.status(404).json(errorResponse("Component not found"));
     }
 
-    // Ambil target tahun ini
-    const target = await prisma.componentTarget.findUnique({
-      where: { componentId_year: { componentId: id, year } },
-    });
+    // Batch fetch: semua target dan realisasi untuk rentang tahun sekaligus
+    const [allTargets, allRealizations] = await Promise.all([
+      prisma.componentTarget.findMany({
+        where: { componentId: id, year: { in: years } },
+      }),
+      prisma.componentRealization.findMany({
+        where: { idComponent: id, year: { in: years } },
+      }),
+    ]);
 
-    // Ambil semua realisasi untuk tahun ini
-    const realizationsRaw = await prisma.componentRealization.findMany({
-      where: { idComponent: id, year },
-    });
+    // Index target by year
+    const targetByYear = new Map(allTargets.map((t) => [t.year, t]));
 
-    // Index by month (null → 0)
-    const byMonth = new Map(realizationsRaw.map((r) => [r.month ?? 0, r]));
+    // Index realisasi by year → month
+    const realizationsByYear = new Map<number, Map<number, typeof allRealizations[0]>>();
+    for (const r of allRealizations) {
+      if (!realizationsByYear.has(r.year)) realizationsByYear.set(r.year, new Map());
+      realizationsByYear.get(r.year)!.set(r.month ?? 0, r);
+    }
 
-    const row = (monthKey: number | 0, extra: object) => {
+    // Helper bangun satu baris realisasi
+    const buildRow = (byMonth: Map<number, typeof allRealizations[0]>, year: number, monthKey: number, extra: object) => {
       const r = byMonth.get(monthKey);
       return {
         id: r?.idRealization ?? null,
@@ -428,37 +439,56 @@ export const getComponentRealizationView = async (
       };
     };
 
-    let realizations: object[];
+    // Helper bangun array rows untuk satu tahun berdasarkan periodType
+    const buildRows = (byMonth: Map<number, typeof allRealizations[0]>, year: number): object[] => {
+      const row = (monthKey: number, extra: object) => buildRow(byMonth, year, monthKey, extra);
 
-    switch (component.periodType) {
-      case "yearly":
-        realizations = [row(0, {})];
-        break;
+      switch (component.periodType) {
+        case "yearly":
+          return [row(0, {})];
 
-      case "quarter":
-        realizations = [
-          row(3,  { quarter: "Q1", month: 3 }),
-          row(6,  { quarter: "Q2", month: 6 }),
-          row(9,  { quarter: "Q3", month: 9 }),
-          row(12, { quarter: "Q4", month: 12 }),
-        ];
-        break;
+        case "quarter":
+          return [
+            row(3,  { quarter: "Q1", month: 3 }),
+            row(6,  { quarter: "Q2", month: 6 }),
+            row(9,  { quarter: "Q3", month: 9 }),
+            row(12, { quarter: "Q4", month: 12 }),
+          ];
 
-      case "semester":
-        realizations = [
-          row(6,  { semester: "S1", month: 6 }),
-          row(12, { semester: "S2", month: 12 }),
-        ];
-        break;
+        case "semester":
+          return [
+            row(6,  { semester: "S1", month: 6 }),
+            row(12, { semester: "S2", month: 12 }),
+          ];
 
-      case "monthly":
-      default:
-        realizations = Array.from({ length: 12 }, (_, i) => {
-          const month = i + 1;
-          return row(month, { month, monthName: MONTH_NAMES[i] });
-        });
-        break;
-    }
+        case "monthly":
+        default:
+          return Array.from({ length: 12 }, (_, i) => {
+            const month = i + 1;
+            return row(month, { month, monthName: MONTH_NAMES[i] });
+          });
+      }
+    };
+
+    // Susun data per tahun (descending)
+    const data = years.map((year) => {
+      const target = targetByYear.get(year) ?? null;
+      const byMonth = realizationsByYear.get(year) ?? new Map();
+
+      return {
+        year,
+        target: {
+          id: target?.id ?? null,
+          targetQ1: target ? Number(target.targetQ1) : null,
+          targetQ2: target ? Number(target.targetQ2) : null,
+          targetQ3: target ? Number(target.targetQ3) : null,
+          targetQ4: target ? Number(target.targetQ4) : null,
+          targetYear: target ? Number(target.targetYear) : null,
+          _action: target ? "PUT" : "POST",
+        },
+        realizations: buildRows(byMonth, year),
+      };
+    });
 
     res.json(successResponse({
       component: {
@@ -472,20 +502,15 @@ export const getComponentRealizationView = async (
         tags: component.tags.map((ct) => ct.tag),
         ikus: component.ikus.map((ci) => ci.iku),
       },
-      year,
-      target: {
-        id: target?.id ?? null,
-        targetQ1: target ? Number(target.targetQ1) : null,
-        targetQ2: target ? Number(target.targetQ2) : null,
-        targetQ3: target ? Number(target.targetQ3) : null,
-        targetQ4: target ? Number(target.targetQ4) : null,
-        targetYear: target ? Number(target.targetYear) : null,
-        _action: target ? "PUT" : "POST",
-      },
-      realizations,
+      years,      // daftar tahun yang di-return
+      data,       // array per tahun, descending
     }));
   } catch (error) {
     next(error);
   }
 };
+
+
+
+
 
