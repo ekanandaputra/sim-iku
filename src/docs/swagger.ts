@@ -1366,6 +1366,18 @@ const swaggerDefinition = {
             schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
             description: "Number of items per page",
           },
+          {
+            name: "name",
+            in: "query",
+            schema: { type: "string" },
+            description: "Filter components by name (substring match)",
+          },
+          {
+            name: "tag",
+            in: "query",
+            schema: { type: "string" },
+            description: "Filter components by tag name (substring match)",
+          },
         ],
         responses: {
           "200": {
