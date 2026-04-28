@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
+import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, Length } from "class-validator";
 import { ComponentDataType, ComponentSourceType, ComponentPeriodType } from "../generated/prisma/enums";
 
 export class ComponentCreateDto {
@@ -28,6 +28,11 @@ export class ComponentCreateDto {
   @IsOptional()
   @IsEnum(ComponentPeriodType, { message: "Period type must be one of: monthly, quarter, semester, yearly" })
   periodType?: ComponentPeriodType;
+
+  @IsOptional()
+  @IsArray({ message: "tagIds must be an array" })
+  @IsUUID(undefined, { each: true, message: "Each tagId must be a valid UUID" })
+  tagIds?: string[];
 }
 
 export class ComponentUpdateDto {

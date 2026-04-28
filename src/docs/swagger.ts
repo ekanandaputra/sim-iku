@@ -24,6 +24,7 @@ const swaggerDefinition = {
     { name: "ComponentTarget", description: "Component target endpoints" },
     { name: "Dashboard", description: "Dashboard visualization endpoints" },
     { name: "Document", description: "Document upload and tagging endpoints" },
+    { name: "Tag", description: "Tag management and assignment endpoints" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -89,6 +90,8 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
+          ikus: { type: "array", items: { $ref: "#/components/schemas/IkuRef" } },
         },
         required: ["code", "name"],
       },
@@ -103,6 +106,98 @@ const swaggerDefinition = {
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
         },
         required: ["code", "name"],
+      },
+      Tag: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string", example: "Prioritas Nasional" },
+          color: { type: "string", nullable: true, example: "#3B82F6" },
+          deletedAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "name"],
+      },
+      TagCreate: {
+        type: "object",
+        properties: {
+          name: { type: "string", example: "Prioritas Nasional" },
+          color: { type: "string", nullable: true, example: "#3B82F6", description: "Hex color code (#RRGGBB)" },
+        },
+        required: ["name"],
+      },
+      TagUpdate: {
+        type: "object",
+        properties: {
+          name: { type: "string", example: "Prioritas Nasional" },
+          color: { type: "string", nullable: true, example: "#3B82F6", description: "Hex color code (#RRGGBB)" },
+        },
+      },
+      IkuRef: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string" },
+          name: { type: "string" },
+        },
+        required: ["id", "code", "name"],
+      },
+      ComponentWithMeta: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string", nullable: true },
+          dataType: { type: "string", enum: ["number", "percentage", "integer"], nullable: true },
+          sourceType: { type: "string", enum: ["database", "api", "manual"], nullable: true },
+          periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
+          ikus: { type: "array", items: { $ref: "#/components/schemas/IkuRef" } },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "code", "name"],
+      },
+      RealizationRow: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid", nullable: true, description: "null jika belum ada realisasi bulan ini" },
+          month: { type: "integer", minimum: 1, maximum: 12 },
+          monthName: { type: "string", example: "Januari" },
+          year: { type: "integer" },
+          value: { type: "number", nullable: true },
+        },
+      },
+      QuarterSummary: {
+        type: "object",
+        properties: {
+          quarter: { type: "string", example: "Q1" },
+          months: { type: "array", items: { type: "integer" }, example: [1, 2, 3] },
+          target: { type: "number", nullable: true },
+        },
+      },
+      ComponentRealizationView: {
+        type: "object",
+        properties: {
+          component: { $ref: "#/components/schemas/ComponentWithMeta" },
+          year: { type: "integer", example: 2024 },
+          target: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid", nullable: true },
+              targetQ1: { type: "number", nullable: true },
+              targetQ2: { type: "number", nullable: true },
+              targetQ3: { type: "number", nullable: true },
+              targetQ4: { type: "number", nullable: true },
+              targetYear: { type: "number", nullable: true },
+              _action: { type: "string", enum: ["POST", "PUT"], description: "Hint: POST jika target belum ada, PUT jika sudah ada" },
+            },
+          },
+          quarters: { type: "array", items: { $ref: "#/components/schemas/QuarterSummary" } },
+          realizations: { type: "array", items: { $ref: "#/components/schemas/RealizationRow" } },
+        },
       },
       SuccessResponseSingleComponent: {
         type: "object",
@@ -2064,8 +2159,10 @@ const swaggerDefinition = {
         tags: ["ComponentRealization"],
         summary: "List component realizations",
         parameters: [
-          { name: "idComponent", in: "query", schema: { type: "string" } },
-          { name: "idPeriod", in: "query", schema: { type: "string", format: "uuid" } },
+          { name: "idComponent", in: "query", schema: { type: "string", format: "uuid" }, description: "Filter by component ID" },
+          { name: "month", in: "query", schema: { type: "integer", minimum: 1, maximum: 12 }, description: "Filter by month" },
+          { name: "year", in: "query", schema: { type: "integer" }, description: "Filter by year" },
+          { name: "tagId", in: "query", schema: { type: "string", format: "uuid" }, description: "Filter by tag — hanya tampilkan realisasi komponen yang memiliki tag ini" },
         ],
         responses: { "200": { description: "List records", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/ComponentRealization" } } } } } } } },
       },
@@ -2217,6 +2314,129 @@ const swaggerDefinition = {
         summary: "Delete component target",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+    },
+
+    // ─── TAG CRUD ─────────────────────────────────────────────────────────────
+    "/api/tags": {
+      get: {
+        tags: ["Tag"],
+        summary: "List all tags",
+        parameters: [
+          { name: "name", in: "query", schema: { type: "string" }, description: "Filter by name (partial match)" },
+          { name: "includeDeleted", in: "query", schema: { type: "boolean", default: false }, description: "Include soft-deleted tags" },
+        ],
+        responses: {
+          "200": {
+            description: "List of tags",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/Tag" } } } } } },
+          },
+        },
+      },
+      post: {
+        tags: ["Tag"],
+        summary: "Create a new tag",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/TagCreate" }, examples: { sample: { value: { name: "Prioritas Nasional", color: "#3B82F6" } } } } },
+        },
+        responses: {
+          "201": { description: "Tag created", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Tag" } } } } } },
+          "400": { description: "Validation or duplicate name", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+    "/api/tags/{id}": {
+      get: {
+        tags: ["Tag"],
+        summary: "Get tag by ID",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": { description: "Tag details with associated components", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Tag" } } } } } },
+          "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+      put: {
+        tags: ["Tag"],
+        summary: "Update a tag",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/TagUpdate" } } } },
+        responses: {
+          "200": { description: "Tag updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/Tag" } } } } } },
+          "400": { description: "Duplicate name", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+          "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+      delete: {
+        tags: ["Tag"],
+        summary: "Soft-delete a tag",
+        description: "Sets deletedAt timestamp. Tag akan disembunyikan dari semua list dan tidak bisa di-assign ke component baru.",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": { description: "Tag soft-deleted" },
+          "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+
+    // ─── COMPONENT TAG MANAGEMENT ─────────────────────────────────────────────
+    "/api/components/{id}/tags": {
+      get: {
+        tags: ["Tag"],
+        summary: "List tags assigned to a component",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" }],
+        responses: {
+          "200": { description: "List of tags", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { type: "array", items: { $ref: "#/components/schemas/Tag" } } } } } } },
+          "404": { description: "Component not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+      post: {
+        tags: ["Tag"],
+        summary: "Assign a tag to a component",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { type: "object", properties: { tagId: { type: "string", format: "uuid" } }, required: ["tagId"] } } },
+        },
+        responses: {
+          "201": { description: "Tag assigned", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } },
+          "400": { description: "Already assigned or invalid tagId", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+          "404": { description: "Component or tag not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+    "/api/components/{id}/tags/{tagId}": {
+      delete: {
+        tags: ["Tag"],
+        summary: "Unassign a tag from a component",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" },
+          { name: "tagId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Tag ID" },
+        ],
+        responses: {
+          "200": { description: "Tag unassigned" },
+          "404": { description: "Assignment not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+
+    // ─── COMPONENT REALIZATION VIEW ────────────────────────────────────────────
+    "/api/components/{id}/realization": {
+      get: {
+        tags: ["Component"],
+        summary: "Get component realization view (detail + target + realisasi per bulan)",
+        description: "Mengembalikan detail komponen, target per kuartal, dan 12 baris realisasi per bulan untuk tahun yang dipilih. Setiap baris realisasi menyertakan id (null jika belum ada) sebagai hint POST vs PUT.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" },
+          { name: "year", in: "query", schema: { type: "integer", default: 2024 }, description: "Tahun data (default: tahun berjalan)" },
+        ],
+        responses: {
+          "200": {
+            description: "Realization view data",
+            content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/ComponentRealizationView" } } } } },
+          },
+          "404": { description: "Component not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
       },
     },
   },

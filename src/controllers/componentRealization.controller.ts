@@ -9,6 +9,7 @@ type RealizationQuery = {
   idComponent?: string;
   month?: string;
   year?: string;
+  tagId?: string;
   page?: string;
   limit?: string;
 };
@@ -170,10 +171,33 @@ export const listComponentRealizations = async (
     if (req.query.month) where.month = parseInt(req.query.month);
     if (req.query.year) where.year = parseInt(req.query.year);
 
+    // Filter by tag: cari componentId yang punya tag tersebut
+    if (req.query.tagId) {
+      const componentTags = await prisma.componentTag.findMany({
+        where: { tagId: req.query.tagId, tag: { deletedAt: null } },
+        select: { componentId: true },
+      });
+
+      const componentIds = componentTags.map((ct) => ct.componentId);
+
+      if (componentIds.length === 0) {
+        return res.json(successResponse([]));
+      }
+
+      // Gabungkan dengan filter idComponent jika ada
+      if (where.idComponent) {
+        if (!componentIds.includes(where.idComponent)) {
+          return res.json(successResponse([]));
+        }
+      } else {
+        where.idComponent = { in: componentIds };
+      }
+    }
+
     const records = await prisma.componentRealization.findMany({
       where,
       orderBy: [{ year: "desc" }, { month: "desc" }],
-      include: { component: true },
+      include: { component: { include: { tags: { where: { tag: { deletedAt: null } }, include: { tag: true } } } } },
     });
     res.json(successResponse(records));
   } catch (error) {
