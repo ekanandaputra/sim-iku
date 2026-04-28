@@ -669,6 +669,7 @@ const swaggerDefinition = {
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
           tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
+          ikus: { type: "array", items: { $ref: "#/components/schemas/IkuRef" } },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         }
@@ -733,6 +734,69 @@ const swaggerDefinition = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/SuccessResponseListRealizationMetrics" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/realizations/{type}/{id}/view": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["ComponentRealization"],
+        summary: "Get Realization View for Component or IKU",
+        description: "Returns 6 years of target and realization data (selected year + 5 previous) for a specific metric type (component or iku).",
+        parameters: [
+          {
+            name: "type",
+            in: "path",
+            required: true,
+            schema: { type: "string", enum: ["component", "iku"] },
+            description: "Metric type (component or iku)",
+          },
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Metric ID",
+          },
+          {
+            name: "year",
+            in: "query",
+            schema: { type: "integer" },
+            description: "Base year (defaults to current year)",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Realization view data",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        metric: { $ref: "#/components/schemas/RealizationMetric" },
+                        years: { type: "array", items: { type: "integer" } },
+                        data: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              year: { type: "integer" },
+                              target: { type: "object" },
+                              realizations: { type: "array", items: { type: "object" } },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
               },
             },
           },

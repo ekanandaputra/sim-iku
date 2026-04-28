@@ -8,7 +8,6 @@ import {
   listComponentTags,
   assignTagToComponent,
   unassignTagFromComponent,
-  getComponentRealizationView,
 } from "../controllers/component.controller";
 import { validateBody } from "../middleware/validate";
 import { authenticate } from "../middleware/auth";
@@ -30,7 +29,5 @@ router.get("/:id/tags", listComponentTags);
 router.post("/:id/tags", assignTagToComponent);
 router.delete("/:id/tags/:tagId", unassignTagFromComponent);
 
-// Realization view (detail + target + realisasi per bulan)
-router.get("/:id/realization", getComponentRealizationView);
 
 export default router;
