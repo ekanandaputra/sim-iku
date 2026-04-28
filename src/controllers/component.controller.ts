@@ -362,17 +362,26 @@ const MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
+// Konvensi penyimpanan bulan per period type:
+//   yearly   → month = null  (key 0 di Map)
+//   quarter  → month = 3, 6, 9, 12  (akhir kuartal)
+//   semester → month = 6, 12        (akhir semester)
+//   monthly  → month = 1 – 12
+
 type RealizationViewQuery = { year?: string };
 
 /**
  * GET COMPONENT REALIZATION VIEW
  * GET /api/components/:id/realization?year=2024
  *
- * Mengembalikan detail komponen beserta target (per kuartal) dan
- * realisasi (per bulan) dalam satu payload terstruktur untuk ditampilkan
- * sebagai tabel editable. Jika target atau realisasi bulan belum ada,
- * id-nya null dan value-nya null — frontend tinggal POST untuk membuat
- * atau PUT untuk memperbarui.
+ * Baris realisasi disesuaikan dengan periodType komponen:
+ *   - yearly   → 1 baris (year, value)
+ *   - quarter  → 4 baris (Q1–Q4 dengan month konvensi akhir kuartal)
+ *   - semester → 2 baris (S1–S2 dengan month konvensi akhir semester)
+ *   - monthly  → 12 baris (per bulan)
+ *
+ * id null pada baris = belum ada data → frontend kirim POST
+ * id ada            = sudah ada data  → frontend kirim PUT
  */
 export const getComponentRealizationView = async (
   req: Request<ComponentParams, {}, {}, RealizationViewQuery>,
@@ -405,31 +414,51 @@ export const getComponentRealizationView = async (
       where: { idComponent: id, year },
     });
 
-    // Index realisasi by bulan untuk lookup O(1)
-    const realizationByMonth = new Map(
-      realizationsRaw.map((r) => [r.month ?? 0, r])
-    );
+    // Index by month (null → 0)
+    const byMonth = new Map(realizationsRaw.map((r) => [r.month ?? 0, r]));
 
-    // Bangun baris realisasi — 12 bulan, null jika belum ada
-    const realizations = Array.from({ length: 12 }, (_, i) => {
-      const month = i + 1;
-      const r = realizationByMonth.get(month);
+    const row = (monthKey: number | 0, extra: object) => {
+      const r = byMonth.get(monthKey);
       return {
         id: r?.idRealization ?? null,
-        month,
-        monthName: MONTH_NAMES[i],
         year,
         value: r ? Number(r.value) : null,
+        _action: r ? "PUT" : "POST",
+        ...extra,
       };
-    });
+    };
 
-    // Tentukan quarter mana yang aktif berdasarkan periodType
-    const quarters = [
-      { quarter: "Q1", months: [1, 2, 3], target: target ? Number(target.targetQ1) : null },
-      { quarter: "Q2", months: [4, 5, 6], target: target ? Number(target.targetQ2) : null },
-      { quarter: "Q3", months: [7, 8, 9], target: target ? Number(target.targetQ3) : null },
-      { quarter: "Q4", months: [10, 11, 12], target: target ? Number(target.targetQ4) : null },
-    ];
+    let realizations: object[];
+
+    switch (component.periodType) {
+      case "yearly":
+        realizations = [row(0, {})];
+        break;
+
+      case "quarter":
+        realizations = [
+          row(3,  { quarter: "Q1", month: 3 }),
+          row(6,  { quarter: "Q2", month: 6 }),
+          row(9,  { quarter: "Q3", month: 9 }),
+          row(12, { quarter: "Q4", month: 12 }),
+        ];
+        break;
+
+      case "semester":
+        realizations = [
+          row(6,  { semester: "S1", month: 6 }),
+          row(12, { semester: "S2", month: 12 }),
+        ];
+        break;
+
+      case "monthly":
+      default:
+        realizations = Array.from({ length: 12 }, (_, i) => {
+          const month = i + 1;
+          return row(month, { month, monthName: MONTH_NAMES[i] });
+        });
+        break;
+    }
 
     res.json(successResponse({
       component: {
@@ -451,11 +480,8 @@ export const getComponentRealizationView = async (
         targetQ3: target ? Number(target.targetQ3) : null,
         targetQ4: target ? Number(target.targetQ4) : null,
         targetYear: target ? Number(target.targetYear) : null,
-        // Hint untuk frontend: gunakan POST /api/component-targets jika id null,
-        // PUT /api/component-targets/:id jika sudah ada
         _action: target ? "PUT" : "POST",
       },
-      quarters,
       realizations,
     }));
   } catch (error) {
