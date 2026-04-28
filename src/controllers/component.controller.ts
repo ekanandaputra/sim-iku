@@ -9,6 +9,8 @@ type ComponentParams = {
 type PaginationQuery = {
   page?: string;
   limit?: string;
+  name?: string;
+  tag?: string;
 };
 
 /**
@@ -25,8 +27,30 @@ export const listComponents = async (
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
+    const nameFilter = req.query.name?.trim();
+    const tagFilter = req.query.tag?.trim();
+
+    // Build where clause
+    const where: Record<string, any> = {};
+
+    if (nameFilter) {
+      where.name = { contains: nameFilter };
+    }
+
+    if (tagFilter) {
+      where.tags = {
+        some: {
+          tag: {
+            deletedAt: null,
+            name: { contains: tagFilter },
+          },
+        },
+      };
+    }
+
     const [components, total] = await Promise.all([
       prisma.component.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
@@ -35,7 +59,7 @@ export const listComponents = async (
           ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
         },
       }),
-      prisma.component.count(),
+      prisma.component.count({ where }),
     ]);
 
     res.json(successResponse({
