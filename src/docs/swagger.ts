@@ -546,31 +546,61 @@ const swaggerDefinition = {
           idIku: { type: "string" },
           month: { type: "integer" },
           year: { type: "integer" },
-          calculatedValue: { type: "number" },
+          calculatedValue: { type: "number", nullable: true, description: "Numeric value for unit: percentage | number" },
+          metadata: {
+            type: "object",
+            nullable: true,
+            description: "JSON metadata: { text: string } for unit=text, { files: [...] } for unit=file",
+          },
           formulaVersion: { type: ["string", "null"] },
           calculatedAt: { type: "string", format: "date-time" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           iku: { type: "object" },
         },
-        required: ["idResult", "idIku", "month", "year", "calculatedValue", "calculatedAt"],
+        required: ["idResult", "idIku", "month", "year", "calculatedAt"],
       },
       IkuResultCreate: {
         type: "object",
+        description: "Create or upsert an IKU result. Provide calculatedValue for unit=percentage|number, metadata.text for unit=text, metadata.files for unit=file.",
         properties: {
           idIku: { type: "string" },
           month: { type: "integer" },
           year: { type: "integer" },
-          calculatedValue: { type: "number" },
+          calculatedValue: { type: "number", nullable: true, description: "Required for unit: percentage | number" },
+          metadata: {
+            type: "object",
+            nullable: true,
+            description: "Required for unit=text ({ text: string }) or unit=file ({ files: [{ documentId, name }] })",
+            properties: {
+              text: { type: "string", description: "For unit=text" },
+              files: {
+                type: "array",
+                description: "For unit=file",
+                items: {
+                  type: "object",
+                  properties: {
+                    documentId: { type: "string", format: "uuid" },
+                    name: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
           formulaVersion: { type: "string" },
           calculatedAt: { type: "string", format: "date-time" },
         },
-        required: ["idIku", "month", "year", "calculatedValue"],
+        required: ["idIku", "month", "year"],
       },
       IkuResultUpdate: {
         type: "object",
         properties: {
-          calculatedValue: { type: "number" },
+          calculatedValue: { type: "number", nullable: true, description: "For unit: percentage | number" },
+          metadata: {
+            type: "object",
+            nullable: true,
+            description: "For unit=text ({ text: string }) or unit=file ({ files: [...] })",
+          },
           formulaVersion: { type: "string" },
           calculatedAt: { type: "string", format: "date-time" },
         },
@@ -1008,23 +1038,41 @@ const swaggerDefinition = {
       get: {
         tags: ["Document"],
         summary: "List all uploaded documents",
+        parameters: [
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 }, description: "Page number" },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 }, description: "Items per page" },
+        ],
         responses: {
           "200": {
-            description: "List of documents",
+            description: "Paginated list of documents",
             content: {
               "application/json": {
                 schema: {
                   type: "object",
                   properties: {
                     success: { type: "boolean" },
-                    data: { type: "array", items: { $ref: "#/components/schemas/Document" } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                    data: {
+                      type: "object",
+                      properties: {
+                        data: { type: "array", items: { $ref: "#/components/schemas/Document" } },
+                        pagination: {
+                          type: "object",
+                          properties: {
+                            page: { type: "integer" },
+                            limit: { type: "integer" },
+                            total: { type: "integer" },
+                            totalPages: { type: "integer" },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
     "/api/documents/{id}": {
       delete: {
@@ -2599,6 +2647,139 @@ const swaggerDefinition = {
             content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/ComponentRealizationView" } } } } },
           },
           "404": { description: "Component not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+
+    // ─── BULK SAVE REALIZATION ──────────────────────────────────────────────────
+    "/api/realizations/{type}/{id}/bulk": {
+      security: [{ bearerAuth: [] }],
+      post: {
+        tags: ["ComponentRealization"],
+        summary: "Bulk save realizations for a Component or IKU",
+        description: `Upserts multiple realization rows for a given year. \n\n**For type=component:** \`value\` is required. \`month\` must match the component's periodType (0=yearly, 3/6/9/12=quarter, 6/12=semester, 1-12=monthly). Optionally attach \`documentIds\`.\n\n**For type=iku (unit=percentage|number):** \`value\` is required.\n**For type=iku (unit=text):** \`metadata.text\` (string) is required.\n**For type=iku (unit=file):** \`metadata.files\` (array) is required.`,
+        parameters: [
+          {
+            name: "type",
+            in: "path",
+            required: true,
+            schema: { type: "string", enum: ["component", "iku"] },
+            description: "Metric type",
+          },
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Metric ID",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["year", "realizations"],
+                properties: {
+                  year: { type: "integer", minimum: 2000, description: "Realization year" },
+                  realizations: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      required: ["month"],
+                      properties: {
+                        month: { type: "integer", minimum: 0, maximum: 12, description: "0=yearly, 3/6/9/12=quarter, 6/12=semester, 1-12=monthly" },
+                        value: { type: "number", nullable: true, description: "Numeric value (required for component and IKU unit=percentage|number)" },
+                        metadata: {
+                          type: "object",
+                          nullable: true,
+                          description: "For IKU unit=text: { text: string }; for IKU unit=file: { files: [{ documentId, name }] }",
+                          properties: {
+                            text: { type: "string" },
+                            files: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  documentId: { type: "string", format: "uuid" },
+                                  name: { type: "string" },
+                                },
+                              },
+                            },
+                          },
+                        },
+                        documentIds: {
+                          type: "array",
+                          items: { type: "string", format: "uuid" },
+                          description: "For type=component only: attach document IDs",
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              examples: {
+                componentBulk: {
+                  summary: "Bulk save component realizations (monthly)",
+                  value: {
+                    year: 2025,
+                    realizations: [
+                      { month: 1, value: 85.5 },
+                      { month: 2, value: 90.0 },
+                      { month: 3, value: 88.3, documentIds: ["uuid-doc-1"] },
+                    ],
+                  },
+                },
+                ikuNumericBulk: {
+                  summary: "Bulk save IKU results (unit=percentage)",
+                  value: {
+                    year: 2025,
+                    realizations: [{ month: 0, value: 75.0 }],
+                  },
+                },
+                ikuTextBulk: {
+                  summary: "Bulk save IKU results (unit=text)",
+                  value: {
+                    year: 2025,
+                    realizations: [{ month: 0, metadata: { text: "Laporan sudah selesai" } }],
+                  },
+                },
+                ikuFileBulk: {
+                  summary: "Bulk save IKU results (unit=file)",
+                  value: {
+                    year: 2025,
+                    realizations: [{ month: 0, metadata: { files: [{ documentId: "uuid-doc-1", name: "laporan.pdf" }] } }],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Bulk save successful",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Bulk save component realizations successful" },
+                    data: { type: "array", items: { type: "object" } },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation error (invalid month for periodType, missing value/metadata)",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } },
+          },
+          "404": {
+            description: "Component or IKU not found",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } },
+          },
         },
       },
     },

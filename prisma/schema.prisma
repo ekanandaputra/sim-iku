@@ -173,7 +173,8 @@ model IkuResult {
   idIku           String   @map("id_iku")
   month           Int
   year            Int
-  calculatedValue Decimal  @map("calculated_value") @db.Decimal(18, 4)
+  calculatedValue Decimal? @map("calculated_value") @db.Decimal(18, 4)
+  metadata        Json?    @map("metadata")
   formulaVersion  String?  @map("formula_version")
   calculatedAt    DateTime @default(now()) @map("calculated_at")
   createdAt       DateTime @default(now()) @map("created_at")

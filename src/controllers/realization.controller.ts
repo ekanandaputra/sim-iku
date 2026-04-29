@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "../generated/prisma/client";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { calculateIkuResultsForComponentRealization } from "./componentRealization.controller";
@@ -331,28 +332,25 @@ export const bulkSaveRealization = async (
         if (!validMonths.includes(item.month)) {
           return res.status(400).json(errorResponse(`Invalid month ${item.month} for periodType ${component.periodType}`));
         }
+        if (item.value == null) {
+          return res.status(400).json(errorResponse("value is required for component realization"));
+        }
       }
 
       const results = [];
       for (const item of realizations) {
         const record = await prisma.componentRealization.upsert({
           where: {
-            idComponent_month_year: {
-              idComponent: id,
-              month: item.month,
-              year,
-            },
+            idComponent_month_year: { idComponent: id, month: item.month, year },
           },
-          create: { idComponent: id, month: item.month, year, value: item.value },
-          update: { value: item.value },
+          create: { idComponent: id, month: item.month, year, value: item.value! },
+          update: { value: item.value! },
         });
 
         if (item.documentIds && Array.isArray(item.documentIds)) {
           for (const docId of item.documentIds) {
             await prisma.componentDocument.upsert({
-              where: {
-                componentId_documentId: { componentId: id, documentId: docId },
-              },
+              where: { componentId_documentId: { componentId: id, documentId: docId } },
               create: { componentId: id, documentId: docId },
               update: {},
             });
@@ -366,22 +364,45 @@ export const bulkSaveRealization = async (
       }
 
       return res.json(successResponse(results, "Bulk save component realizations successful"));
+
     } else if (type.toLowerCase() === "iku") {
       const iku = await prisma.iKU.findUnique({ where: { id } });
       if (!iku) return res.status(404).json(errorResponse("IKU not found"));
-      
+
+      // Validate value vs metadata based on unit type
       for (const item of realizations) {
-        if (item.month !== 0) {
-          return res.status(400).json(errorResponse(`Invalid month ${item.month} for IKU (must be 0)`));
+        if (iku.unit === "percentage" || iku.unit === "number") {
+          if (item.value == null) {
+            return res.status(400).json(errorResponse(`value is required for IKU unit type '${iku.unit}'`));
+          }
+        }
+        if (iku.unit === "text") {
+          if (!item.metadata || typeof item.metadata.text !== "string") {
+            return res.status(400).json(errorResponse("metadata.text (string) is required for IKU unit type 'text'"));
+          }
+        }
+        if (iku.unit === "file") {
+          if (!item.metadata || !Array.isArray(item.metadata.files) || item.metadata.files.length === 0) {
+            return res.status(400).json(errorResponse("metadata.files (array) is required for IKU unit type 'file'"));
+          }
         }
       }
 
       const results = [];
       for (const item of realizations) {
         const record = await prisma.ikuResult.upsert({
-          where: { idIku_month_year: { idIku: id, month: 0, year } },
-          create: { idIku: id, month: 0, year, calculatedValue: item.value },
-          update: { calculatedValue: item.value },
+          where: { idIku_month_year: { idIku: id, month: item.month, year } },
+          create: {
+            idIku: id,
+            month: item.month,
+            year,
+            calculatedValue: item.value ?? null,
+            metadata: item.metadata ?? Prisma.JsonNull,
+          },
+          update: {
+            calculatedValue: item.value ?? null,
+            metadata: item.metadata ?? Prisma.JsonNull,
+          },
         });
         results.push(record);
       }

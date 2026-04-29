@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
+import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsObject } from "class-validator";
 
 export class IkuResultCreateDto {
   @IsNotEmpty({ message: "idIku is required" })
@@ -13,9 +13,21 @@ export class IkuResultCreateDto {
   @IsInt({ message: "year must be an integer" })
   year!: number;
 
-  @IsNotEmpty({ message: "calculatedValue is required" })
+  /**
+   * For unit: percentage | number
+   * Either calculatedValue or metadata must be provided.
+   */
+  @IsOptional()
   @IsNumber({}, { message: "calculatedValue must be numeric" })
-  calculatedValue!: number;
+  calculatedValue?: number;
+
+  /**
+   * For unit: text  → { text: "string value" }
+   * For unit: file  → { files: [{ documentId: "uuid", name: "filename" }, ...] }
+   */
+  @IsOptional()
+  @IsObject({ message: "metadata must be a JSON object" })
+  metadata?: Record<string, any>;
 
   @IsOptional()
   @IsString({ message: "formulaVersion must be a string" })
@@ -30,6 +42,10 @@ export class IkuResultUpdateDto {
   @IsOptional()
   @IsNumber({}, { message: "calculatedValue must be numeric" })
   calculatedValue?: number;
+
+  @IsOptional()
+  @IsObject({ message: "metadata must be a JSON object" })
+  metadata?: Record<string, any>;
 
   @IsOptional()
   @IsString({ message: "formulaVersion must be a string" })
