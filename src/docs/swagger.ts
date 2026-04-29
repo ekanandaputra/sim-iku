@@ -2848,7 +2848,7 @@ const swaggerDefinition = {
       get: {
         tags: ["Import"],
         summary: "Download Excel template for formula import",
-        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, is_final.",
+        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final.",
         responses: {
           "200": {
             description: "Excel template file (.xlsx)",

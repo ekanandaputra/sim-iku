@@ -82,12 +82,13 @@ export const downloadFormulaTemplate = (req: Request, res: Response) => {
     "formula_name",
     "formula_description",
     "formula_expression",
+    "final_result_key",
     "is_final",
   ];
 
   const samples = [
-    ["IKU001", "Rumus Utama", "Perhitungan standar", "((COMP001 + COMP002) / COMP003) * 100", "TRUE"],
-    ["IKU001", "Rumus Alternatif", "Tanpa komponen C", "COMP001 + COMP002", "FALSE"],
+    ["IKU001", "Rumus Utama", "Perhitungan standar", "((COMP001 + COMP002) / COMP003) * 100", "BOD_COD_RESULT", "TRUE"],
+    ["IKU001", "Rumus Alternatif", "Tanpa komponen C", "COMP001 + COMP002", "RESULT", "FALSE"],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -238,6 +239,7 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
       const ikuCode = toString(r[col("iku_code")]);
       const expression = toString(r[col("formula_expression")]);
       const name = toString(r[col("formula_name")]) || "Formula Import";
+      const finalResultKey = toString(r[col("final_result_key")]) || "RESULT";
       const isFinal = toBool(r[col("is_final")]);
 
       if (!ikuCode || !expression) continue;
@@ -249,7 +251,7 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
       }
 
       try {
-        const parsed = parseFormulaExpression(expression);
+        const parsed = parseFormulaExpression(expression, finalResultKey);
 
         // Validasi komponen
         const missing = [];
