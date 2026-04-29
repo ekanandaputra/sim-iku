@@ -14,7 +14,7 @@ type RealizationQuery = {
   limit?: string;
 };
 
-async function calculateIkuResultsForComponentRealization(idComponent: string, month: number, year: number) {
+export async function calculateIkuResultsForComponentRealization(idComponent: string, month: number, year: number) {
   console.log("Calculating IKU results for component realization", { idComponent, month, year });
   const component = await prisma.component.findUnique({ where: { id: idComponent } });
   if (!component) {

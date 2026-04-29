@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { calculateIkuResultsForComponentRealization } from "./componentRealization.controller";
+import { BulkSaveRealizationDto } from "../dtos/realization.dto";
 
 const YEARS_RANGE = 6;
 const MONTH_NAMES = [
@@ -293,6 +295,98 @@ export const getRealizationView = async (
         years,
         data,
       }));
+    } else {
+      return res.status(400).json(errorResponse("Invalid type. Must be 'component' or 'iku'"));
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * BULK SAVE REALIZATION
+ * POST /api/realizations/:type/:id/bulk
+ */
+export const bulkSaveRealization = async (
+  req: Request<{ type: string; id: string }, {}, BulkSaveRealizationDto>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { type, id } = req.params;
+    const { year, realizations } = req.body;
+
+    if (type.toLowerCase() === "component") {
+      const component = await prisma.component.findUnique({ where: { id } });
+      if (!component) return res.status(404).json(errorResponse("Component not found"));
+
+      // Validate month according to periodType
+      const validMonths: number[] = [];
+      if (component.periodType === "yearly") validMonths.push(0);
+      else if (component.periodType === "semester") validMonths.push(6, 12);
+      else if (component.periodType === "quarter") validMonths.push(3, 6, 9, 12);
+      else if (component.periodType === "monthly") validMonths.push(...Array.from({ length: 12 }, (_, i) => i + 1));
+
+      for (const item of realizations) {
+        if (!validMonths.includes(item.month)) {
+          return res.status(400).json(errorResponse(`Invalid month ${item.month} for periodType ${component.periodType}`));
+        }
+      }
+
+      const results = [];
+      for (const item of realizations) {
+        const record = await prisma.componentRealization.upsert({
+          where: {
+            idComponent_month_year: {
+              idComponent: id,
+              month: item.month,
+              year,
+            },
+          },
+          create: { idComponent: id, month: item.month, year, value: item.value },
+          update: { value: item.value },
+        });
+
+        if (item.documentIds && Array.isArray(item.documentIds)) {
+          for (const docId of item.documentIds) {
+            await prisma.componentDocument.upsert({
+              where: {
+                componentId_documentId: { componentId: id, documentId: docId },
+              },
+              create: { componentId: id, documentId: docId },
+              update: {},
+            });
+          }
+        }
+
+        if (item.month != null) {
+          await calculateIkuResultsForComponentRealization(id, item.month, year);
+        }
+        results.push(record);
+      }
+
+      return res.json(successResponse(results, "Bulk save component realizations successful"));
+    } else if (type.toLowerCase() === "iku") {
+      const iku = await prisma.iKU.findUnique({ where: { id } });
+      if (!iku) return res.status(404).json(errorResponse("IKU not found"));
+      
+      for (const item of realizations) {
+        if (item.month !== 0) {
+          return res.status(400).json(errorResponse(`Invalid month ${item.month} for IKU (must be 0)`));
+        }
+      }
+
+      const results = [];
+      for (const item of realizations) {
+        const record = await prisma.ikuResult.upsert({
+          where: { idIku_month_year: { idIku: id, month: 0, year } },
+          create: { idIku: id, month: 0, year, calculatedValue: item.value },
+          update: { calculatedValue: item.value },
+        });
+        results.push(record);
+      }
+
+      return res.json(successResponse(results, "Bulk save IKU results successful"));
     } else {
       return res.status(400).json(errorResponse("Invalid type. Must be 'component' or 'iku'"));
     }

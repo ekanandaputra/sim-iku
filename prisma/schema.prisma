@@ -41,37 +41,38 @@ enum IkuUnitType {
 }
 
 model IKU {
-  id            String          @id @default(uuid()) @db.VarChar(36)
-  code          String          @unique
+  id            String         @id @default(uuid()) @db.VarChar(36)
+  code          String         @unique
   name          String
   description   String?
-  isDirectInput Boolean         @default(false) @map("is_direct_input")
-  unit          IkuUnitType     @default(percentage)
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  isDirectInput Boolean        @default(false) @map("is_direct_input")
+  unit          IkuUnitType    @default(percentage)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
   components    IKUComponent[]
   formulas      IKUFormula[]
   iku_results   IkuResult[]
   targets       IkuTarget[]
+
   @@map("ikus")
 }
 
-
 model Component {
-  id          String          @id @default(uuid()) @db.VarChar(36)
-  code        String          @unique
-  name        String
-  description String?
-  dataType    ComponentDataType? @map("data_type")
-  sourceType  ComponentSourceType? @map("source_type")
-  periodType  ComponentPeriodType @default(yearly) @map("period_type")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  ikus        IKUComponent[]
+  id           String                 @id @default(uuid()) @db.VarChar(36)
+  code         String                 @unique
+  name         String
+  description  String?
+  dataType     ComponentDataType?     @map("data_type")
+  sourceType   ComponentSourceType?   @map("source_type")
+  periodType   ComponentPeriodType    @default(yearly) @map("period_type")
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+  ikus         IKUComponent[]
   realizations ComponentRealization[]
-  targets     ComponentTarget[]
-  documents   ComponentDocument[]
-  tags        ComponentTag[]
+  targets      ComponentTarget[]
+  documents    ComponentDocument[]
+  tags         ComponentTag[]
+
   @@map("components")
 }
 
@@ -103,56 +104,56 @@ enum FormulaOperandType {
 }
 
 enum FormulaOperator {
-  ADD    @map("+")
-  SUB    @map("-")
-  MUL    @map("*")
-  DIV    @map("/")
+  ADD @map("+")
+  SUB @map("-")
+  MUL @map("*")
+  DIV @map("/")
 }
 
 model IKUFormula {
-  id             String               @id @default(uuid()) @db.VarChar(36)
-  iku            IKU                  @relation(fields: [ikuId], references: [id])
-  ikuId          String               @db.VarChar(36)
+  id             String             @id @default(uuid()) @db.VarChar(36)
+  iku            IKU                @relation(fields: [ikuId], references: [id])
+  ikuId          String             @db.VarChar(36)
   name           String
   description    String?
-  finalResultKey String               @default("RESULT")
-  isActive       Boolean              @default(true) @map("is_active")
-  isFinal        Boolean              @default(false) @map("is_final")
-  version        Int                  @default(1)
-  createdAt      DateTime             @default(now()) @map("created_at")
-  updatedAt      DateTime             @updatedAt @map("updated_at")
+  finalResultKey String             @default("RESULT")
+  isActive       Boolean            @default(true) @map("is_active")
+  isFinal        Boolean            @default(false) @map("is_final")
+  version        Int                @default(1)
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
   details        IKUFormulaDetail[]
 
   @@map("iku_formula")
 }
 
 model IKUFormulaDetail {
-  id         String             @id @default(uuid()) @db.VarChar(36)
-  formula    IKUFormula         @relation(fields: [formulaId], references: [id])
-  formulaId  String             @db.VarChar(36)
-  sequence   Int
+  id        String     @id @default(uuid()) @db.VarChar(36)
+  formula   IKUFormula @relation(fields: [formulaId], references: [id])
+  formulaId String     @db.VarChar(36)
+  sequence  Int
 
-  leftType   FormulaOperandType @map("left_type")
-  leftValue  String             @map("left_value")
+  leftType  FormulaOperandType @map("left_type")
+  leftValue String             @map("left_value")
 
-  operator   FormulaOperator
+  operator FormulaOperator
 
   rightType  FormulaOperandType @map("right_type")
   rightValue String             @map("right_value")
 
-  resultKey  String             @map("result_key")
+  resultKey String @map("result_key")
 
-  createdAt  DateTime           @default(now()) @map("created_at")
-  updatedAt  DateTime           @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("iku_formula_detail")
+  @@unique([formulaId, sequence])
   @@index([formulaId])
   @@index([sequence])
-  @@unique([formulaId, sequence])
+  @@map("iku_formula_detail")
 }
 
 model ComponentRealization {
-  idRealization String   @id @default(uuid()) @db.VarChar(36) @map("id")
+  idRealization String   @id @default(uuid()) @map("id") @db.VarChar(36)
   idComponent   String   @map("id_component")
   month         Int?
   year          Int
@@ -162,62 +163,62 @@ model ComponentRealization {
 
   component Component @relation(fields: [idComponent], references: [id])
 
-  @@map("component_realizations")
   @@unique([idComponent, month, year])
   @@index([idComponent])
+  @@map("component_realizations")
 }
 
 model IkuResult {
-  idResult        String   @id @default(uuid()) @db.VarChar(36) @map("id")
+  idResult        String   @id @default(uuid()) @map("id") @db.VarChar(36)
   idIku           String   @map("id_iku")
   month           Int
   year            Int
-  calculatedValue Decimal  @db.Decimal(18, 4) @map("calculated_value")
+  calculatedValue Decimal  @map("calculated_value") @db.Decimal(18, 4)
   formulaVersion  String?  @map("formula_version")
   calculatedAt    DateTime @default(now()) @map("calculated_at")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  iku    IKU   @relation(fields: [idIku], references: [id])
+  iku IKU @relation(fields: [idIku], references: [id])
 
-  @@map("iku_results")
   @@unique([idIku, month, year])
   @@index([idIku])
   @@index([year])
   @@index([month])
+  @@map("iku_results")
 }
 
 model IkuTarget {
   id         String   @id @default(uuid()) @db.VarChar(36)
-  ikuId      String   @db.VarChar(36) @map("iku_id")
+  ikuId      String   @map("iku_id") @db.VarChar(36)
   year       Int
-  targetQ1   Decimal? @db.Decimal(18, 4) @map("target_q1")
-  targetQ2   Decimal? @db.Decimal(18, 4) @map("target_q2")
-  targetQ3   Decimal? @db.Decimal(18, 4) @map("target_q3")
-  targetQ4   Decimal? @db.Decimal(18, 4) @map("target_q4")
-  targetYear Decimal? @db.Decimal(18, 4) @map("target_year")
+  targetQ1   Decimal? @map("target_q1") @db.Decimal(18, 4)
+  targetQ2   Decimal? @map("target_q2") @db.Decimal(18, 4)
+  targetQ3   Decimal? @map("target_q3") @db.Decimal(18, 4)
+  targetQ4   Decimal? @map("target_q4") @db.Decimal(18, 4)
+  targetYear Decimal? @map("target_year") @db.Decimal(18, 4)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  iku        IKU      @relation(fields: [ikuId], references: [id])
+  iku IKU @relation(fields: [ikuId], references: [id])
 
   @@unique([ikuId, year])
   @@map("iku_targets")
 }
 
 model ComponentTarget {
-  id          String    @id @default(uuid()) @db.VarChar(36)
-  componentId String    @db.VarChar(36) @map("component_id")
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  componentId String   @map("component_id") @db.VarChar(36)
   year        Int
-  targetQ1    Decimal?  @db.Decimal(18, 4) @map("target_q1")
-  targetQ2    Decimal?  @db.Decimal(18, 4) @map("target_q2")
-  targetQ3    Decimal?  @db.Decimal(18, 4) @map("target_q3")
-  targetQ4    Decimal?  @db.Decimal(18, 4) @map("target_q4")
-  targetYear  Decimal?  @db.Decimal(18, 4) @map("target_year")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  targetQ1    Decimal? @map("target_q1") @db.Decimal(18, 4)
+  targetQ2    Decimal? @map("target_q2") @db.Decimal(18, 4)
+  targetQ3    Decimal? @map("target_q3") @db.Decimal(18, 4)
+  targetQ4    Decimal? @map("target_q4") @db.Decimal(18, 4)
+  targetYear  Decimal? @map("target_year") @db.Decimal(18, 4)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  component   Component @relation(fields: [componentId], references: [id])
+  component Component @relation(fields: [componentId], references: [id])
 
   @@unique([componentId, year])
   @@map("component_targets")
@@ -233,19 +234,19 @@ model Document {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  components   ComponentDocument[]
+  components ComponentDocument[]
 
   @@map("documents")
 }
 
 model ComponentDocument {
-  id          String    @id @default(uuid()) @db.VarChar(36)
-  componentId String    @db.VarChar(36) @map("component_id")
-  documentId  String    @db.VarChar(36) @map("document_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  componentId String   @map("component_id") @db.VarChar(36)
+  documentId  String   @map("document_id") @db.VarChar(36)
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  component   Component @relation(fields: [componentId], references: [id])
-  document    Document  @relation(fields: [documentId], references: [id])
+  component Component @relation(fields: [componentId], references: [id])
+  document  Document  @relation(fields: [documentId], references: [id])
 
   @@unique([componentId, documentId])
   @@map("component_documents")
@@ -264,13 +265,13 @@ model Tag {
 }
 
 model ComponentTag {
-  id          String    @id @default(uuid()) @db.VarChar(36)
-  componentId String    @db.VarChar(36) @map("component_id")
-  tagId       String    @db.VarChar(36) @map("tag_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  componentId String   @map("component_id") @db.VarChar(36)
+  tagId       String   @map("tag_id") @db.VarChar(36)
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  component   Component @relation(fields: [componentId], references: [id])
-  tag         Tag       @relation(fields: [tagId], references: [id])
+  component Component @relation(fields: [componentId], references: [id])
+  tag       Tag       @relation(fields: [tagId], references: [id])
 
   @@unique([componentId, tagId])
   @@map("component_tags")
