@@ -132,8 +132,8 @@ function tokenize(input: string): Token[] {
     } else if (ch === "/") {
       tokens.push({ type: "SLASH", value: "/" });
       i++;
-    } else if (/\d/.test(ch) || ch === ".") {
-      // Number literal (integer or decimal)
+    } else if (/\d/.test(ch) || (ch === "." && i + 1 < input.length && /\d/.test(input[i + 1]))) {
+      // Number literal (integer or decimal, handles 0.2 and .2)
       let num = "";
       while (i < input.length && (/\d/.test(input[i]) || input[i] === ".")) {
         num += input[i];
@@ -141,9 +141,9 @@ function tokenize(input: string): Token[] {
       }
       tokens.push({ type: "NUMBER", value: num });
     } else if (/[A-Za-z_]/.test(ch)) {
-      // Identifier (component code): letters, digits, underscores
+      // Identifier (component code): letters, digits, underscores, and dots
       let id = "";
-      while (i < input.length && /[A-Za-z0-9_]/.test(input[i])) {
+      while (i < input.length && /[A-Za-z0-9_.]/.test(input[i])) {
         id += input[i];
         i++;
       }
