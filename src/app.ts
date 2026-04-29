@@ -17,6 +17,7 @@ import dashboardRouter from "./routes/dashboard.route";
 import documentRouter from "./routes/document.route";
 import tagRouter from "./routes/tag.route";
 import realizationRouter from "./routes/realization.route";
+import importRouter from "./routes/import.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -44,6 +45,7 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/documents", documentRouter);
 app.use("/api/tags", tagRouter);
 app.use("/api/realizations", realizationRouter);
+app.use("/api/import", importRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

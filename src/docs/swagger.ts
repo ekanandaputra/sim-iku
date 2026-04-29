@@ -25,6 +25,7 @@ const swaggerDefinition = {
     { name: "Dashboard", description: "Dashboard visualization endpoints" },
     { name: "Document", description: "Document upload and tagging endpoints" },
     { name: "Tag", description: "Tag management and assignment endpoints" },
+    { name: "Import", description: "Import master data (IKU, IKP, Mapping) from Excel" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -2778,6 +2779,149 @@ const swaggerDefinition = {
           },
           "404": {
             description: "Component or IKU not found",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } },
+          },
+        },
+      },
+    },
+
+    // ─── IMPORT MASTER DATA ────────────────────────────────────────────────
+    "/api/import/master/template": {
+      get: {
+        tags: ["Import"],
+        summary: "Download Excel template for master data import",
+        description: "Returns an .xlsx file with the correct column headers and sample rows for importing IKU, IKP (Component), and their mapping.",
+        responses: {
+          "200": {
+            description: "Excel template file (.xlsx)",
+            content: {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                schema: { type: "string", format: "binary" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/import/master": {
+      post: {
+        tags: ["Import"],
+        summary: "Import master data (IKU, IKP, Mapping, Formula) from Excel",
+        description: `Upload a single \`.xlsx\` file with sheet named **MasterData**.\n\n**Columns:** \`iku_code\`*, \`iku_name\`*, \`iku_description\`, \`iku_is_direct_input\`, \`iku_unit\`, \`ikp_code\`, \`ikp_name\`, \`ikp_description\`, \`ikp_data_type\`, \`ikp_source_type\`, \`ikp_period_type\`, \`formula_name\`, \`formula_expression\`, \`formula_is_final\`\n\n**Rules:**\n- \`iku_code\` and \`iku_name\` are required on every data row.\n- To map one IKU to multiple IKPs, repeat the row with the same \`iku_code\` and a different \`ikp_code\`.\n- The **first occurrence** of each \`iku_code\` wins for IKU master data AND formula.\n- If \`ikp_code\` is provided, \`ikp_name\` is also required.\n- All upserts are by \`code\` (unique key). Existing records are updated; new ones are created.\n\n**Formula Expression:** If \`formula_name\` and \`formula_expression\` are provided on the first row of an IKU group, the expression is parsed into formula steps automatically. Use component codes (\`ikp_code\`) as identifiers. Supports \`+ - * /\` and parentheses.\n\nExample: \`((COMP001 + COMP002) / COMP003) * 100\``,
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                required: ["file"],
+                properties: {
+                  file: {
+                    type: "string",
+                    format: "binary",
+                    description: "Excel file (.xlsx) — must contain sheet 'MasterData'",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Import completed (may contain parse errors for individual rows)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Import master data completed" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        summary: {
+                          type: "object",
+                          properties: {
+                            iku: {
+                              type: "object",
+                              properties: {
+                                created: { type: "integer", example: 2 },
+                                updated: { type: "integer", example: 1 },
+                              },
+                            },
+                            ikp: {
+                              type: "object",
+                              properties: {
+                                created: { type: "integer", example: 3 },
+                                updated: { type: "integer", example: 0 },
+                              },
+                            },
+                            mapping: {
+                              type: "object",
+                              properties: {
+                                created: { type: "integer", example: 3 },
+                                skipped: { type: "integer", example: 0, description: "Already existing mappings" },
+                              },
+                            },
+                            formula: {
+                              type: "object",
+                              properties: {
+                                created: { type: "integer", example: 1 },
+                                errors: { type: "integer", example: 0 },
+                              },
+                            },
+                          },
+                        },
+                        totalRows: { type: "integer", description: "Total valid data rows processed" },
+                        skippedRows: { type: "integer", description: "Rows skipped due to parse errors" },
+                        parseErrors: {
+                          type: "array",
+                          description: "Per-row errors found during parsing",
+                          items: {
+                            type: "object",
+                            properties: {
+                              row: { type: "integer", description: "Excel row number (1-based)" },
+                              error: { type: "string" },
+                            },
+                          },
+                        },
+                        formulaErrors: {
+                          type: "array",
+                          description: "Formula parsing errors",
+                          items: {
+                            type: "object",
+                            properties: {
+                              ikuCode: { type: "string" },
+                              row: { type: "integer" },
+                              error: { type: "string" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+                example: {
+                  success: true,
+                  message: "Import master data completed",
+                  data: {
+                    summary: {
+                      iku: { created: 2, updated: 1 },
+                      ikp: { created: 3, updated: 0 },
+                      mapping: { created: 3, skipped: 0 },
+                      formula: { created: 1, errors: 0 },
+                    },
+                    totalRows: 5,
+                    skippedRows: 0,
+                    parseErrors: [],
+                    formulaErrors: [],
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "No file, invalid file type, missing sheet, or missing required columns",
             content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } },
           },
         },
