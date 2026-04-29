@@ -1,27 +1,25 @@
 import { Router } from "express";
 import multer from "multer";
-import { downloadTemplate, importMasterData } from "../controllers/import.controller";
+import { 
+  downloadMasterTemplate, 
+  downloadFormulaTemplate, 
+  importMasterData, 
+  importFormulas 
+} from "../controllers/import.controller";
 
 const router = Router();
 
-// Use memory storage so we don't write temp files to disk
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB max
-  fileFilter: (_req, file, cb) => {
-    const allowed = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-    ];
-    if (allowed.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only .xlsx files are allowed"));
-    }
-  },
 });
 
-router.get("/master/template", downloadTemplate);
+// Master Data (IKU, IKP, Mapping)
+router.get("/master/template", downloadMasterTemplate);
 router.post("/master", upload.single("file"), importMasterData);
+
+// Formula Data
+router.get("/formulas/template", downloadFormulaTemplate);
+router.post("/formulas", upload.single("file"), importFormulas);
 
 export default router;
