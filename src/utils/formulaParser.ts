@@ -57,7 +57,7 @@ type ASTNode = NumberNode | IdentifierNode | BinaryOpNode;
 
 // ─── Output step (matches IKUFormulaDetail shape) ─────────────────────────────
 
-export type OperandType = "component" | "constant" | "temp";
+export type OperandType = "component" | "constant" | "temp" | "formula_ref";
 export type Operator = "ADD" | "SUB" | "MUL" | "DIV";
 
 export interface FormulaStep {

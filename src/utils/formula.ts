@@ -86,7 +86,14 @@ export async function evaluateFormula(
       let refFormula = await prisma.iKUFormula.findUnique({ where: { id: ref } });
       if (!refFormula) {
         refFormula = await prisma.iKUFormula.findFirst({
-          where: { name: ref, ikuId: formula.ikuId },
+          where: { 
+            ikuId: formula.ikuId,
+            OR: [
+              { name: ref },
+              { finalResultKey: ref }
+            ]
+          },
+          orderBy: { version: "desc" }
         });
       }
 
@@ -208,7 +215,18 @@ export async function getFormulaRequiredComponentCodes(
       }
     } else if (step.leftType === FormulaOperandType.formula_ref) {
       let refFormula = await prisma.iKUFormula.findUnique({ where: { id: step.leftValue } });
-      if (!refFormula) refFormula = await prisma.iKUFormula.findFirst({ where: { name: step.leftValue, ikuId: formula.ikuId } });
+      if (!refFormula) {
+        refFormula = await prisma.iKUFormula.findFirst({ 
+          where: { 
+            ikuId: formula.ikuId,
+            OR: [
+              { name: step.leftValue },
+              { finalResultKey: step.leftValue }
+            ]
+          },
+          orderBy: { version: "desc" }
+        });
+      }
       if (refFormula) {
         const subCodes = await getFormulaRequiredComponentCodes(refFormula.id, visited);
         subCodes.forEach(c => codes.add(c));
@@ -229,7 +247,18 @@ export async function getFormulaRequiredComponentCodes(
       }
     } else if (step.rightType === FormulaOperandType.formula_ref) {
       let refFormula = await prisma.iKUFormula.findUnique({ where: { id: step.rightValue } });
-      if (!refFormula) refFormula = await prisma.iKUFormula.findFirst({ where: { name: step.rightValue, ikuId: formula.ikuId } });
+      if (!refFormula) {
+        refFormula = await prisma.iKUFormula.findFirst({ 
+          where: { 
+            ikuId: formula.ikuId,
+            OR: [
+              { name: step.rightValue },
+              { finalResultKey: step.rightValue }
+            ]
+          },
+          orderBy: { version: "desc" }
+        });
+      }
       if (refFormula) {
         const subCodes = await getFormulaRequiredComponentCodes(refFormula.id, visited);
         subCodes.forEach(c => codes.add(c));

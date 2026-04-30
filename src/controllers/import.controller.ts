@@ -233,6 +233,14 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
     let formulaCreated = 0;
     const formulaErrors: any[] = [];
 
+    // Pre-collect all final_result_key in this file to support cross-references
+    const allFinalResultKeysInFile = new Set<string>();
+    for (let i = 1; i < raw.length; i++) {
+      const fr = raw[i];
+      const key = toString(fr[col("final_result_key")]);
+      if (key) allFinalResultKeysInFile.add(key);
+    }
+
     for (let i = 1; i < raw.length; i++) {
       const r = raw[i];
       const rowNum = i + 1;
@@ -253,46 +261,99 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
       try {
         const parsed = parseFormulaExpression(expression, finalResultKey);
 
-        // Validasi komponen
+        // Validasi komponen & formula_ref
         const missing = [];
+        const formulaRefs = new Set<string>();
         for (const c of parsed.componentCodes) {
-          const exists = await prisma.component.count({ where: { code: c } });
-          if (!exists) missing.push(c);
+          // 1. Cek di tabel Component
+          const existsInComponent = await prisma.component.count({ where: { code: c } });
+          if (existsInComponent) continue;
+
+          // 2. Cek di tabel IKUFormula (existing)
+          const existsInFormulaDb = await prisma.iKUFormula.count({ where: { finalResultKey: c, ikuId: iku.id } });
+          if (existsInFormulaDb) {
+            formulaRefs.add(c);
+            continue;
+          }
+
+          // 3. Cek di file yang sama
+          if (allFinalResultKeysInFile.has(c)) {
+            formulaRefs.add(c);
+            continue;
+          }
+
+          missing.push(c);
         }
+
         if (missing.length > 0) {
-          formulaErrors.push({ row: rowNum, error: `Component(s) not found: ${missing.join(", ")}` });
+          formulaErrors.push({ row: rowNum, error: `Component(s) or Formula Result Key(s) not found: ${missing.join(", ")}` });
           continue;
         }
 
-        const last = await prisma.iKUFormula.findFirst({ where: { ikuId: iku.id }, orderBy: { version: "desc" } });
-        const version = (last?.version ?? 0) + 1;
+        const existing = await prisma.iKUFormula.findFirst({ 
+          where: { ikuId: iku.id, finalResultKey: parsed.finalResultKey },
+          orderBy: { version: "desc" }
+        });
 
         await prisma.$transaction(async (tx) => {
           if (isFinal) {
-            await tx.iKUFormula.updateMany({ where: { ikuId: iku.id, isFinal: true }, data: { isFinal: false } });
+            await tx.iKUFormula.updateMany({ 
+              where: { ikuId: iku.id, isFinal: true }, 
+              data: { isFinal: false } 
+            });
           }
-          await tx.iKUFormula.create({
-            data: {
-              ikuId: iku.id,
-              name,
-              description: toString(r[col("formula_description")]) || `Imported v${version}`,
-              finalResultKey: parsed.finalResultKey,
-              isActive: true,
-              isFinal,
-              version,
-              details: {
-                create: parsed.steps.map(s => ({
-                  sequence: s.sequence,
-                  leftType: s.leftType as any,
-                  leftValue: s.leftValue,
-                  operator: s.operator as any,
-                  rightType: s.rightType as any,
-                  rightValue: s.rightValue,
-                  resultKey: s.resultKey,
-                }))
-              }
+
+          const detailData = parsed.steps.map(s => {
+            let leftType = s.leftType;
+            if (leftType === "component" && formulaRefs.has(s.leftValue)) {
+              leftType = "formula_ref";
             }
+            let rightType = s.rightType;
+            if (rightType === "component" && formulaRefs.has(s.rightValue)) {
+              rightType = "formula_ref";
+            }
+
+            return {
+              sequence: s.sequence,
+              leftType: leftType as any,
+              leftValue: s.leftValue,
+              operator: s.operator as any,
+              rightType: rightType as any,
+              rightValue: s.rightValue,
+              resultKey: s.resultKey,
+            };
           });
+
+          if (existing) {
+            // UPDATE: Clear old details and update formula
+            await tx.iKUFormulaDetail.deleteMany({ where: { formulaId: existing.id } });
+            await tx.iKUFormula.update({
+              where: { id: existing.id },
+              data: {
+                name,
+                description: toString(r[col("formula_description")]) || existing.description,
+                isFinal,
+                details: { create: detailData }
+              }
+            });
+          } else {
+            // CREATE: New version
+            const last = await prisma.iKUFormula.findFirst({ where: { ikuId: iku.id }, orderBy: { version: "desc" } });
+            const version = (last?.version ?? 0) + 1;
+            
+            await tx.iKUFormula.create({
+              data: {
+                ikuId: iku.id,
+                name,
+                description: toString(r[col("formula_description")]) || `Imported v${version}`,
+                finalResultKey: parsed.finalResultKey,
+                isActive: true,
+                isFinal,
+                version,
+                details: { create: detailData }
+              }
+            });
+          }
         });
         formulaCreated++;
       } catch (err: any) {
