@@ -22,6 +22,8 @@ type IkuResultQuery = {
 async function validateValueByUnit(
   ikuId: string,
   calculatedValue?: number | null,
+  textValue?: string | null,
+  documentIds?: string[] | null,
   metadata?: Record<string, any> | null
 ): Promise<string | null> {
   const iku = await prisma.iKU.findUnique({ where: { id: ikuId } });
@@ -36,14 +38,14 @@ async function validateValueByUnit(
   }
 
   if (unit === "text") {
-    if (!metadata || typeof metadata.text !== "string") {
-      return "metadata.text (string) is required for unit type 'text'";
+    if (!textValue && (!metadata || typeof metadata.text !== "string")) {
+      return "textValue or metadata.text (string) is required for unit type 'text'";
     }
   }
 
   if (unit === "file") {
-    if (!metadata || !Array.isArray(metadata.files) || metadata.files.length === 0) {
-      return "metadata.files (array) is required for unit type 'file'";
+    if ((!documentIds || !Array.isArray(documentIds)) && (!metadata || !Array.isArray(metadata.files))) {
+      return "documentIds (array) or metadata.files (array) is required for unit type 'file'";
     }
   }
 
@@ -116,9 +118,9 @@ export const createIkuResult = async (
   next: NextFunction
 ) => {
   try {
-    const { idIku, month, year, calculatedValue, metadata, formulaVersion, calculatedAt } = req.body;
+    const { idIku, month, year, calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt } = req.body;
 
-    const validationError = await validateValueByUnit(idIku, calculatedValue, metadata);
+    const validationError = await validateValueByUnit(idIku, calculatedValue, textValue, documentIds, metadata);
     if (validationError) {
       return res.status(400).json(errorResponse(validationError));
     }
@@ -132,12 +134,16 @@ export const createIkuResult = async (
         month,
         year,
         calculatedValue: calculatedValue ?? null,
+        textValue: textValue ?? null,
+        documentIds: documentIds ?? Prisma.JsonNull,
         metadata: metadata ?? Prisma.JsonNull,
         formulaVersion: formulaVersion ?? null,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : new Date(),
       },
       update: {
         calculatedValue: calculatedValue ?? null,
+        textValue: textValue ?? null,
+        documentIds: documentIds ?? Prisma.JsonNull,
         metadata: metadata ?? Prisma.JsonNull,
         formulaVersion: formulaVersion ?? undefined,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : undefined,
@@ -158,7 +164,7 @@ export const updateIkuResult = async (
 ) => {
   try {
     const id = req.params.id;
-    const { calculatedValue, metadata, formulaVersion, calculatedAt } = req.body;
+    const { calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt } = req.body;
 
     const existing = await prisma.ikuResult.findUnique({ where: { idResult: id } });
     if (!existing) {
@@ -168,6 +174,8 @@ export const updateIkuResult = async (
     const validationError = await validateValueByUnit(
       existing.idIku,
       calculatedValue ?? (existing.calculatedValue ? Number(existing.calculatedValue) : null),
+      textValue ?? existing.textValue,
+      documentIds ?? (existing.documentIds as string[] | null),
       metadata ?? (existing.metadata as Record<string, any> | null)
     );
     if (validationError) {
@@ -178,6 +186,8 @@ export const updateIkuResult = async (
       where: { idResult: id },
       data: {
         calculatedValue: calculatedValue !== undefined ? calculatedValue : existing.calculatedValue,
+        textValue: textValue !== undefined ? textValue : existing.textValue,
+        documentIds: documentIds !== undefined ? documentIds : existing.documentIds,
         metadata: metadata !== undefined ? metadata : existing.metadata,
         formulaVersion: formulaVersion ?? existing.formulaVersion,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : existing.calculatedAt,

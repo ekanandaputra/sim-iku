@@ -548,10 +548,12 @@ const swaggerDefinition = {
           month: { type: "integer" },
           year: { type: "integer" },
           calculatedValue: { type: "number", nullable: true, description: "Numeric value for unit: percentage | number" },
+          textValue: { type: "string", nullable: true, description: "Text value for unit: text" },
+          documentIds: { type: "array", items: { type: "string", format: "uuid" }, nullable: true, description: "Document IDs for unit: file" },
           metadata: {
             type: "object",
             nullable: true,
-            description: "JSON metadata: { text: string } for unit=text, { files: [...] } for unit=file",
+            description: "JSON metadata for additional data",
           },
           formulaVersion: { type: ["string", "null"] },
           calculatedAt: { type: "string", format: "date-time" },
@@ -569,24 +571,12 @@ const swaggerDefinition = {
           month: { type: "integer" },
           year: { type: "integer" },
           calculatedValue: { type: "number", nullable: true, description: "Required for unit: percentage | number" },
+          textValue: { type: "string", nullable: true, description: "Required for unit: text" },
+          documentIds: { type: "array", items: { type: "string", format: "uuid" }, nullable: true, description: "Required for unit: file" },
           metadata: {
             type: "object",
             nullable: true,
-            description: "Required for unit=text ({ text: string }) or unit=file ({ files: [{ documentId, name }] })",
-            properties: {
-              text: { type: "string", description: "For unit=text" },
-              files: {
-                type: "array",
-                description: "For unit=file",
-                items: {
-                  type: "object",
-                  properties: {
-                    documentId: { type: "string", format: "uuid" },
-                    name: { type: "string" },
-                  },
-                },
-              },
-            },
+            description: "Optional JSON metadata",
           },
           formulaVersion: { type: "string" },
           calculatedAt: { type: "string", format: "date-time" },
@@ -597,10 +587,12 @@ const swaggerDefinition = {
         type: "object",
         properties: {
           calculatedValue: { type: "number", nullable: true, description: "For unit: percentage | number" },
+          textValue: { type: "string", nullable: true, description: "For unit: text" },
+          documentIds: { type: "array", items: { type: "string", format: "uuid" }, nullable: true, description: "For unit: file" },
           metadata: {
             type: "object",
             nullable: true,
-            description: "For unit=text ({ text: string }) or unit=file ({ files: [...] })",
+            description: "Optional JSON metadata",
           },
           formulaVersion: { type: "string" },
           calculatedAt: { type: "string", format: "date-time" },

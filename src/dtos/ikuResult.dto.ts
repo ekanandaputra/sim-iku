@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsObject } from "class-validator";
+import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, IsObject, IsArray } from "class-validator";
 
 export class IkuResultCreateDto {
   @IsNotEmpty({ message: "idIku is required" })
@@ -13,18 +13,19 @@ export class IkuResultCreateDto {
   @IsInt({ message: "year must be an integer" })
   year!: number;
 
-  /**
-   * For unit: percentage | number
-   * Either calculatedValue or metadata must be provided.
-   */
   @IsOptional()
   @IsNumber({}, { message: "calculatedValue must be numeric" })
   calculatedValue?: number;
 
-  /**
-   * For unit: text  → { text: "string value" }
-   * For unit: file  → { files: [{ documentId: "uuid", name: "filename" }, ...] }
-   */
+  @IsOptional()
+  @IsString({ message: "textValue must be a string" })
+  textValue?: string;
+
+  @IsOptional()
+  @IsArray({ message: "documentIds must be an array" })
+  @IsString({ each: true, message: "Each documentId must be a string" })
+  documentIds?: string[];
+
   @IsOptional()
   @IsObject({ message: "metadata must be a JSON object" })
   metadata?: Record<string, any>;
@@ -42,6 +43,15 @@ export class IkuResultUpdateDto {
   @IsOptional()
   @IsNumber({}, { message: "calculatedValue must be numeric" })
   calculatedValue?: number;
+
+  @IsOptional()
+  @IsString({ message: "textValue must be a string" })
+  textValue?: string;
+
+  @IsOptional()
+  @IsArray({ message: "documentIds must be an array" })
+  @IsString({ each: true, message: "Each documentId must be a string" })
+  documentIds?: string[];
 
   @IsOptional()
   @IsObject({ message: "metadata must be a JSON object" })
