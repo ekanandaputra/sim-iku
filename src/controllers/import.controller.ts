@@ -369,3 +369,165 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+
+// ─── EXPORT DATA ─────────────────────────────────────────────────────────────
+
+export const exportMasterData = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const headers = [
+      "iku_code",
+      "iku_name",
+      "iku_description",
+      "iku_is_direct_input",
+      "iku_unit",
+      "ikp_code",
+      "ikp_name",
+      "ikp_description",
+      "ikp_data_type",
+      "ikp_source_type",
+      "ikp_period_type",
+    ];
+
+    const ikus = await prisma.iKU.findMany({
+      include: {
+        components: {
+          include: {
+            component: true
+          }
+        }
+      }
+    });
+
+    const data: any[][] = [headers];
+
+    for (const iku of ikus) {
+      if (iku.components.length > 0) {
+        for (const mapping of iku.components) {
+          const comp = mapping.component;
+          data.push([
+            iku.code,
+            iku.name,
+            iku.description || "",
+            iku.isDirectInput ? "TRUE" : "FALSE",
+            iku.unit,
+            comp.code,
+            comp.name,
+            comp.description || "",
+            comp.dataType || "",
+            comp.sourceType || "",
+            comp.periodType || "",
+          ]);
+        }
+      } else {
+        data.push([
+          iku.code,
+          iku.name,
+          iku.description || "",
+          iku.isDirectInput ? "TRUE" : "FALSE",
+          iku.unit,
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+        ]);
+      }
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws["!cols"] = headers.map(() => ({ wch: 20 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, SHEET_MASTER);
+
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", 'attachment; filename="export_master_data.xlsx"');
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const reconstructFormula = (details: any[], resultKey: string): string => {
+  const step = details.find(d => d.resultKey === resultKey);
+  if (!step) return resultKey;
+
+  const operatorSymbol = (op: string) => {
+    switch (op) {
+      case "ADD": return "+";
+      case "SUB": return "-";
+      case "MUL": return "*";
+      case "DIV": return "/";
+      default: return op;
+    }
+  };
+
+  const parseSide = (type: string, value: string) => {
+    if (type === "temp") {
+      return reconstructFormula(details, value);
+    }
+    return value;
+  };
+
+  const left = parseSide(step.leftType, step.leftValue);
+  const right = parseSide(step.rightType, step.rightValue);
+  const op = operatorSymbol(step.operator);
+
+  return `(${left} ${op} ${right})`;
+};
+
+export const exportFormulas = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const headers = [
+      "iku_code",
+      "formula_name",
+      "formula_description",
+      "formula_expression",
+      "final_result_key",
+      "is_final",
+    ];
+
+    const formulas = await prisma.iKUFormula.findMany({
+      include: {
+        iku: true,
+        details: true
+      }
+    });
+
+    const data: any[][] = [headers];
+
+    for (const formula of formulas) {
+      let expression = "";
+      if (formula.details && formula.details.length > 0) {
+        expression = reconstructFormula(formula.details, formula.finalResultKey);
+        // remove outermost parenthesis if present
+        if (expression.startsWith("(") && expression.endsWith(")")) {
+          expression = expression.slice(1, -1);
+        }
+      }
+
+      data.push([
+        formula.iku.code,
+        formula.name,
+        formula.description || "",
+        expression,
+        formula.finalResultKey,
+        formula.isFinal ? "TRUE" : "FALSE",
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws["!cols"] = headers.map(() => ({ wch: 25 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, SHEET_FORMULA);
+
+    const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    res.setHeader("Content-Disposition", 'attachment; filename="export_formulas.xlsx"');
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+

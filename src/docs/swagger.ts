@@ -2791,6 +2791,19 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/import/master/export": {
+      get: {
+        tags: ["Import"],
+        summary: "Export master data to Excel",
+        description: "Returns an .xlsx file containing all existing IKU, Component (IKP), and their mapping data, formatted similarly to the import template.",
+        responses: {
+          "200": {
+            description: "Excel export file (.xlsx)",
+            content: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: "string", format: "binary" } } },
+          },
+        },
+      },
+    },
     "/api/import/master": {
       post: {
         tags: ["Import"],
@@ -2849,6 +2862,19 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/import/formulas/export": {
+      get: {
+        tags: ["Import"],
+        summary: "Export formulas to Excel",
+        description: "Returns an .xlsx file containing all existing IKU Formulas, formatted similarly to the import template.",
+        responses: {
+          "200": {
+            description: "Excel export file (.xlsx)",
+            content: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: "string", format: "binary" } } },
+          },
+        },
+      },
+    },
     "/api/import/formulas": {
       post: {
         tags: ["Import"],
@@ -2887,24 +2913,6 @@ const swaggerDefinition = {
         },
       },
     },
-        requestBody: {
-          required: true,
-          content: {
-            "multipart/form-data": {
-              schema: {
-                type: "object",
-                required: ["file"],
-                properties: {
-                  file: {
-                    type: "string",
-                    format: "binary",
-                    description: "Excel file (.xlsx) — must contain sheet 'MasterData'",
-                  },
-                },
-              },
-            },
-          },
-        },
   },
 };
 

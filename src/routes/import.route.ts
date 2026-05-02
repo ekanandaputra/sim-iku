@@ -4,7 +4,9 @@ import {
   downloadMasterTemplate, 
   downloadFormulaTemplate, 
   importMasterData, 
-  importFormulas 
+  importFormulas,
+  exportMasterData,
+  exportFormulas
 } from "../controllers/import.controller";
 
 const router = Router();
@@ -17,9 +19,11 @@ const upload = multer({
 // Master Data (IKU, IKP, Mapping)
 router.get("/master/template", downloadMasterTemplate);
 router.post("/master", upload.single("file"), importMasterData);
+router.get("/master/export", exportMasterData);
 
 // Formula Data
 router.get("/formulas/template", downloadFormulaTemplate);
 router.post("/formulas", upload.single("file"), importFormulas);
+router.get("/formulas/export", exportFormulas);
 
 export default router;
