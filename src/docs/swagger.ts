@@ -840,6 +840,65 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/realizations/{type}/{id}/detail": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["ComponentRealization"],
+        summary: "Get Realization Detail for Component or IKU",
+        description: "Returns metric data, realization result, and mapped documents for a specific month and year.",
+        parameters: [
+          {
+            name: "type",
+            in: "path",
+            required: true,
+            schema: { type: "string", enum: ["component", "iku"] },
+            description: "Metric type (component or iku)",
+          },
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Metric ID",
+          },
+          {
+            name: "year",
+            in: "query",
+            required: true,
+            schema: { type: "integer" },
+            description: "Year of the realization",
+          },
+          {
+            name: "month",
+            in: "query",
+            schema: { type: "integer" },
+            description: "Month of the realization (optional, depends on periodType)",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Realization detail data",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        metric: { $ref: "#/components/schemas/RealizationMetric" },
+                        realization: { type: "object", nullable: true, description: "ComponentRealization or IkuResult object including documents" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/dashboard/iku": {
       security: [{ bearerAuth: [] }],
       get: {

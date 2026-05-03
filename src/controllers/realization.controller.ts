@@ -415,3 +415,82 @@ export const bulkSaveRealization = async (
     next(error);
   }
 };
+
+/**
+ * GET REALIZATION DETAIL
+ * GET /api/realizations/:type/:id/detail?year=2024&month=3
+ */
+export const getRealizationDetail = async (
+  req: Request<{ type: string; id: string }, {}, {}, { month?: string; year: string }>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { type, id } = req.params;
+    const year = parseInt(req.query.year);
+    if (!year || isNaN(year)) {
+      return res.status(400).json(errorResponse("Valid year is required in query"));
+    }
+
+    const month = req.query.month ? parseInt(req.query.month) : null;
+
+    if (type.toLowerCase() === "component") {
+      const component = await prisma.component.findUnique({
+        where: { id },
+        include: {
+          tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
+          ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
+        },
+      });
+
+      if (!component) return res.status(404).json(errorResponse("Component not found"));
+
+      let realization = null;
+      
+      const realizations = await prisma.componentRealization.findMany({
+        where: { idComponent: id, year, month },
+        include: { documents: { include: { document: true } } },
+      });
+
+      if (realizations.length > 0) {
+        realization = realizations[0];
+      }
+
+      return res.json(successResponse({
+        metric: component,
+        realization,
+      }));
+
+    } else if (type.toLowerCase() === "iku") {
+      const iku = await prisma.iKU.findUnique({ where: { id } });
+      if (!iku) return res.status(404).json(errorResponse("IKU not found"));
+
+      let realization = null;
+      
+      const results = await prisma.ikuResult.findMany({
+        where: { idIku: id, year, month: month ?? 0 },
+      });
+
+      if (results.length > 0) {
+        const result = results[0];
+        let documents: any[] = [];
+        if (result.documentIds && Array.isArray(result.documentIds)) {
+          documents = await prisma.document.findMany({
+            where: { id: { in: result.documentIds as string[] } }
+          });
+        }
+        realization = { ...result, documents };
+      }
+
+      return res.json(successResponse({
+        metric: iku,
+        realization,
+      }));
+
+    } else {
+      return res.status(400).json(errorResponse("Invalid type. Must be 'component' or 'iku'"));
+    }
+  } catch (error) {
+    next(error);
+  }
+};
