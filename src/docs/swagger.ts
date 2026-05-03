@@ -171,7 +171,7 @@ const swaggerDefinition = {
         type: "object",
         properties: {
           id: { type: "string", format: "uuid", nullable: true, description: "null jika belum ada realisasi bulan ini" },
-          month: { type: "integer", minimum: 1, maximum: 12 },
+          month: { type: "integer", minimum: 0, maximum: 12 },
           monthName: { type: "string", example: "Januari" },
           year: { type: "integer" },
           value: { type: "number", nullable: true },

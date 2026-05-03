@@ -7,7 +7,7 @@ export class ComponentRealizationCreateDto {
 
   @IsOptional()
   @IsInt({ message: "month must be an integer" })
-  @Min(1)
+  @Min(0)
   @Max(12)
   month?: number;
 
