@@ -197,7 +197,10 @@ export const listComponentRealizations = async (
     const records = await prisma.componentRealization.findMany({
       where,
       orderBy: [{ year: "desc" }, { month: "desc" }],
-      include: { component: { include: { tags: { where: { tag: { deletedAt: null } }, include: { tag: true } } } } },
+      include: { 
+        component: { include: { tags: { where: { tag: { deletedAt: null } }, include: { tag: true } } } },
+        documents: { include: { document: true } }
+      },
     });
     res.json(successResponse(records));
   } catch (error) {
@@ -214,7 +217,10 @@ export const getComponentRealizationById = async (
     const id = req.params.id;
     const record = await prisma.componentRealization.findUnique({
       where: { idRealization: id },
-      include: { component: true },
+      include: { 
+        component: true,
+        documents: { include: { document: true } }
+      },
     });
 
     if (!record) {
@@ -255,19 +261,15 @@ export const createComponentRealization = async (
     });
 
     if (documentIds && Array.isArray(documentIds)) {
+      await prisma.componentRealizationDocument.deleteMany({
+        where: { realizationId: record.idRealization }
+      });
       for (const docId of documentIds) {
-        await prisma.componentDocument.upsert({
-          where: {
-            componentId_documentId: {
-              componentId: idComponent,
-              documentId: docId
-            }
-          },
-          create: {
-            componentId: idComponent,
+        await prisma.componentRealizationDocument.create({
+          data: {
+            realizationId: record.idRealization,
             documentId: docId
-          },
-          update: {}
+          }
         });
       }
     }
@@ -302,19 +304,15 @@ export const updateComponentRealization = async (
     });
 
     if (documentIds && Array.isArray(documentIds)) {
+      await prisma.componentRealizationDocument.deleteMany({
+        where: { realizationId: updated.idRealization }
+      });
       for (const docId of documentIds) {
-        await prisma.componentDocument.upsert({
-          where: {
-            componentId_documentId: {
-              componentId: updated.idComponent,
-              documentId: docId
-            }
-          },
-          create: {
-            componentId: updated.idComponent,
+        await prisma.componentRealizationDocument.create({
+          data: {
+            realizationId: updated.idRealization,
             documentId: docId
-          },
-          update: {}
+          }
         });
       }
     }

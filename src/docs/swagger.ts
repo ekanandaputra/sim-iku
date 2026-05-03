@@ -493,17 +493,31 @@ const swaggerDefinition = {
           },
         },
       },
+      ComponentRealizationDocument: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          realizationId: { type: "string", format: "uuid" },
+          documentId: { type: "string", format: "uuid" },
+          createdAt: { type: "string", format: "date-time" },
+          document: { $ref: "#/components/schemas/Document" },
+        },
+      },
       ComponentRealization: {
         type: "object",
         properties: {
-          idRealization: { type: "integer" },
-          idComponent: { type: "string" },
+          idRealization: { type: "string", format: "uuid" },
+          idComponent: { type: "string", format: "uuid" },
           month: { type: "integer", nullable: true },
           year: { type: "integer" },
           value: { type: "number" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           component: { type: "object" },
+          documents: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ComponentRealizationDocument" }
+          },
         },
         required: ["idRealization", "idComponent", "year", "value"],
       },

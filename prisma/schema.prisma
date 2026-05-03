@@ -162,6 +162,7 @@ model ComponentRealization {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   component Component @relation(fields: [idComponent], references: [id])
+  documents ComponentRealizationDocument[]
 
   @@unique([idComponent, month, year])
   @@index([idComponent])
@@ -238,6 +239,7 @@ model Document {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   components ComponentDocument[]
+  realizationDocuments ComponentRealizationDocument[]
 
   @@map("documents")
 }
@@ -278,4 +280,17 @@ model ComponentTag {
 
   @@unique([componentId, tagId])
   @@map("component_tags")
+}
+
+model ComponentRealizationDocument {
+  id            String   @id @default(uuid()) @db.VarChar(36)
+  realizationId String   @map("realization_id") @db.VarChar(36)
+  documentId    String   @map("document_id") @db.VarChar(36)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  realization ComponentRealization @relation(fields: [realizationId], references: [idRealization], onDelete: Cascade)
+  document    Document             @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([realizationId, documentId])
+  @@map("component_realization_documents")
 }
