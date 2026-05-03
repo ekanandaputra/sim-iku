@@ -845,7 +845,7 @@ const swaggerDefinition = {
       get: {
         tags: ["ComponentRealization"],
         summary: "Get Realization Detail for Component or IKU",
-        description: "Returns metric data, realization result, and mapped documents for a specific month and year.",
+        description: "Returns metric data, realization result, and mapped documents using the realization ID.",
         parameters: [
           {
             name: "type",
@@ -859,20 +859,7 @@ const swaggerDefinition = {
             in: "path",
             required: true,
             schema: { type: "string", format: "uuid" },
-            description: "Metric ID",
-          },
-          {
-            name: "year",
-            in: "query",
-            required: true,
-            schema: { type: "integer" },
-            description: "Year of the realization",
-          },
-          {
-            name: "month",
-            in: "query",
-            schema: { type: "integer" },
-            description: "Month of the realization (optional, depends on periodType)",
+            description: "Realization ID (idRealization for component, idResult for iku)",
           },
         ],
         responses: {

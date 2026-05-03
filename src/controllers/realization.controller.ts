@@ -418,73 +418,60 @@ export const bulkSaveRealization = async (
 
 /**
  * GET REALIZATION DETAIL
- * GET /api/realizations/:type/:id/detail?year=2024&month=3
+ * GET /api/realizations/:type/:id/detail
+ * :id here is idRealization (for component) or idResult (for IKU)
  */
 export const getRealizationDetail = async (
-  req: Request<{ type: string; id: string }, {}, {}, { month?: string; year: string }>,
+  req: Request<{ type: string; id: string }>,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { type, id } = req.params;
-    const year = parseInt(req.query.year);
-    if (!year || isNaN(year)) {
-      return res.status(400).json(errorResponse("Valid year is required in query"));
-    }
-
-    const month = req.query.month ? parseInt(req.query.month) : null;
 
     if (type.toLowerCase() === "component") {
-      const component = await prisma.component.findUnique({
-        where: { id },
+      const realization = await prisma.componentRealization.findUnique({
+        where: { idRealization: id },
         include: {
-          tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
-          ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
+          component: {
+            include: {
+              tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
+              ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
+            }
+          },
+          documents: { include: { document: true } },
         },
       });
 
-      if (!component) return res.status(404).json(errorResponse("Component not found"));
+      if (!realization) return res.status(404).json(errorResponse("Component realization not found"));
 
-      let realization = null;
-      
-      const realizations = await prisma.componentRealization.findMany({
-        where: { idComponent: id, year, month },
-        include: { documents: { include: { document: true } } },
-      });
-
-      if (realizations.length > 0) {
-        realization = realizations[0];
-      }
+      const { component, ...realizationData } = realization;
 
       return res.json(successResponse({
         metric: component,
-        realization,
+        realization: realizationData,
       }));
 
     } else if (type.toLowerCase() === "iku") {
-      const iku = await prisma.iKU.findUnique({ where: { id } });
-      if (!iku) return res.status(404).json(errorResponse("IKU not found"));
-
-      let realization = null;
-      
-      const results = await prisma.ikuResult.findMany({
-        where: { idIku: id, year, month: month ?? 0 },
+      const result = await prisma.ikuResult.findUnique({
+        where: { idResult: id },
+        include: { iku: true }
       });
 
-      if (results.length > 0) {
-        const result = results[0];
-        let documents: any[] = [];
-        if (result.documentIds && Array.isArray(result.documentIds)) {
-          documents = await prisma.document.findMany({
-            where: { id: { in: result.documentIds as string[] } }
-          });
-        }
-        realization = { ...result, documents };
+      if (!result) return res.status(404).json(errorResponse("IKU result not found"));
+
+      let documents: any[] = [];
+      if (result.documentIds && Array.isArray(result.documentIds)) {
+        documents = await prisma.document.findMany({
+          where: { id: { in: result.documentIds as string[] } }
+        });
       }
+
+      const { iku, ...realizationData } = result;
 
       return res.json(successResponse({
         metric: iku,
-        realization,
+        realization: { ...realizationData, documents },
       }));
 
     } else {
