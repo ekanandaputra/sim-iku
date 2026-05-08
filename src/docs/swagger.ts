@@ -18,6 +18,7 @@ const swaggerDefinition = {
     { name: "IKU", description: "IKU management endpoints" },
     { name: "Component", description: "Component management endpoints" },
     { name: "Formula", description: "IKU formula calculation and management" },
+    { name: "Realization", description: "Unified realization metrics (IKU & Component)" },
     { name: "ComponentRealization", description: "Component realization endpoints" },
     { name: "IKUResult", description: "IKU result endpoints" },
     { name: "IKUTarget", description: "IKU target endpoints" },
@@ -25,6 +26,8 @@ const swaggerDefinition = {
     { name: "Dashboard", description: "Dashboard visualization endpoints" },
     { name: "Document", description: "Document upload and tagging endpoints" },
     { name: "Tag", description: "Tag management and assignment endpoints" },
+    { name: "ComponentUsers", description: "Assign / unassign users to Components (userId from external auth service)" },
+    { name: "IkuUsers", description: "Assign / unassign users to IKUs (userId from external auth service)" },
     { name: "Import", description: "Import master data (IKU, IKP, Mapping) from Excel" },
   ],
   security: [{ bearerAuth: [] }],
@@ -730,15 +733,31 @@ const swaggerDefinition = {
           }
         }
       },
+      UserIdsBody: {
+        type: "object",
+        required: ["userIds"],
+        properties: {
+          userIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of external user IDs (from auth service)",
+            example: ["user-uuid-1", "user-uuid-2"],
+          },
+        },
+      },
     },
   },
   paths: {
     "/api/realizations/metrics": {
-      security: [{ bearerAuth: [] }],
       get: {
-        tags: ["ComponentRealization"],
+        tags: ["Realization"],
         summary: "List metrics (IKU & Component) available for realization",
-        description: "Returns a paginated, unified list of IKUs (where isDirectInput=true) and Components. Filter by name and tag (tag only applies to Components).",
+        description: "Returns a paginated, unified list of IKUs (isDirectInput=true) and Components.\n\n" +
+          "**Authentication:** Always pass `Authorization: Bearer <token>`.\n\n" +
+          "**User Filter (`ENABLE_USER_FILTER` env):**\n" +
+          "- `false` (default) — returns all metrics; token is optional.\n" +
+          "- `true` — only returns metrics assigned to the authenticated user via `iku_users` / `component_users` tables. Token is required; missing/invalid token returns an empty list.",
+        security: [{ bearerAuth: [] }],
         parameters: [
           {
             name: "page",
@@ -774,6 +793,7 @@ const swaggerDefinition = {
               },
             },
           },
+          "401": { description: "Unauthorized (token required when ENABLE_USER_FILTER=true)" },
         },
       },
     },
@@ -2970,6 +2990,182 @@ const swaggerDefinition = {
               },
             },
           },
+        },
+      },
+    },
+    // ───────────────────────────── Component Users ─────────────────────────────
+    "/api/component-users/{componentId}": {
+      get: {
+        tags: ["ComponentUsers"],
+        summary: "List all users assigned to a Component",
+        parameters: [
+          { name: "componentId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" },
+        ],
+        responses: {
+          "200": { description: "Component info and its user assignments" },
+          "404": { description: "Component not found" },
+        },
+      },
+      put: {
+        tags: ["ComponentUsers"],
+        summary: "Sync (replace) all user assignments for a Component",
+        description: "Replaces the entire user list. Pass an empty array to remove all assignments.",
+        parameters: [
+          { name: "componentId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Assignments updated" },
+          "404": { description: "Component not found" },
+        },
+      },
+    },
+    "/api/component-users/{componentId}/assign": {
+      post: {
+        tags: ["ComponentUsers"],
+        summary: "Assign users to a Component (additive — does not remove existing)",
+        parameters: [
+          { name: "componentId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Users assigned" },
+          "404": { description: "Component not found" },
+        },
+      },
+    },
+    "/api/component-users/{componentId}/unassign": {
+      delete: {
+        tags: ["ComponentUsers"],
+        summary: "Unassign specific users from a Component",
+        parameters: [
+          { name: "componentId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Component ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Users unassigned" },
+          "404": { description: "Component not found" },
+        },
+      },
+    },
+    "/api/component-users/by-user/{userId}": {
+      get: {
+        tags: ["ComponentUsers"],
+        summary: "List all Components assigned to a specific user",
+        parameters: [
+          { name: "userId", in: "path", required: true, schema: { type: "string" }, description: "External user ID" },
+        ],
+        responses: {
+          "200": { description: "List of components assigned to the user" },
+        },
+      },
+    },
+    // ───────────────────────────── IKU Users ─────────────────────────────
+    "/api/iku-users/{ikuId}": {
+      get: {
+        tags: ["IkuUsers"],
+        summary: "List all users assigned to an IKU",
+        parameters: [
+          { name: "ikuId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "IKU ID" },
+        ],
+        responses: {
+          "200": { description: "IKU info and its user assignments" },
+          "404": { description: "IKU not found" },
+        },
+      },
+      put: {
+        tags: ["IkuUsers"],
+        summary: "Sync (replace) all user assignments for an IKU",
+        description: "Replaces the entire user list. Pass an empty array to remove all assignments.",
+        parameters: [
+          { name: "ikuId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "IKU ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Assignments updated" },
+          "404": { description: "IKU not found" },
+        },
+      },
+    },
+    "/api/iku-users/{ikuId}/assign": {
+      post: {
+        tags: ["IkuUsers"],
+        summary: "Assign users to an IKU (additive — does not remove existing)",
+        parameters: [
+          { name: "ikuId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "IKU ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Users assigned" },
+          "404": { description: "IKU not found" },
+        },
+      },
+    },
+    "/api/iku-users/{ikuId}/unassign": {
+      delete: {
+        tags: ["IkuUsers"],
+        summary: "Unassign specific users from an IKU",
+        parameters: [
+          { name: "ikuId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "IKU ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Users unassigned" },
+          "404": { description: "IKU not found" },
+        },
+      },
+    },
+    "/api/iku-users/by-user/{userId}": {
+      get: {
+        tags: ["IkuUsers"],
+        summary: "List all IKUs assigned to a specific user",
+        parameters: [
+          { name: "userId", in: "path", required: true, schema: { type: "string" }, description: "External user ID" },
+        ],
+        responses: {
+          "200": { description: "List of IKUs assigned to the user" },
         },
       },
     },
