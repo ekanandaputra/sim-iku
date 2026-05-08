@@ -21,6 +21,11 @@ type PaginationQuery = {
 /**
  * LIST REALIZATION METRICS
  * GET /api/realizations/metrics
+ *
+ * When ENABLE_USER_FILTER=true, the Bearer token is required.
+ * The userId is extracted from the JWT payload (req.user.id).
+ * When ENABLE_USER_FILTER=false (or unset), all IKUs and Components are returned
+ * and authentication is not required.
  */
 export const getRealizationMetrics = async (
   req: Request<{}, {}, {}, PaginationQuery>,
@@ -33,7 +38,20 @@ export const getRealizationMetrics = async (
     const skip = (page - 1) * limit;
 
     const nameFilter = req.query.name?.trim();
-    const tagFilter = req.query.tag?.trim();
+    const tagFilter  = req.query.tag?.trim();
+
+    const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    const userId = userFilterEnabled ? (req as any).user?.id : undefined;
+
+    // When user filter is active but token is missing / invalid, return empty result
+    if (userFilterEnabled && !userId) {
+      return res.json(
+        successResponse({
+          data: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        })
+      );
+    }
 
     let ikus: any[] = [];
 
@@ -43,6 +61,11 @@ export const getRealizationMetrics = async (
       if (nameFilter) {
         ikuWhere.name = { contains: nameFilter };
       }
+      if (userFilterEnabled && userId) {
+        // Only IKUs where this user is assigned
+        ikuWhere.users = { some: { userId } };
+      }
+
       ikus = await prisma.iKU.findMany({
         where: ikuWhere,
         orderBy: { createdAt: "desc" },
@@ -62,6 +85,10 @@ export const getRealizationMetrics = async (
           },
         },
       };
+    }
+    if (userFilterEnabled && userId) {
+      // Only Components where this user is assigned
+      compWhere.users = { some: { userId } };
     }
 
     const components = await prisma.component.findMany({
@@ -131,6 +158,7 @@ export const getRealizationMetrics = async (
     next(error);
   }
 };
+
 
 /**
  * GET REALIZATION VIEW
