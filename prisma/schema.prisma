@@ -303,11 +303,13 @@ model ComponentUser {
   id          String   @id @default(uuid()) @db.VarChar(36)
   componentId String   @map("component_id") @db.VarChar(36)
   userId      String   @map("user_id")
+  prodiId     String?  @map("prodi_id") @db.VarChar(36)
   createdAt   DateTime @default(now()) @map("created_at")
 
   component Component @relation(fields: [componentId], references: [id])
+  prodi     Prodi?    @relation(fields: [prodiId], references: [id])
 
-  @@unique([componentId, userId])
+  @@unique([componentId, userId, prodiId])
   @@map("component_users")
 }
 
@@ -330,6 +332,7 @@ model Prodi {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   breakdowns ComponentRealizationBreakdown[]
+  componentUsers ComponentUser[]
 
   @@map("prodi")
 }

@@ -29,7 +29,15 @@ export const listComponentUsers = async (
       select: {
         id: true,
         userId: true,
+        prodiId: true,
         createdAt: true,
+        prodi: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     });
 
@@ -51,7 +59,7 @@ export const assignUsers = async (
 ) => {
   try {
     const { componentId } = req.params;
-    const { userIds } = req.body as { userIds: string[] };
+    const { userIds, prodiId } = req.body as { userIds: string[]; prodiId?: string };
 
     const component = await prisma.component.findUnique({
       where: { id: componentId },
@@ -64,10 +72,16 @@ export const assignUsers = async (
     const created = await prisma.$transaction(
       userIds.map((userId) =>
         prisma.componentUser.upsert({
-          where: { componentId_userId: { componentId, userId } },
-          create: { componentId, userId },
+          where: {
+            componentId_userId_prodiId: {
+              componentId,
+              userId,
+              prodiId: prodiId as any,
+            },
+          },
+          create: { componentId, userId, prodiId: prodiId || null },
           update: {},
-          select: { id: true, userId: true, createdAt: true },
+          select: { id: true, userId: true, prodiId: true, createdAt: true },
         })
       )
     );
@@ -92,7 +106,7 @@ export const unassignUsers = async (
 ) => {
   try {
     const { componentId } = req.params;
-    const { userIds } = req.body as { userIds: string[] };
+    const { userIds, prodiId } = req.body as { userIds: string[]; prodiId?: string };
 
     const component = await prisma.component.findUnique({
       where: { id: componentId },
@@ -105,6 +119,7 @@ export const unassignUsers = async (
       where: {
         componentId,
         userId: { in: userIds },
+        prodiId: prodiId || null,
       },
     });
 
@@ -173,7 +188,7 @@ export const syncUsers = async (
 ) => {
   try {
     const { componentId } = req.params;
-    const { userIds } = req.body as { userIds: string[] };
+    const { userIds, prodiId } = req.body as { userIds: string[]; prodiId?: string };
 
     const component = await prisma.component.findUnique({
       where: { id: componentId },
@@ -183,20 +198,26 @@ export const syncUsers = async (
     }
 
     await prisma.$transaction(async (tx) => {
-      // Delete all existing
-      await tx.componentUser.deleteMany({ where: { componentId } });
+      // Delete all existing for this component and prodi
+      await tx.componentUser.deleteMany({
+        where: { componentId, prodiId: prodiId || null },
+      });
 
       // Re-create with new list
       if (userIds.length > 0) {
         await tx.componentUser.createMany({
-          data: userIds.map((userId) => ({ componentId, userId })),
+          data: userIds.map((userId) => ({
+            componentId,
+            userId,
+            prodiId: prodiId || null,
+          })),
         });
       }
     });
 
     const updated = await prisma.componentUser.findMany({
-      where: { componentId },
-      select: { id: true, userId: true, createdAt: true },
+      where: { componentId, prodiId: prodiId || null },
+      select: { id: true, userId: true, prodiId: true, createdAt: true },
     });
 
     res.json(successResponse(updated, "Component users updated successfully"));
