@@ -19,6 +19,7 @@ import tagRouter from "./routes/tag.route";
 import realizationRouter from "./routes/realization.route";
 import importRouter from "./routes/import.route";
 import componentUserRouter from "./routes/componentUser.route";
+import ikuUserRouter from "./routes/ikuUser.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -48,6 +49,7 @@ app.use("/api/tags", tagRouter);
 app.use("/api/realizations", realizationRouter);
 app.use("/api/import", importRouter);
 app.use("/api/component-users", componentUserRouter);
+app.use("/api/iku-users", ikuUserRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

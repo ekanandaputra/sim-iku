@@ -53,6 +53,7 @@ model IKU {
   formulas      IKUFormula[]
   iku_results   IkuResult[]
   targets       IkuTarget[]
+  users         IkuUser[]
 
   @@map("ikus")
 }
@@ -306,4 +307,16 @@ model ComponentUser {
 
   @@unique([componentId, userId])
   @@map("component_users")
+}
+
+model IkuUser {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  ikuId     String   @map("iku_id") @db.VarChar(36)
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  iku IKU @relation(fields: [ikuId], references: [id])
+
+  @@unique([ikuId, userId])
+  @@map("iku_users")
 }
