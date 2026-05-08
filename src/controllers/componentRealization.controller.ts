@@ -240,6 +240,17 @@ export const createComponentRealization = async (
   try {
     const { idComponent, month, year, value, documentIds } = req.body;
 
+    // Guard: jika komponen menggunakan breakdown, nilai tidak boleh di-input langsung
+    const component = await prisma.component.findUnique({ where: { id: idComponent } });
+    if (!component) return res.status(404).json(errorResponse("Component not found"));
+    if (component.hasBreakdown) {
+      return res.status(400).json(
+        errorResponse(
+          "Component ini menggunakan breakdown per prodi. Input nilai melalui POST /api/component-realizations/:id/breakdown"
+        )
+      );
+    }
+
     const record = await prisma.componentRealization.upsert({
       where: {
         idComponent_month_year: {
@@ -293,9 +304,21 @@ export const updateComponentRealization = async (
     const id = req.params.id;
     const { value, documentIds } = req.body;
 
-    const existing = await prisma.componentRealization.findUnique({ where: { idRealization: id } });
+    const existing = await prisma.componentRealization.findUnique({
+      where: { idRealization: id },
+      include: { component: true },
+    });
     if (!existing) {
       return res.status(404).json(errorResponse("Component realization not found"));
+    }
+
+    // Guard: jika komponen menggunakan breakdown, nilai tidak boleh diubah langsung
+    if (existing.component.hasBreakdown) {
+      return res.status(400).json(
+        errorResponse(
+          "Component ini menggunakan breakdown per prodi. Update nilai melalui POST /api/component-realizations/:id/breakdown"
+        )
+      );
     }
 
     const updated = await prisma.componentRealization.update({

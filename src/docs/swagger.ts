@@ -28,6 +28,8 @@ const swaggerDefinition = {
     { name: "Tag", description: "Tag management and assignment endpoints" },
     { name: "ComponentUsers", description: "Assign / unassign users to Components (userId from external auth service)" },
     { name: "IkuUsers", description: "Assign / unassign users to IKUs (userId from external auth service)" },
+    { name: "Prodi", description: "Master data Program Studi" },
+    { name: "ComponentBreakdown", description: "Breakdown realisasi komponen per prodi (nilai total = sum breakdown)" },
     { name: "Import", description: "Import master data (IKU, IKP, Mapping) from Excel" },
   ],
   security: [{ bearerAuth: [] }],
@@ -86,6 +88,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          hasBreakdown: { type: "boolean", default: false, description: "Jika true, nilai realisasi dihitung otomatis dari breakdown per prodi" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -100,6 +103,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          hasBreakdown: { type: "boolean", default: false },
           tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
           ikus: { type: "array", items: { $ref: "#/components/schemas/IkuRef" } },
         },
@@ -114,6 +118,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          hasBreakdown: { type: "boolean" },
         },
         required: ["code", "name"],
       },
@@ -743,6 +748,70 @@ const swaggerDefinition = {
             description: "Array of external user IDs (from auth service)",
             example: ["user-uuid-1", "user-uuid-2"],
           },
+        },
+      },
+      Prodi: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string", example: "TI" },
+          name: { type: "string", example: "Teknik Informatika" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "code", "name"],
+      },
+      ProdiCreate: {
+        type: "object",
+        required: ["code", "name"],
+        properties: {
+          code: { type: "string", maxLength: 50, example: "TI" },
+          name: { type: "string", maxLength: 200, example: "Teknik Informatika" },
+        },
+      },
+      BreakdownItem: {
+        type: "object",
+        required: ["prodiId", "value"],
+        properties: {
+          prodiId: { type: "string", format: "uuid" },
+          value: { type: "number", minimum: 0 },
+        },
+      },
+      SaveBreakdownBody: {
+        type: "object",
+        required: ["breakdowns"],
+        properties: {
+          breakdowns: {
+            type: "array",
+            items: { $ref: "#/components/schemas/BreakdownItem" },
+          },
+        },
+      },
+      BreakdownResponse: {
+        type: "object",
+        properties: {
+          realization: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              month: { type: "integer", nullable: true },
+              year: { type: "integer" },
+              totalValue: { type: "number", description: "Sum of all breakdown values" },
+            },
+          },
+          component: { $ref: "#/components/schemas/Component" },
+          breakdowns: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                prodi: { $ref: "#/components/schemas/Prodi" },
+                value: { type: "number" },
+              },
+            },
+          },
+          total: { type: "number" },
         },
       },
     },
@@ -3166,6 +3235,102 @@ const swaggerDefinition = {
         ],
         responses: {
           "200": { description: "List of IKUs assigned to the user" },
+        },
+      },
+    },
+    // ───────────────────────────── Prodi ─────────────────────────────
+    "/api/prodi": {
+      get: {
+        tags: ["Prodi"],
+        summary: "List all Prodi",
+        parameters: [
+          { name: "name", in: "query", schema: { type: "string" }, description: "Filter by name" },
+          { name: "code", in: "query", schema: { type: "string" }, description: "Filter by code" },
+        ],
+        responses: { "200": { description: "List of Prodi" } },
+      },
+      post: {
+        tags: ["Prodi"],
+        summary: "Create a new Prodi",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ProdiCreate" } } },
+        },
+        responses: {
+          "201": { description: "Prodi created" },
+          "400": { description: "Code already exists or validation error" },
+        },
+      },
+    },
+    "/api/prodi/{id}": {
+      get: {
+        tags: ["Prodi"],
+        summary: "Get Prodi by ID",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: { "200": { description: "Prodi detail" }, "404": { description: "Not found" } },
+      },
+      put: {
+        tags: ["Prodi"],
+        summary: "Update Prodi",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/ProdiCreate" } } },
+        },
+        responses: { "200": { description: "Prodi updated" }, "404": { description: "Not found" } },
+      },
+      delete: {
+        tags: ["Prodi"],
+        summary: "Delete Prodi",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: { "200": { description: "Prodi deleted" }, "404": { description: "Not found" } },
+      },
+    },
+    // ───────────────────────────── Component Breakdown ─────────────────────────────
+    "/api/component-realizations/{realizationId}/breakdown": {
+      get: {
+        tags: ["ComponentBreakdown"],
+        summary: "Get breakdown entries for a realization",
+        description: "Returns all prodi breakdown values and the auto-calculated total for the given ComponentRealization.",
+        parameters: [
+          { name: "realizationId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "ComponentRealization ID" },
+        ],
+        responses: {
+          "200": { description: "Breakdown data", content: { "application/json": { schema: { $ref: "#/components/schemas/BreakdownResponse" } } } },
+          "400": { description: "Component does not have breakdown enabled" },
+          "404": { description: "Realization not found" },
+        },
+      },
+      post: {
+        tags: ["ComponentBreakdown"],
+        summary: "Save (bulk upsert) breakdown entries for a realization",
+        description: "Upserts the provided prodi breakdown values, then auto-sums them into `ComponentRealization.value` and triggers IKU recalculation.",
+        parameters: [
+          { name: "realizationId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "ComponentRealization ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/SaveBreakdownBody" } } },
+        },
+        responses: {
+          "200": { description: "Breakdown saved and total updated" },
+          "400": { description: "Component does not have breakdown enabled, or invalid prodiId" },
+          "404": { description: "Realization not found" },
+        },
+      },
+    },
+    "/api/component-realizations/{realizationId}/breakdown/{prodiId}": {
+      delete: {
+        tags: ["ComponentBreakdown"],
+        summary: "Delete a single breakdown entry",
+        description: "Removes one prodi entry and re-sums the total in ComponentRealization.value.",
+        parameters: [
+          { name: "realizationId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "prodiId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Entry deleted and total updated" },
+          "404": { description: "Realization or breakdown entry not found" },
         },
       },
     },

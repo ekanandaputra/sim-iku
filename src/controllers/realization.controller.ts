@@ -129,6 +129,7 @@ export const getRealizationMetrics = async (
         dataType: c.dataType,
         sourceType: c.sourceType,
         periodType: c.periodType,
+        hasBreakdown: c.hasBreakdown,
         tags: c.tags.map((ct) => ct.tag),
         ikus: c.ikus.map((ci) => ci.iku),
         createdAt: c.createdAt,
@@ -349,8 +350,18 @@ export const bulkSaveRealization = async (
       const component = await prisma.component.findUnique({ where: { id } });
       if (!component) return res.status(404).json(errorResponse("Component not found"));
 
+      // Guard: komponen dengan hasBreakdown tidak bisa di-bulk save langsung
+      if (component.hasBreakdown) {
+        return res.status(400).json(
+          errorResponse(
+            "Component ini menggunakan breakdown per prodi. Input realisasi melalui POST /api/component-realizations/:id/breakdown"
+          )
+        );
+      }
+
       // Validate month according to periodType
       const validMonths: number[] = [];
+
       if (component.periodType === "yearly") validMonths.push(0);
       else if (component.periodType === "semester") validMonths.push(6, 12);
       else if (component.periodType === "quarter") validMonths.push(3, 6, 9, 12);

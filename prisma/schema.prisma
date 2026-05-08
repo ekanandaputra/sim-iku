@@ -66,6 +66,7 @@ model Component {
   dataType     ComponentDataType?     @map("data_type")
   sourceType   ComponentSourceType?   @map("source_type")
   periodType   ComponentPeriodType    @default(yearly) @map("period_type")
+  hasBreakdown Boolean                @default(false) @map("has_breakdown")
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
   ikus         IKUComponent[]
@@ -163,8 +164,9 @@ model ComponentRealization {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  component Component @relation(fields: [idComponent], references: [id])
-  documents ComponentRealizationDocument[]
+  component  Component @relation(fields: [idComponent], references: [id])
+  documents  ComponentRealizationDocument[]
+  breakdowns ComponentRealizationBreakdown[]
 
   @@unique([idComponent, month, year])
   @@index([idComponent])
@@ -319,4 +321,31 @@ model IkuUser {
 
   @@unique([ikuId, userId])
   @@map("iku_users")
+}
+
+model Prodi {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  code       String   @unique
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  breakdowns ComponentRealizationBreakdown[]
+
+  @@map("prodi")
+}
+
+model ComponentRealizationBreakdown {
+  id            String   @id @default(uuid()) @db.VarChar(36)
+  realizationId String   @map("realization_id") @db.VarChar(36)
+  prodiId       String   @map("prodi_id") @db.VarChar(36)
+  value         Decimal  @db.Decimal(18, 4)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  realization ComponentRealization @relation(fields: [realizationId], references: [idRealization], onDelete: Cascade)
+  prodi       Prodi                @relation(fields: [prodiId], references: [id])
+
+  @@unique([realizationId, prodiId])
+  @@index([realizationId])
+  @@map("component_realization_breakdowns")
 }
