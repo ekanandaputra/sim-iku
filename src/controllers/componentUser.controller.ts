@@ -69,22 +69,24 @@ export const assignUsers = async (
     }
 
     // Upsert each userId (skip if already assigned)
-    const created = await prisma.$transaction(
-      userIds.map((userId) =>
-        prisma.componentUser.upsert({
-          where: {
-            componentId_userId_prodiId: {
-              componentId,
-              userId,
-              prodiId: prodiId as any,
-            },
-          },
-          create: { componentId, userId, prodiId: prodiId || null },
-          update: {},
+    const created = await prisma.$transaction(async (tx) => {
+      const results = [];
+      for (const userId of userIds) {
+        let existing = await tx.componentUser.findFirst({
+          where: { componentId, userId, prodiId: prodiId || null },
           select: { id: true, userId: true, prodiId: true, createdAt: true },
-        })
-      )
-    );
+        });
+
+        if (!existing) {
+          existing = await tx.componentUser.create({
+            data: { componentId, userId, prodiId: prodiId || null },
+            select: { id: true, userId: true, prodiId: true, createdAt: true },
+          });
+        }
+        results.push(existing);
+      }
+      return results;
+    });
 
     res.status(201).json(
       successResponse(created, `${created.length} user(s) assigned to component`)

@@ -82,6 +82,10 @@ router.get("/by-user/:userId", listComponentsByUser);
  *                 items:
  *                   type: string
  *                 example: ["user-uuid-1", "user-uuid-2"]
+ *               prodiId:
+ *                 type: string
+ *                 description: Optional Prodi ID
+ *                 example: "prodi-uuid-1"
  *     responses:
  *       201:
  *         description: Users assigned
@@ -116,6 +120,10 @@ router.post("/:componentId/assign", validateBody(AssignUsersDto), assignUsers);
  *                 items:
  *                   type: string
  *                 example: ["user-uuid-1"]
+ *               prodiId:
+ *                 type: string
+ *                 description: Optional Prodi ID
+ *                 example: "prodi-uuid-1"
  *     responses:
  *       200:
  *         description: Users unassigned
@@ -151,6 +159,10 @@ router.delete("/:componentId/unassign", validateBody(UnassignUsersDto), unassign
  *                   type: string
  *                 description: Full list of userIds to assign (existing removed, new ones added)
  *                 example: ["user-uuid-1", "user-uuid-2"]
+ *               prodiId:
+ *                 type: string
+ *                 description: Optional Prodi ID
+ *                 example: "prodi-uuid-1"
  *     responses:
  *       200:
  *         description: Assignments updated
