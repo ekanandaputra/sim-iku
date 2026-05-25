@@ -243,6 +243,10 @@ export const createComponentRealization = async (
     const component = await prisma.component.findUnique({ where: { id: idComponent } });
     if (!component) return res.status(404).json(errorResponse("Component not found"));
 
+    if (component.hasBreakdown && !prodiId) {
+      return res.status(400).json(errorResponse("prodiId is mandatory for components with breakdowns"));
+    }
+
     let record: any;
 
     if (prodiId) {
@@ -336,6 +340,10 @@ export const updateComponentRealization = async (
     });
     if (!existing) {
       return res.status(404).json(errorResponse("Component realization not found"));
+    }
+
+    if (existing.component.hasBreakdown && !prodiId) {
+      return res.status(400).json(errorResponse("prodiId is mandatory for components with breakdowns"));
     }
 
     let updated: any;
