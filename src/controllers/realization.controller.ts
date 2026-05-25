@@ -38,7 +38,7 @@ export const getRealizationMetrics = async (
     const skip = (page - 1) * limit;
 
     const nameFilter = req.query.name?.trim();
-    const tagFilter  = req.query.tag?.trim();
+    const tagFilter = req.query.tag?.trim();
 
     const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
@@ -106,8 +106,17 @@ export const getRealizationMetrics = async (
       orderBy: { createdAt: "desc" },
     });
 
+    const prodis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+
+    let userComponentMappings: any[] = [];
+    if (userFilterEnabled && userId) {
+      userComponentMappings = await prisma.componentUser.findMany({
+        where: { userId },
+      });
+    }
+
     // Merge and format the responses
-    const merged = [
+    const merged: any[] = [
       ...ikus.map((i) => ({
         id: i.id,
         type: "IKU",
@@ -120,22 +129,56 @@ export const getRealizationMetrics = async (
         createdAt: i.createdAt,
         updatedAt: i.updatedAt,
       })),
-      ...components.map((c) => ({
-        id: c.id,
-        type: "COMPONENT",
-        code: c.code,
-        name: c.name,
-        description: c.description,
-        dataType: c.dataType,
-        sourceType: c.sourceType,
-        periodType: c.periodType,
-        hasBreakdown: c.hasBreakdown,
-        tags: c.tags.map((ct) => ct.tag),
-        ikus: c.ikus.map((ci) => ci.iku),
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
-      })),
     ];
+
+    for (const c of components) {
+      if (c.hasBreakdown) {
+        let allowedProdis = prodis;
+        if (userFilterEnabled && userId) {
+          const mappings = userComponentMappings.filter((m) => m.componentId === c.id);
+          const hasGlobalAccess = mappings.some((m) => !m.prodiId);
+          if (!hasGlobalAccess) {
+            const allowedProdiIds = mappings.map((m) => m.prodiId).filter(Boolean);
+            allowedProdis = prodis.filter((p) => allowedProdiIds.includes(p.id));
+          }
+        }
+
+        for (const p of allowedProdis) {
+          merged.push({
+            id: c.id,
+            prodiId: p.id,
+            type: "COMPONENT",
+            code: `${c.code}/${p.code}`,
+            name: `${c.name} - ${p.name}`,
+            description: c.description,
+            dataType: c.dataType,
+            sourceType: c.sourceType,
+            periodType: c.periodType,
+            hasBreakdown: c.hasBreakdown,
+            tags: c.tags.map((ct) => ct.tag),
+            ikus: c.ikus.map((ci) => ci.iku),
+            createdAt: c.createdAt,
+            updatedAt: c.updatedAt,
+          });
+        }
+      } else {
+        merged.push({
+          id: c.id,
+          type: "COMPONENT",
+          code: c.code,
+          name: c.name,
+          description: c.description,
+          dataType: c.dataType,
+          sourceType: c.sourceType,
+          periodType: c.periodType,
+          hasBreakdown: c.hasBreakdown,
+          tags: c.tags.map((ct) => ct.tag),
+          ikus: c.ikus.map((ci) => ci.iku),
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        });
+      }
+    }
 
     // Sort by createdAt descending across both types
     merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -174,7 +217,11 @@ export const getRealizationView = async (
   next: NextFunction
 ) => {
   try {
-    const { type, id } = req.params;
+    let { type, id } = req.params;
+    let prodiId: string | null = null;
+    if (type.toLowerCase() === "component" && id.includes("_")) {
+      [id, prodiId] = id.split("_");
+    }
     const baseYear = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
     const years = Array.from({ length: YEARS_RANGE }, (_, i) => baseYear - i);
 
@@ -191,7 +238,10 @@ export const getRealizationView = async (
 
       const [allTargets, allRealizations] = await Promise.all([
         prisma.componentTarget.findMany({ where: { componentId: id, year: { in: years } } }),
-        prisma.componentRealization.findMany({ where: { idComponent: id, year: { in: years } } }),
+        prisma.componentRealization.findMany({
+          where: { idComponent: id, year: { in: years } },
+          include: { breakdowns: prodiId ? { where: { prodiId } } : false }
+        }),
       ]);
 
       const targetByYear = new Map(allTargets.map((t) => [t.year, t]));
@@ -203,10 +253,14 @@ export const getRealizationView = async (
 
       const buildRow = (byMonth: Map<number, typeof allRealizations[0]>, year: number, monthKey: number, extra: object) => {
         const r = byMonth.get(monthKey);
+        let value = r ? Number(r.value) : null;
+        if (r && prodiId && (r as any).breakdowns?.length) {
+          value = Number((r as any).breakdowns[0].value);
+        }
         return {
           id: r?.idRealization ?? null,
           year,
-          value: r ? Number(r.value) : null,
+          value,
           _action: r ? "PUT" : "POST",
           ...extra,
         };
