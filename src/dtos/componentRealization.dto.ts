@@ -24,6 +24,10 @@ export class ComponentRealizationCreateDto {
   @IsArray()
   @IsString({ each: true })
   documentIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  prodiId?: string;
 }
 
 export class ComponentRealizationUpdateDto {
@@ -35,4 +39,8 @@ export class ComponentRealizationUpdateDto {
   @IsArray()
   @IsString({ each: true })
   documentIds?: string[];
+
+  @IsOptional()
+  @IsString()
+  prodiId?: string;
 }

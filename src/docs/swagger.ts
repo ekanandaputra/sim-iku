@@ -537,6 +537,7 @@ const swaggerDefinition = {
           year: { type: "integer" },
           value: { type: "number" },
           documentIds: { type: "array", items: { type: "string", format: "uuid" } },
+          prodiId: { type: "string", format: "uuid", nullable: true, description: "Optional Prodi ID for breakdown components" },
         },
         required: ["idComponent", "year", "value"],
       },
@@ -545,6 +546,7 @@ const swaggerDefinition = {
         properties: {
           value: { type: "number" },
           documentIds: { type: "array", items: { type: "string", format: "uuid" } },
+          prodiId: { type: "string", format: "uuid", nullable: true, description: "Optional Prodi ID for breakdown components" },
         },
         required: ["value"],
       },

@@ -238,38 +238,64 @@ export const createComponentRealization = async (
   next: NextFunction
 ) => {
   try {
-    const { idComponent, month, year, value, documentIds } = req.body;
+    const { idComponent, month, year, value, documentIds, prodiId } = req.body;
 
-    // Guard: jika komponen menggunakan breakdown, nilai tidak boleh di-input langsung
     const component = await prisma.component.findUnique({ where: { id: idComponent } });
     if (!component) return res.status(404).json(errorResponse("Component not found"));
-    if (component.hasBreakdown) {
-      return res.status(400).json(
-        errorResponse(
-          "Component ini menggunakan breakdown per prodi. Input nilai melalui POST /api/component-realizations/:id/breakdown"
-        )
-      );
-    }
 
-    const record = await prisma.componentRealization.upsert({
-      where: {
-        idComponent_month_year: {
+    let record: any;
+
+    if (prodiId) {
+      // Find or create the main realization record
+      record = await prisma.componentRealization.findUnique({
+        where: { idComponent_month_year: { idComponent, month, year } }
+      });
+
+      if (!record) {
+        record = await prisma.componentRealization.create({
+          data: { idComponent, month, year, value: 0 }
+        });
+      }
+
+      // Upsert breakdown
+      await prisma.componentRealizationBreakdown.upsert({
+        where: { realizationId_prodiId: { realizationId: record.idRealization, prodiId } },
+        create: { realizationId: record.idRealization, prodiId, value },
+        update: { value }
+      });
+
+      // Recalculate total value for the main realization record
+      const breakdowns = await prisma.componentRealizationBreakdown.findMany({
+        where: { realizationId: record.idRealization }
+      });
+      const totalValue = breakdowns.reduce((sum, b) => sum + Number(b.value), 0);
+
+      record = await prisma.componentRealization.update({
+        where: { idRealization: record.idRealization },
+        data: { value: totalValue },
+        include: { component: true }
+      });
+    } else {
+      record = await prisma.componentRealization.upsert({
+        where: {
+          idComponent_month_year: {
+            idComponent,
+            month,
+            year,
+          },
+        },
+        create: {
           idComponent,
           month,
           year,
+          value,
         },
-      },
-      create: {
-        idComponent,
-        month,
-        year,
-        value,
-      },
-      update: {
-        value,
-      },
-      include: { component: true },
-    });
+        update: {
+          value,
+        },
+        include: { component: true },
+      });
+    }
 
     if (documentIds && Array.isArray(documentIds)) {
       await prisma.componentRealizationDocument.deleteMany({
@@ -302,7 +328,7 @@ export const updateComponentRealization = async (
 ) => {
   try {
     const id = req.params.id;
-    const { value, documentIds } = req.body;
+    const { value, documentIds, prodiId } = req.body;
 
     const existing = await prisma.componentRealization.findUnique({
       where: { idRealization: id },
@@ -312,19 +338,32 @@ export const updateComponentRealization = async (
       return res.status(404).json(errorResponse("Component realization not found"));
     }
 
-    // Guard: jika komponen menggunakan breakdown, nilai tidak boleh diubah langsung
-    if (existing.component.hasBreakdown) {
-      return res.status(400).json(
-        errorResponse(
-          "Component ini menggunakan breakdown per prodi. Update nilai melalui POST /api/component-realizations/:id/breakdown"
-        )
-      );
-    }
+    let updated: any;
 
-    const updated = await prisma.componentRealization.update({
-      where: { idRealization: id },
-      data: { value },
-    });
+    if (prodiId) {
+      // Upsert breakdown
+      await prisma.componentRealizationBreakdown.upsert({
+        where: { realizationId_prodiId: { realizationId: id, prodiId } },
+        create: { realizationId: id, prodiId, value },
+        update: { value }
+      });
+
+      // Recalculate total value for the main realization record
+      const breakdowns = await prisma.componentRealizationBreakdown.findMany({
+        where: { realizationId: id }
+      });
+      const totalValue = breakdowns.reduce((sum, b) => sum + Number(b.value), 0);
+
+      updated = await prisma.componentRealization.update({
+        where: { idRealization: id },
+        data: { value: totalValue },
+      });
+    } else {
+      updated = await prisma.componentRealization.update({
+        where: { idRealization: id },
+        data: { value },
+      });
+    }
 
     if (documentIds && Array.isArray(documentIds)) {
       await prisma.componentRealizationDocument.deleteMany({
