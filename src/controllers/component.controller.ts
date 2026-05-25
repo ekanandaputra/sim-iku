@@ -11,6 +11,7 @@ type PaginationQuery = {
   limit?: string;
   name?: string;
   tag?: string;
+  search?: string;
 };
 
 /**
@@ -29,11 +30,17 @@ export const listComponents = async (
 
     const nameFilter = req.query.name?.trim();
     const tagFilter = req.query.tag?.trim();
+    const searchFilter = req.query.search?.trim();
 
     // Build where clause
-    const where: Record<string, any> = {};
+    const where: any = {};
 
-    if (nameFilter) {
+    if (searchFilter) {
+      where.OR = [
+        { name: { contains: searchFilter } },
+        { code: { contains: searchFilter } },
+      ];
+    } else if (nameFilter) {
       where.name = { contains: nameFilter };
     }
 

@@ -10,6 +10,7 @@ type PaginationQuery = {
   page?: string;
   limit?: string;
   includeInactive?: string;
+  search?: string;
 };
 
 /**
@@ -26,13 +27,24 @@ export const listIkus = async (
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
 
+    const searchFilter = req.query.search?.trim();
+
+    const where: any = {};
+    if (searchFilter) {
+      where.OR = [
+        { name: { contains: searchFilter } },
+        { code: { contains: searchFilter } },
+      ];
+    }
+
     const [ikus, total] = await Promise.all([
       prisma.iKU.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
       }),
-      prisma.iKU.count(),
+      prisma.iKU.count({ where }),
     ]);
 
     res.json(successResponse({

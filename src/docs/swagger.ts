@@ -1323,6 +1323,12 @@ const swaggerDefinition = {
             schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
             description: "Number of items per page",
           },
+          {
+            name: "search",
+            in: "query",
+            schema: { type: "string" },
+            description: "Search IKUs by name or code (substring match)",
+          },
         ],
         responses: {
           "200": {
@@ -1710,10 +1716,16 @@ const swaggerDefinition = {
             description: "Number of items per page",
           },
           {
+            name: "search",
+            in: "query",
+            schema: { type: "string" },
+            description: "Search components by name or code (substring match). Overrides the `name` filter if provided.",
+          },
+          {
             name: "name",
             in: "query",
             schema: { type: "string" },
-            description: "Filter components by name (substring match)",
+            description: "Filter components by name (substring match). Ignored if `search` is provided.",
           },
           {
             name: "tag",
@@ -2013,6 +2025,7 @@ const swaggerDefinition = {
       put: {
         tags: ["Formula"],
         summary: "Update an IKU formula",
+        description: "Updates the formula in-place (name, description, isFinal, and steps). Existing steps are replaced with the new ones provided. The formula version is NOT incremented.",
         parameters: [
           {
             name: "id",
