@@ -276,44 +276,40 @@ export const updateIkuFormula = async (
       return res.status(400).json(errorResponse("At least one formula step is required"));
     }
 
-    const lastVersion = await prisma.iKUFormula.findFirst({
-      where: { ikuId },
-      orderBy: { version: "desc" },
-      select: { version: true },
-    });
-    const nextVersion = (lastVersion?.version ?? 0) + 1;
-
     // Build transaction operations based on isFinal flag
     const transactionOps: any[] = [];
 
-    if (isFinal === true) {
+    const newIsFinal = isFinal !== undefined ? isFinal : existing.isFinal;
+
+    if (newIsFinal === true) {
       transactionOps.push(
         prisma.iKUFormula.updateMany({
-          where: { ikuId, isFinal: true },
+          where: { ikuId, isFinal: true, id: { not: id } },
           data: { isFinal: false },
         })
       );
     }
 
     transactionOps.push(
-      prisma.iKUFormula.create({
+      prisma.iKUFormula.update({
+        where: { id },
         data: {
-          ikuId,
           name,
           description,
           finalResultKey,
-          isActive: true,
-          isFinal: isFinal ?? false,
-          version: nextVersion,
-          details: { create: createSteps },
+          isFinal: newIsFinal,
+          details: {
+            deleteMany: {},
+            create: createSteps,
+          },
         },
       })
     );
 
-    const created = await prisma.$transaction(transactionOps);
+    const updated = await prisma.$transaction(transactionOps);
 
-    // the create call is the last item in the transaction array
-    const formula = created[created.length - 1];
+    // the update call is the last item in the transaction array
+    const formula = updated[updated.length - 1];
 
     res.json(successResponse(formula, "Formula updated successfully"));
   } catch (error) {
