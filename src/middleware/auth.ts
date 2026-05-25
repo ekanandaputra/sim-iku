@@ -21,14 +21,14 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   try {
     const payload = verifyJwt(token);
     // validasi payload
-    if (!payload.userId || !payload.email) {
+    if (!payload.userId) {
       return res.status(401).json(errorResponse("Invalid token payload"));
     }
 
     // attach user ke request
     req.user = {
       id: payload.userId,
-      email: payload.email,
+      email: payload.email || "",
     };
     next();
   } catch (err) {
@@ -53,10 +53,10 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
 
   try {
     const payload = verifyJwt(token);
-    if (payload.userId && payload.email) {
+    if (payload.userId) {
       (req as AuthRequest).user = {
         id: payload.userId,
-        email: payload.email,
+        email: payload.email || "",
       };
     }
   } catch {
