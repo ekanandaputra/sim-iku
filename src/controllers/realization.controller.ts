@@ -42,7 +42,7 @@ export const getRealizationMetrics = async (
 
     const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
-
+    console.log(req.user);
     // When user filter is active but token is missing / invalid, return empty result
     if (userFilterEnabled && !userId) {
       return res.json(
