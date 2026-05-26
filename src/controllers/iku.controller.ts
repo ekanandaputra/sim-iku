@@ -202,17 +202,17 @@ export const listIkuComponents = async (
 ) => {
   try {
     const id = req.params.id;
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-    const skip = (page - 1) * limit;
+    // const page = Math.max(1, Number(req.query.page) || 1);
+    // const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    // const skip = (page - 1) * limit;
 
     const iku = await prisma.iKU.findUnique({
       where: { id },
       include: {
         components: {
           include: { component: true },
-          skip,
-          take: limit,
+          // skip,
+          // take: limit,
           orderBy: { id: "asc" },
         },
       },
