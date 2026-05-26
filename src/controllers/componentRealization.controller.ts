@@ -102,13 +102,13 @@ export async function calculateIkuResultsForComponentRealization(idComponent: st
     }
 
     const componentValues: ComponentValues = {};
-    let missingData = false;
+    let hasData = false;
 
     for (const code of formulaCodes) {
       const targetComponent = codeToComponent.get(code);
       if (!targetComponent) {
-        missingData = true;
-        break;
+        componentValues[code] = 0;
+        continue;
       }
 
       const componentReals = realizationsByComponentId.get(targetComponent.id) || [];
@@ -117,15 +117,15 @@ export async function calculateIkuResultsForComponentRealization(idComponent: st
         : componentReals.filter((realization) => realization.month === month);
 
       if (!selectedValues.length) {
-        missingData = true;
-        break;
+        componentValues[code] = 0;
+      } else {
+        hasData = true;
+        componentValues[code] = selectedValues.reduce((sum, realization) => sum + Number(realization.value), 0);
       }
-
-      componentValues[code] = selectedValues.reduce((sum, realization) => sum + Number(realization.value), 0);
     }
 
-    if (missingData) {
-      console.log(`Missing data for formula ${formula.id}, skipping evaluation.`);
+    if (!hasData) {
+      console.log(`Missing all data for formula ${formula.id}, skipping evaluation.`);
       continue;
     }
 
