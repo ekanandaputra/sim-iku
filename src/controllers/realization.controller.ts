@@ -68,7 +68,7 @@ export const getRealizationMetrics = async (
 
       ikus = await prisma.iKU.findMany({
         where: ikuWhere,
-        orderBy: { createdAt: "desc" },
+        orderBy: { code: "asc" },
       });
     }
 
@@ -103,7 +103,7 @@ export const getRealizationMetrics = async (
           include: { iku: { select: { id: true, code: true, name: true } } },
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { code: "asc" },
     });
 
     const prodis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
@@ -180,8 +180,8 @@ export const getRealizationMetrics = async (
       }
     }
 
-    // Sort by createdAt descending across both types
-    merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    // Sort by code ascending across both types
+    merged.sort((a, b) => a.code.localeCompare(b.code));
 
     // Paginate in memory
     const total = merged.length;
