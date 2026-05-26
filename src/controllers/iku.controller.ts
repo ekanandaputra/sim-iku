@@ -213,7 +213,11 @@ export const listIkuComponents = async (
           include: { component: true },
           // skip,
           // take: limit,
-          orderBy: { id: "asc" },
+          orderBy: {
+            component: {
+              code: "asc",
+            },
+          },
         },
       },
     });
