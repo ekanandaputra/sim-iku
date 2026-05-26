@@ -12,7 +12,51 @@ type PaginationQuery = {
   name?: string;
   tag?: string;
   search?: string;
+  parentId?: string;
 };
+
+/**
+ * Helper: include clause untuk component dengan hierarki parent + children
+ */
+const componentInclude = {
+  parent: { select: { id: true, code: true, name: true } },
+  children: {
+    select: { id: true, code: true, name: true, periodType: true, hasBreakdown: true },
+    orderBy: { code: "asc" as const },
+  },
+  tags: {
+    where: { tag: { deletedAt: null } },
+    include: { tag: true },
+    orderBy: { tag: { name: "asc" as const } },
+  },
+  ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
+};
+
+/**
+ * Helper: cegah circular reference (nenek moyang tidak boleh menjadi anak)
+ * Traverse naik dari calon parent ke atas, pastikan tidak ada `id` yang sama
+ */
+async function hasCircularReference(
+  candidateParentId: string,
+  componentId: string
+): Promise<boolean> {
+  let current: string | null = candidateParentId;
+  const visited = new Set<string>();
+
+  while (current) {
+    if (visited.has(current)) break; // loop tak terduga
+    if (current === componentId) return true; // circular!
+    visited.add(current);
+
+    const comp: { parentId: string | null } | null = await prisma.component.findUnique({
+      where: { id: current },
+      select: { parentId: true },
+    });
+    current = comp?.parentId ?? null;
+  }
+
+  return false;
+}
 
 /**
  * LIST COMPONENTS
@@ -31,6 +75,7 @@ export const listComponents = async (
     const nameFilter = req.query.name?.trim();
     const tagFilter = req.query.tag?.trim();
     const searchFilter = req.query.search?.trim();
+    const parentIdFilter = req.query.parentId?.trim();
 
     // Build where clause
     const where: any = {};
@@ -55,16 +100,20 @@ export const listComponents = async (
       };
     }
 
+    // Filter by parentId: bisa filter root (parentId=null) atau by specific parent
+    if (parentIdFilter === "null") {
+      where.parentId = null; // hanya root components
+    } else if (parentIdFilter) {
+      where.parentId = parentIdFilter;
+    }
+
     const [components, total] = await Promise.all([
       prisma.component.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
-          ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
-        },
+        orderBy: { code: "asc" },
+        include: componentInclude,
       }),
       prisma.component.count({ where }),
     ]);
@@ -74,6 +123,7 @@ export const listComponents = async (
         ...c,
         tags: c.tags.map((ct) => ct.tag),
         ikus: c.ikus.map((ci) => ci.iku),
+        isCalculated: c.children.length > 0,
       })),
       pagination: {
         page,
@@ -101,10 +151,7 @@ export const getComponentById = async (
 
     const component = await prisma.component.findUnique({
       where: { id },
-      include: {
-        tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
-        ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
-      },
+      include: componentInclude,
     });
 
     if (!component) {
@@ -115,6 +162,7 @@ export const getComponentById = async (
       ...component,
       tags: component.tags.map((ct) => ct.tag),
       ikus: component.ikus.map((ci) => ci.iku),
+      isCalculated: component.children.length > 0,
     }));
   } catch (error) {
     next(error);
@@ -131,14 +179,20 @@ export const createComponent = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, dataType, sourceType, periodType, tagIds } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, tagIds, parentId } = req.body;
 
-    const existing = await prisma.component.findUnique({
-      where: { code },
-    });
-
+    // Cek kode unik
+    const existing = await prisma.component.findUnique({ where: { code } });
     if (existing) {
       return res.status(400).json(errorResponse("Component code already exists"));
+    }
+
+    // Validasi parentId jika ada
+    if (parentId) {
+      const parent = await prisma.component.findUnique({ where: { id: parentId } });
+      if (!parent) {
+        return res.status(404).json(errorResponse("Parent component not found"));
+      }
     }
 
     // Validasi tagIds jika ada (exclude soft-deleted)
@@ -157,19 +211,13 @@ export const createComponent = async (
       name,
       description,
       periodType,
+      parentId: parentId ?? null,
     };
 
-    if (dataType !== undefined) {
-      componentData.dataType = dataType;
-    }
+    if (dataType !== undefined) componentData.dataType = dataType;
+    if (sourceType !== undefined) componentData.sourceType = sourceType;
 
-    if (sourceType !== undefined) {
-      componentData.sourceType = sourceType;
-    }
-
-    const component = await prisma.component.create({
-      data: componentData,
-    });
+    const component = await prisma.component.create({ data: componentData });
 
     // Assign tags jika ada
     if (tagIds && tagIds.length > 0) {
@@ -178,19 +226,17 @@ export const createComponent = async (
       });
     }
 
-    // Return component lengkap dengan tags
+    // Return component lengkap
     const result = await prisma.component.findUnique({
       where: { id: component.id },
-      include: {
-        tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
-        ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
-      },
+      include: componentInclude,
     });
 
     res.status(201).json(successResponse({
       ...result,
       tags: result!.tags.map((ct) => ct.tag),
       ikus: result!.ikus.map((ci) => ci.iku),
+      isCalculated: result!.children.length > 0,
     }, "Component created successfully"));
   } catch (error) {
     next(error);
@@ -208,47 +254,65 @@ export const updateComponent = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, dataType, sourceType, periodType } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, parentId } = req.body;
 
-    const existing = await prisma.component.findUnique({
-      where: { id },
-    });
-
+    const existing = await prisma.component.findUnique({ where: { id } });
     if (!existing) {
       return res.status(404).json(errorResponse("Component not found"));
     }
 
+    // Cek kode unik (jika berubah)
     if (code !== existing.code) {
-      const other = await prisma.component.findUnique({
-        where: { code },
-      });
-
+      const other = await prisma.component.findUnique({ where: { code } });
       if (other) {
         return res.status(400).json(errorResponse("Component code already exists"));
       }
     }
 
-    const updateData: any = {
-      code,
-      name,
-      description,
-      periodType,
-    };
+    // Validasi parentId jika diubah
+    if (parentId !== undefined) {
+      if (parentId !== null) {
+        // Self-reference check
+        if (parentId === id) {
+          return res.status(400).json(errorResponse("Component cannot be its own parent"));
+        }
 
-    if (dataType !== undefined) {
-      updateData.dataType = dataType;
+        // Parent harus ada
+        const parent = await prisma.component.findUnique({ where: { id: parentId } });
+        if (!parent) {
+          return res.status(404).json(errorResponse("Parent component not found"));
+        }
+
+        // Circular reference check
+        const isCircular = await hasCircularReference(parentId, id);
+        if (isCircular) {
+          return res.status(400).json(
+            errorResponse("Circular reference detected: a descendant cannot become a parent")
+          );
+        }
+      }
     }
 
-    if (sourceType !== undefined) {
-      updateData.sourceType = sourceType;
-    }
+    const updateData: any = { code, name, description, periodType };
+
+    if (dataType !== undefined) updateData.dataType = dataType;
+    if (sourceType !== undefined) updateData.sourceType = sourceType;
+
+    // parentId: undefined berarti tidak diubah, null berarti dijadikan root, string berarti diubah
+    if (parentId !== undefined) updateData.parentId = parentId;
 
     const updated = await prisma.component.update({
       where: { id },
       data: updateData,
+      include: componentInclude,
     });
 
-    res.json(successResponse(updated, "Component updated successfully"));
+    res.json(successResponse({
+      ...updated,
+      tags: updated.tags.map((ct) => ct.tag),
+      ikus: updated.ikus.map((ci) => ci.iku),
+      isCalculated: updated.children.length > 0,
+    }, "Component updated successfully"));
   } catch (error) {
     next(error);
   }
@@ -268,15 +332,21 @@ export const deleteComponent = async (
 
     const existing = await prisma.component.findUnique({
       where: { id },
+      include: { children: { select: { id: true } } },
     });
 
     if (!existing) {
       return res.status(404).json(errorResponse("Component not found"));
     }
 
-    await prisma.component.delete({
-      where: { id },
-    });
+    // Cegah hapus komponen yang masih punya children
+    if (existing.children.length > 0) {
+      return res.status(400).json(
+        errorResponse("Cannot delete component that has child components. Remove children first.")
+      );
+    }
+
+    await prisma.component.delete({ where: { id } });
 
     res.json(successResponse(null, "Component deleted successfully"));
   } catch (error) {
@@ -387,15 +457,3 @@ export const unassignTagFromComponent = async (
     next(error);
   }
 };
-
-const MONTH_NAMES = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
-
-
-
-
-
-
-

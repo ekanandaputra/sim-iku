@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { Prisma } from "../generated/prisma/client";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
-import { calculateIkuResultsForComponentRealization } from "./componentRealization.controller";
+import { calculateIkuResultsForComponentRealization, calculateParentComponentSum } from "./componentRealization.controller";
 import { BulkSaveRealizationDto } from "../dtos/realization.dto";
 
 const YEARS_RANGE = 6;
@@ -72,7 +72,9 @@ export const getRealizationMetrics = async (
       });
     }
 
-    const compWhere: any = {};
+    const compWhere: any = {
+      children: { none: {} }
+    };
     if (nameFilter) {
       compWhere.name = { contains: nameFilter };
     }
@@ -87,8 +89,11 @@ export const getRealizationMetrics = async (
       };
     }
     if (userFilterEnabled && userId) {
-      // Only Components where this user is assigned
-      compWhere.users = { some: { userId } };
+      // Only Components where this user is assigned or assigned to its parent
+      compWhere.OR = [
+        { users: { some: { userId } } },
+        { parent: { users: { some: { userId } } } }
+      ];
     }
 
     const components = await prisma.component.findMany({
@@ -135,7 +140,7 @@ export const getRealizationMetrics = async (
       if (c.hasBreakdown) {
         let allowedProdis = prodis;
         if (userFilterEnabled && userId) {
-          const mappings = userComponentMappings.filter((m) => m.componentId === c.id);
+          const mappings = userComponentMappings.filter((m) => m.componentId === c.id || (c.parentId && m.componentId === c.parentId));
           const hasGlobalAccess = mappings.some((m) => !m.prodiId);
           if (!hasGlobalAccess) {
             const allowedProdiIds = mappings.map((m) => m.prodiId).filter(Boolean);
@@ -401,8 +406,20 @@ export const bulkSaveRealization = async (
     const { year, realizations } = req.body;
 
     if (type.toLowerCase() === "component") {
-      const component = await prisma.component.findUnique({ where: { id } });
+      const component = await prisma.component.findUnique({
+        where: { id },
+        include: { children: { select: { id: true } } },
+      });
       if (!component) return res.status(404).json(errorResponse("Component not found"));
+
+      // Guard: komponen yang punya children tidak bisa diinput manual
+      if (component.children.length > 0) {
+        return res.status(400).json(
+          errorResponse(
+            "Komponen ini memiliki sub-komponen. Nilai dihitung otomatis dari SUM sub-komponen. Input realisasi pada masing-masing sub-komponen."
+          )
+        );
+      }
 
       // Guard: komponen dengan hasBreakdown tidak bisa di-bulk save langsung
       if (component.hasBreakdown) {
@@ -453,6 +470,10 @@ export const bulkSaveRealization = async (
         if (item.month != null) {
           await calculateIkuResultsForComponentRealization(id, item.month, year);
         }
+
+        // Cascade naik ke parent (jika ada)
+        await calculateParentComponentSum(id, item.month ?? null, year);
+
         results.push(record);
       }
 

@@ -33,6 +33,10 @@ export class ComponentCreateDto {
   @IsArray({ message: "tagIds must be an array" })
   @IsUUID(undefined, { each: true, message: "Each tagId must be a valid UUID" })
   tagIds?: string[];
+
+  @IsOptional()
+  @IsUUID("4", { message: "parentId must be a valid UUID" })
+  parentId?: string;
 }
 
 export class ComponentUpdateDto {
@@ -62,4 +66,8 @@ export class ComponentUpdateDto {
   @IsOptional()
   @IsEnum(ComponentPeriodType, { message: "Period type must be one of: monthly, quarter, semester, yearly" })
   periodType?: ComponentPeriodType;
+
+  @IsOptional()
+  @IsUUID("4", { message: "parentId must be a valid UUID" })
+  parentId?: string | null;
 }

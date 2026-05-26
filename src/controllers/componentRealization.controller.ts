@@ -160,6 +160,81 @@ export async function calculateIkuResultsForComponentRealization(idComponent: st
   }
 }
 
+/**
+ * CALCULATE PARENT COMPONENT SUM (CASCADE)
+ *
+ * Ketika realisasi child komponen disimpan, fungsi ini:
+ * 1. Mencari parent dari komponen tersebut
+ * 2. Menjumlahkan semua realisasi children dari parent (missing = 0)
+ * 3. Meng-upsert realisasi parent dengan nilai total
+ * 4. Memicu kalkulasi IKU untuk parent
+ * 5. Rekursif naik ke parent berikutnya (jika ada)
+ */
+export async function calculateParentComponentSum(
+  componentId: string,
+  month: number | null,
+  year: number
+): Promise<void> {
+  // Cari parentId dari komponen ini
+  const component = await prisma.component.findUnique({
+    where: { id: componentId },
+    select: { parentId: true },
+  });
+
+  if (!component?.parentId) return; // Tidak punya parent, stop
+
+  const parentId = component.parentId;
+
+  // Ambil semua children dari parent
+  const siblings = await prisma.component.findMany({
+    where: { parentId },
+    select: { id: true },
+  });
+  const siblingIds = siblings.map((s) => s.id);
+
+  // Ambil realisasi semua siblings untuk (month, year) yang sama
+  const whereRealization: any = {
+    idComponent: { in: siblingIds },
+    year,
+  };
+  if (month !== null) {
+    whereRealization.month = month;
+  } else {
+    whereRealization.month = null;
+  }
+
+  const realizations = await prisma.componentRealization.findMany({
+    where: whereRealization,
+  });
+
+  // SUM semua nilai (siblings yang tidak punya realisasi dianggap 0)
+  const totalValue = realizations.reduce((sum, r) => sum + Number(r.value), 0);
+
+  // Upsert realisasi parent dengan total
+  await prisma.componentRealization.upsert({
+    where: {
+      idComponent_month_year: {
+        idComponent: parentId,
+        month: month ?? 0,
+        year,
+      },
+    },
+    create: { idComponent: parentId, month: month ?? 0, year, value: totalValue },
+    update: { value: totalValue },
+  });
+
+  console.log(`[Parent SUM] Parent ${parentId}: total = ${totalValue} (month=${month}, year=${year})`);
+
+  // Trigger IKU recalculation untuk parent
+  const effectiveMonth = month ?? 0;
+  if (effectiveMonth !== 0) {
+    await calculateIkuResultsForComponentRealization(parentId, effectiveMonth, year);
+  }
+
+  // Cascade ke atas: cek apakah parent juga punya parent
+  await calculateParentComponentSum(parentId, month, year);
+}
+
 export const listComponentRealizations = async (
   req: Request<{}, {}, {}, RealizationQuery>,
   res: Response,
@@ -240,8 +315,20 @@ export const createComponentRealization = async (
   try {
     const { idComponent, month, year, value, documentIds, prodiId } = req.body;
 
-    const component = await prisma.component.findUnique({ where: { id: idComponent } });
+    const component = await prisma.component.findUnique({
+      where: { id: idComponent },
+      include: { children: { select: { id: true } } },
+    });
     if (!component) return res.status(404).json(errorResponse("Component not found"));
+
+    // Guard: komponen yang punya children dihitung otomatis dari SUM children
+    if (component.children.length > 0) {
+      return res.status(400).json(
+        errorResponse(
+          "Komponen ini memiliki sub-komponen. Nilai dihitung otomatis dari SUM sub-komponen. Input realisasi pada masing-masing sub-komponen."
+        )
+      );
+    }
 
     if (component.hasBreakdown && !prodiId) {
       return res.status(400).json(errorResponse("prodiId is mandatory for components with breakdowns"));
@@ -319,6 +406,9 @@ export const createComponentRealization = async (
       await calculateIkuResultsForComponentRealization(idComponent, month, year);
     }
 
+    // Cascade naik ke parent (jika ada)
+    await calculateParentComponentSum(idComponent, month ?? null, year);
+
     res.status(201).json(successResponse(record, "Component realization created or updated successfully"));
   } catch (error) {
     next(error);
@@ -336,10 +426,23 @@ export const updateComponentRealization = async (
 
     const existing = await prisma.componentRealization.findUnique({
       where: { idRealization: id },
-      include: { component: true },
+      include: {
+        component: {
+          include: { children: { select: { id: true } } },
+        },
+      },
     });
     if (!existing) {
       return res.status(404).json(errorResponse("Component realization not found"));
+    }
+
+    // Guard: komponen yang punya children dihitung otomatis
+    if (existing.component.children.length > 0) {
+      return res.status(400).json(
+        errorResponse(
+          "Komponen ini memiliki sub-komponen. Nilai dihitung otomatis dari SUM sub-komponen."
+        )
+      );
     }
 
     if (existing.component.hasBreakdown && !prodiId) {
@@ -390,6 +493,9 @@ export const updateComponentRealization = async (
     if (updated.month != null) {
       await calculateIkuResultsForComponentRealization(updated.idComponent, updated.month, updated.year);
     }
+
+    // Cascade naik ke parent (jika ada)
+    await calculateParentComponentSum(updated.idComponent, updated.month ?? null, updated.year);
 
     res.json(successResponse(updated, "Component realization updated successfully"));
   } catch (error) {

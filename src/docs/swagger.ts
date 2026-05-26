@@ -89,6 +89,32 @@ const swaggerDefinition = {
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
           hasBreakdown: { type: "boolean", default: false, description: "Jika true, nilai realisasi dihitung otomatis dari breakdown per prodi" },
+          parentId: { type: "string", format: "uuid", nullable: true, description: "ID parent component (null jika root)" },
+          parent: {
+            nullable: true,
+            description: "Parent component (null jika root)",
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              code: { type: "string" },
+              name: { type: "string" },
+            },
+          },
+          children: {
+            type: "array",
+            description: "Sub-komponen langsung. Jika ada children, nilai dihitung otomatis (SUM children).",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                code: { type: "string" },
+                name: { type: "string" },
+                periodType: { type: "string" },
+                hasBreakdown: { type: "boolean" },
+              },
+            },
+          },
+          isCalculated: { type: "boolean", description: "true jika komponen punya children (nilai otomatis dari SUM children, tidak bisa diinput manual)" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -104,8 +130,8 @@ const swaggerDefinition = {
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
           hasBreakdown: { type: "boolean", default: false },
-          tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
-          ikus: { type: "array", items: { $ref: "#/components/schemas/IkuRef" } },
+          parentId: { type: "string", format: "uuid", nullable: true, description: "Optional: jadikan komponen ini sub-komponen dari parent yang ditentukan" },
+          tagIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Array of Tag IDs to assign" },
         },
         required: ["code", "name"],
       },
@@ -119,6 +145,7 @@ const swaggerDefinition = {
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
           hasBreakdown: { type: "boolean" },
+          parentId: { type: "string", format: "uuid", nullable: true, description: "Set null untuk jadikan root; omit untuk tidak mengubah; set string UUID untuk set parent baru" },
         },
         required: ["code", "name"],
       },
@@ -873,7 +900,8 @@ const swaggerDefinition = {
       get: {
         tags: ["ComponentRealization"],
         summary: "Get Realization View for Component or IKU",
-        description: "Returns 6 years of target and realization data (selected year + 5 previous) for a specific metric type (component or iku).",
+        description: "Returns 6 years of target and realization data (selected year + 5 previous) for a specific metric type (component or iku).\n\n" +
+          "**For type=component (with breakdown):** To view breakdown-filtered data for a specific prodi, append the prodi ID using underscore format: `{componentId}_{prodiId}`. Example: `abc-uuid_prodi-uuid`. When a prodiId is provided, the realization value returned is the prodi-specific breakdown value instead of the aggregate total.",
         parameters: [
           {
             name: "type",
@@ -886,8 +914,8 @@ const swaggerDefinition = {
             name: "id",
             in: "path",
             required: true,
-            schema: { type: "string", format: "uuid" },
-            description: "Metric ID",
+            schema: { type: "string" },
+            description: "Metric ID (UUID). For components with breakdown, use `{componentId}_{prodiId}` format to filter by specific prodi.",
           },
           {
             name: "year",
@@ -1733,6 +1761,12 @@ const swaggerDefinition = {
             schema: { type: "string" },
             description: "Filter components by tag name (substring match)",
           },
+          {
+            name: "parentId",
+            in: "query",
+            schema: { type: "string" },
+            description: "Filter by parentId. Use `null` (string) to get only root components (no parent). Use a UUID to get direct children of a specific parent.",
+          },
         ],
         responses: {
           "200": {
@@ -1748,19 +1782,35 @@ const swaggerDefinition = {
       post: {
         tags: ["Component"],
         summary: "Create a new Component",
+        description: "Creates a new component. Optionally assign a `parentId` to create a sub-component (child). If a `parentId` is set, the parent's realization value will be auto-calculated as the SUM of all its children.",
         requestBody: {
           required: true,
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/ComponentCreate" },
               examples: {
-                sample: {
+                rootComponent: {
+                  summary: "Root component (no parent)",
                   value: {
                     code: "COMP001",
                     name: "Example Component",
                     description: "Component for measuring something",
                     dataType: "number",
                     sourceType: "manual",
+                    periodType: "monthly",
+                    tagIds: [],
+                  },
+                },
+                childComponent: {
+                  summary: "Sub-component (with parentId)",
+                  value: {
+                    code: "COMP001-A",
+                    name: "Sub-Component A",
+                    description: "Child of COMP001",
+                    dataType: "number",
+                    sourceType: "manual",
+                    periodType: "monthly",
+                    parentId: "uuid-of-parent-component",
                   },
                 },
               },
@@ -1838,13 +1888,33 @@ const swaggerDefinition = {
             "application/json": {
               schema: { $ref: "#/components/schemas/ComponentUpdate" },
               examples: {
-                sample: {
+                basicUpdate: {
+                  summary: "Update name/code/type",
                   value: {
                     code: "COMP001",
                     name: "Updated component name",
                     description: "Updated description",
                     dataType: "percentage",
                     sourceType: "api",
+                    periodType: "monthly",
+                  },
+                },
+                setParent: {
+                  summary: "Assign a parent (make it a sub-component)",
+                  value: {
+                    code: "COMP001",
+                    name: "Updated component name",
+                    periodType: "monthly",
+                    parentId: "uuid-of-parent-component",
+                  },
+                },
+                removeParent: {
+                  summary: "Remove parent (promote to root)",
+                  value: {
+                    code: "COMP001",
+                    name: "Updated component name",
+                    periodType: "monthly",
+                    parentId: null,
                   },
                 },
               },
@@ -1881,6 +1951,7 @@ const swaggerDefinition = {
       delete: {
         tags: ["Component"],
         summary: "Delete a Component",
+        description: "Deletes a component. **Cannot delete a component that still has child components** — remove all children first.",
         parameters: [
           {
             name: "id",
@@ -1902,6 +1973,15 @@ const swaggerDefinition = {
                     message: { type: "string", example: "Component deleted successfully" },
                   },
                 },
+              },
+            },
+          },
+          "400": {
+            description: "Cannot delete — component still has child components",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+                example: { success: false, message: "Cannot delete component that has child components. Remove children first." },
               },
             },
           },
@@ -2814,7 +2894,13 @@ const swaggerDefinition = {
       post: {
         tags: ["ComponentRealization"],
         summary: "Bulk save realizations for a Component or IKU",
-        description: `Upserts multiple realization rows for a given year. \n\n**For type=component:** \`value\` is required. \`month\` must match the component's periodType (0=yearly, 3/6/9/12=quarter, 6/12=semester, 1-12=monthly). Optionally attach \`documentIds\`.\n\n**For type=iku (unit=percentage|number):** \`value\` is required.\n**For type=iku (unit=text):** \`metadata.text\` (string) is required.\n**For type=iku (unit=file):** \`metadata.files\` (array) is required.`,
+        description: `Upserts multiple realization rows for a given year.\n\n` +
+          `**For type=component:** \`value\` is required. \`month\` must match the component's periodType (0=yearly, 3/6/9/12=quarter, 6/12=semester, 1-12=monthly). Optionally attach \`documentIds\`.\n\n` +
+          `**⚠️ Parent components with sub-components cannot be input manually** — their value is automatically calculated as the SUM of all children. This endpoint returns HTTP 400 for such components. Input realization on each sub-component instead.\n\n` +
+          `**⚠️ Components with \`hasBreakdown=true\`** cannot be saved via this endpoint. Use \`POST /api/component-realizations/{id}/breakdown\` instead.\n\n` +
+          `**For type=iku (unit=percentage|number):** \`value\` is required.\n` +
+          `**For type=iku (unit=text):** \`metadata.text\` (string) is required.\n` +
+          `**For type=iku (unit=file):** \`metadata.files\` (array) is required.`,
         parameters: [
           {
             name: "type",
