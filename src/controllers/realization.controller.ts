@@ -206,6 +206,7 @@ export const getRealizationView = async (
         include: {
           tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
           ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
+          users: userFilterEnabled && userId ? { where: { userId } } : true,
           children: {
             include: {
               users: userFilterEnabled && userId ? { where: { userId } } : true
@@ -227,18 +228,14 @@ export const getRealizationView = async (
         sourceType: component.sourceType,
         periodType: component.periodType,
         hasBreakdown: component.hasBreakdown,
+        isAssigned: userFilterEnabled && userId ? component.users.length > 0 : true,
         tags: component.tags.map((ct) => ct.tag),
         ikus: component.ikus.map((ci) => ci.iku),
       };
 
       if (component.children.length > 0) {
         // Case A: Component punya children
-        let visibleChildren = component.children;
-        if (userFilterEnabled && userId) {
-          visibleChildren = component.children.filter(child => child.users.length > 0);
-        }
-
-        const childIds = visibleChildren.map(c => c.id);
+        const childIds = component.children.map(c => c.id);
         const [allChildTargets, allChildRealizations, allProdis] = await Promise.all([
           prisma.componentTarget.findMany({ where: { componentId: { in: childIds }, year: { in: years } } }),
           prisma.componentRealization.findMany({
@@ -255,7 +252,8 @@ export const getRealizationView = async (
            });
         }
 
-        const formattedChildren = visibleChildren.map(child => {
+        const formattedChildren = component.children.map(child => {
+          const isAssigned = userFilterEnabled && userId ? child.users.length > 0 : true;
           const childInfo = {
             id: child.id,
             code: child.code,
@@ -264,6 +262,7 @@ export const getRealizationView = async (
             dataType: child.dataType,
             sourceType: child.sourceType,
             hasBreakdown: child.hasBreakdown,
+            isAssigned,
           };
 
           const childTargets = allChildTargets.filter(t => t.componentId === child.id);
@@ -308,22 +307,20 @@ export const getRealizationView = async (
           };
 
           if (child.hasBreakdown) {
-            let visibleProdis = allProdis;
-            if (userFilterEnabled && userId) {
-              const mappings = childUserMappings.filter(m => m.componentId === child.id);
-              const hasGlobalAccess = mappings.some(m => !m.prodiId);
-              if (!hasGlobalAccess) {
-                const allowedProdiIds = mappings.map(m => m.prodiId).filter(Boolean);
-                visibleProdis = allProdis.filter(p => allowedProdiIds.includes(p.id));
-              }
-            }
-            
-            // if id had prodiId filtered it
+            let prodisToRender = allProdis;
             if (prodiId) {
-              visibleProdis = visibleProdis.filter(p => p.id === prodiId);
+              prodisToRender = allProdis.filter(p => p.id === prodiId);
             }
 
-            const breakdown = visibleProdis.map(prodi => {
+            const mappings = childUserMappings.filter(m => m.componentId === child.id);
+            const hasGlobalAccess = mappings.some(m => !m.prodiId);
+            const allowedProdiIds = mappings.map(m => m.prodiId).filter(Boolean);
+
+            const breakdown = prodisToRender.map(prodi => {
+               const isProdiAssigned = userFilterEnabled && userId 
+                 ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
+                 : true;
+
                const data = years.map(year => {
                  const target = targetByYear.get(year) ?? null;
                  const byMonth = realizationsByYear.get(year) ?? new Map();
@@ -342,7 +339,7 @@ export const getRealizationView = async (
                  };
                });
                return {
-                 prodi: { id: prodi.id, code: prodi.code, name: prodi.name },
+                 prodi: { id: prodi.id, code: prodi.code, name: prodi.name, isAssigned: isProdiAssigned },
                  data
                }
             });
@@ -426,23 +423,26 @@ export const getRealizationView = async (
       if (component.hasBreakdown) {
         // Case B: Component hasBreakdown
         const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
-        let visibleProdis = allProdis;
+        let userMappings: any[] = [];
         if (userFilterEnabled && userId) {
-          const userMappings = await prisma.componentUser.findMany({
+          userMappings = await prisma.componentUser.findMany({
             where: { componentId: id, userId }
           });
-          const hasGlobalAccess = userMappings.some(m => !m.prodiId);
-          if (!hasGlobalAccess) {
-            const allowedProdiIds = userMappings.map(m => m.prodiId).filter(Boolean);
-            visibleProdis = allProdis.filter(p => allowedProdiIds.includes(p.id));
-          }
         }
         
+        let prodisToRender = allProdis;
         if (prodiId) {
-          visibleProdis = visibleProdis.filter(p => p.id === prodiId);
+          prodisToRender = allProdis.filter(p => p.id === prodiId);
         }
 
-        const breakdown = visibleProdis.map(prodi => {
+        const hasGlobalAccess = userMappings.some(m => !m.prodiId);
+        const allowedProdiIds = userMappings.map(m => m.prodiId).filter(Boolean);
+
+        const breakdown = prodisToRender.map(prodi => {
+           const isProdiAssigned = userFilterEnabled && userId
+             ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
+             : true;
+
            const data = years.map(year => {
              const target = targetByYear.get(year) ?? null;
              const byMonth = realizationsByYear.get(year) ?? new Map();
@@ -461,7 +461,7 @@ export const getRealizationView = async (
              };
            });
            return {
-             prodi: { id: prodi.id, code: prodi.code, name: prodi.name },
+             prodi: { id: prodi.id, code: prodi.code, name: prodi.name, isAssigned: isProdiAssigned },
              data
            }
         });
