@@ -220,11 +220,10 @@ const swaggerDefinition = {
           target: { type: "number", nullable: true },
         },
       },
-      ComponentRealizationView: {
+      RealizationDataRow: {
         type: "object",
         properties: {
-          component: { $ref: "#/components/schemas/ComponentWithMeta" },
-          year: { type: "integer", example: 2024 },
+          year: { type: "integer" },
           target: {
             type: "object",
             properties: {
@@ -234,11 +233,53 @@ const swaggerDefinition = {
               targetQ3: { type: "number", nullable: true },
               targetQ4: { type: "number", nullable: true },
               targetYear: { type: "number", nullable: true },
-              _action: { type: "string", enum: ["POST", "PUT"], description: "Hint: POST jika target belum ada, PUT jika sudah ada" },
+              _action: { type: "string", enum: ["POST", "PUT"] },
             },
           },
-          quarters: { type: "array", items: { $ref: "#/components/schemas/QuarterSummary" } },
           realizations: { type: "array", items: { $ref: "#/components/schemas/RealizationRow" } },
+        },
+      },
+      RealizationBreakdown: {
+        type: "object",
+        properties: {
+          prodi: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              code: { type: "string" },
+              name: { type: "string" },
+              isAssigned: { type: "boolean", description: "true jika user diassign ke prodi ini" },
+            },
+          },
+          data: { type: "array", items: { $ref: "#/components/schemas/RealizationDataRow" } },
+        },
+      },
+      RealizationChild: {
+        type: "object",
+        properties: {
+          component: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              code: { type: "string" },
+              name: { type: "string" },
+              periodType: { type: "string" },
+              dataType: { type: "string" },
+              sourceType: { type: "string" },
+              hasBreakdown: { type: "boolean" },
+              isAssigned: { type: "boolean" },
+            },
+          },
+          breakdown: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RealizationBreakdown" },
+            description: "Hadir jika component child ini memiliki hasBreakdown = true",
+          },
+          data: {
+            type: "array",
+            items: { $ref: "#/components/schemas/RealizationDataRow" },
+            description: "Hadir jika component child ini memiliki hasBreakdown = false",
+          },
         },
       },
       SuccessResponseSingleComponent: {
@@ -777,6 +818,8 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          hasBreakdown: { type: "boolean", nullable: true },
+          isAssigned: { type: "boolean", nullable: true },
           tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
           ikus: { type: "array", items: { $ref: "#/components/schemas/IkuRef" } },
           createdAt: { type: "string", format: "date-time" },
@@ -973,16 +1016,20 @@ const swaggerDefinition = {
                       properties: {
                         metric: { $ref: "#/components/schemas/RealizationMetric" },
                         years: { type: "array", items: { type: "integer" } },
+                        children: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/RealizationChild" },
+                          description: "Tersedia jika komponen root memiliki sub-komponen (Case A).",
+                        },
+                        breakdown: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/RealizationBreakdown" },
+                          description: "Tersedia jika komponen root memiliki hasBreakdown = true (Case B).",
+                        },
                         data: {
                           type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              year: { type: "integer" },
-                              target: { type: "object" },
-                              realizations: { type: "array", items: { type: "object" } },
-                            },
-                          },
+                          items: { $ref: "#/components/schemas/RealizationDataRow" },
+                          description: "Tersedia jika komponen adalah komponen biasa (Case C) atau metrik IKU.",
                         },
                       },
                     },
