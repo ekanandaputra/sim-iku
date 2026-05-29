@@ -348,6 +348,41 @@ const swaggerDefinition = {
           },
         },
       },
+      PaginationMeta: {
+        type: "object",
+        properties: {
+          page: { type: "integer", example: 1 },
+          limit: { type: "integer", example: 20 },
+          total: { type: "integer", example: 100 },
+          totalPages: { type: "integer", example: 5 },
+        },
+      },
+      SuccessResponsePaginatedIku: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/Iku" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
+          },
+        },
+      },
+      SuccessResponsePaginatedComponent: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/Component" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
+          },
+        },
+      },
       IKUComponent: {
         type: "object",
         properties: {
@@ -1360,10 +1395,10 @@ const swaggerDefinition = {
         ],
         responses: {
           "200": {
-            description: "List of IKU records",
+            description: "Paginated list of IKU records",
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/SuccessResponseList" },
+                schema: { $ref: "#/components/schemas/SuccessResponsePaginatedIku" },
               },
             },
           },
@@ -1770,10 +1805,10 @@ const swaggerDefinition = {
         ],
         responses: {
           "200": {
-            description: "List of Component records",
+            description: "Paginated list of Component records",
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/SuccessResponseListComponent" },
+                schema: { $ref: "#/components/schemas/SuccessResponsePaginatedComponent" },
               },
             },
           },
@@ -3208,7 +3243,25 @@ const swaggerDefinition = {
           required: true,
           content: {
             "application/json": {
-              schema: { $ref: "#/components/schemas/UserIdsBody" },
+              schema: {
+                type: "object",
+                required: ["userIds"],
+                properties: {
+                  userIds: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Array of external user IDs (from auth service)",
+                    example: ["user-uuid-1", "user-uuid-2"],
+                  },
+                  prodiId: {
+                    type: "string",
+                    format: "uuid",
+                    nullable: true,
+                    description: "Optional Prodi ID — if provided, assignment is restricted to this prodi (for breakdown components)",
+                    example: "prodi-uuid-1",
+                  },
+                },
+              },
             },
           },
         },
@@ -3229,7 +3282,25 @@ const swaggerDefinition = {
           required: true,
           content: {
             "application/json": {
-              schema: { $ref: "#/components/schemas/UserIdsBody" },
+              schema: {
+                type: "object",
+                required: ["userIds"],
+                properties: {
+                  userIds: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Array of external user IDs to unassign",
+                    example: ["user-uuid-1"],
+                  },
+                  prodiId: {
+                    type: "string",
+                    format: "uuid",
+                    nullable: true,
+                    description: "Optional Prodi ID — if provided, only removes the assignment scoped to this prodi",
+                    example: "prodi-uuid-1",
+                  },
+                },
+              },
             },
           },
         },

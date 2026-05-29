@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { SaveBreakdownDto } from "../dtos/componentBreakdown.dto";
-import { calculateIkuResultsForComponentRealization } from "./componentRealization.controller";
+import { calculateIkuResultsForComponentRealization, calculateParentComponentSum } from "./componentRealization.controller";
 
 type RealizationParams = { realizationId: string };
 
@@ -140,6 +140,14 @@ export const saveBreakdown = async (
       );
     }
 
+    // Cascade ke parent component (jika ada) — penting untuk skenario:
+    // Parent Component → Child Component (hasBreakdown=true) → Breakdown Prodi
+    await calculateParentComponentSum(
+      realization.idComponent,
+      realization.month ?? null,
+      realization.year
+    );
+
     // Return updated state
     const updated = await prisma.componentRealizationBreakdown.findMany({
       where: { realizationId },
@@ -217,6 +225,13 @@ export const deleteBreakdownEntry = async (
         realization.year
       );
     }
+
+    // Cascade ke parent component (jika ada)
+    await calculateParentComponentSum(
+      realization.idComponent,
+      realization.month ?? null,
+      realization.year
+    );
 
     res.json(successResponse({ totalValue: total }, "Breakdown entry deleted"));
   } catch (error) {
