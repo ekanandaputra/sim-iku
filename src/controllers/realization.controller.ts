@@ -73,7 +73,7 @@ export const getRealizationMetrics = async (
     }
 
     const compWhere: any = {
-      children: { none: {} }
+      parentId: null // Hanya level 0 (root) component
     };
     if (nameFilter) {
       compWhere.name = { contains: nameFilter };
@@ -89,10 +89,10 @@ export const getRealizationMetrics = async (
       };
     }
     if (userFilterEnabled && userId) {
-      // Only Components where this user is assigned or assigned to its parent
+      // Only Components where this user is assigned directly, or assigned to one of its children
       compWhere.OR = [
         { users: { some: { userId } } },
-        { parent: { users: { some: { userId } } } }
+        { children: { some: { users: { some: { userId } } } } }
       ];
     }
 
@@ -107,18 +107,15 @@ export const getRealizationMetrics = async (
         ikus: {
           include: { iku: { select: { id: true, code: true, name: true } } },
         },
+        children: {
+          select: {
+            id: true,
+            users: userFilterEnabled && userId ? { where: { userId }, select: { id: true } } : true,
+          }
+        }
       },
       orderBy: { code: "asc" },
     });
-
-    const prodis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
-
-    let userComponentMappings: any[] = [];
-    if (userFilterEnabled && userId) {
-      userComponentMappings = await prisma.componentUser.findMany({
-        where: { userId },
-      });
-    }
 
     // Merge and format the responses
     const merged: any[] = [
@@ -137,52 +134,23 @@ export const getRealizationMetrics = async (
     ];
 
     for (const c of components) {
-      if (c.hasBreakdown) {
-        let allowedProdis = prodis;
-        if (userFilterEnabled && userId) {
-          const mappings = userComponentMappings.filter((m) => m.componentId === c.id || (c.parentId && m.componentId === c.parentId));
-          const hasGlobalAccess = mappings.some((m) => !m.prodiId);
-          if (!hasGlobalAccess) {
-            const allowedProdiIds = mappings.map((m) => m.prodiId).filter(Boolean);
-            allowedProdis = prodis.filter((p) => allowedProdiIds.includes(p.id));
-          }
-        }
-
-        for (const p of allowedProdis) {
-          merged.push({
-            id: c.id,
-            prodiId: p.id,
-            type: "COMPONENT",
-            code: `${c.code}/${p.code}`,
-            name: `${c.name} - ${p.name}`,
-            description: c.description,
-            dataType: c.dataType,
-            sourceType: c.sourceType,
-            periodType: c.periodType,
-            hasBreakdown: c.hasBreakdown,
-            tags: c.tags.map((ct) => ct.tag),
-            ikus: c.ikus.map((ci) => ci.iku),
-            createdAt: c.createdAt,
-            updatedAt: c.updatedAt,
-          });
-        }
-      } else {
-        merged.push({
-          id: c.id,
-          type: "COMPONENT",
-          code: c.code,
-          name: c.name,
-          description: c.description,
-          dataType: c.dataType,
-          sourceType: c.sourceType,
-          periodType: c.periodType,
-          hasBreakdown: c.hasBreakdown,
-          tags: c.tags.map((ct) => ct.tag),
-          ikus: c.ikus.map((ci) => ci.iku),
-          createdAt: c.createdAt,
-          updatedAt: c.updatedAt,
-        });
-      }
+      merged.push({
+        id: c.id,
+        type: "COMPONENT",
+        code: c.code,
+        name: c.name,
+        description: c.description,
+        dataType: c.dataType,
+        sourceType: c.sourceType,
+        periodType: c.periodType,
+        hasBreakdown: c.hasBreakdown,
+        hasChildren: c.children.length > 0,
+        childrenCount: c.children.length,
+        tags: c.tags.map((ct) => ct.tag),
+        ikus: c.ikus.map((ci) => ci.iku),
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      });
     }
 
     // Sort by code ascending across both types
@@ -229,6 +197,8 @@ export const getRealizationView = async (
     }
     const baseYear = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
     const years = Array.from({ length: YEARS_RANGE }, (_, i) => baseYear - i);
+    const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    const userId = userFilterEnabled ? (req as any).user?.id : undefined;
 
     if (type.toLowerCase() === "component") {
       const component = await prisma.component.findUnique({
@@ -236,16 +206,182 @@ export const getRealizationView = async (
         include: {
           tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
           ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
+          children: {
+            include: {
+              users: userFilterEnabled && userId ? { where: { userId } } : true
+            },
+            orderBy: { code: "asc" }
+          }
         },
       });
 
       if (!component) return res.status(404).json(errorResponse("Component not found"));
 
+      const metricInfo = {
+        id: component.id,
+        type: "COMPONENT",
+        code: component.code,
+        name: component.name,
+        description: component.description,
+        dataType: component.dataType,
+        sourceType: component.sourceType,
+        periodType: component.periodType,
+        hasBreakdown: component.hasBreakdown,
+        tags: component.tags.map((ct) => ct.tag),
+        ikus: component.ikus.map((ci) => ci.iku),
+      };
+
+      if (component.children.length > 0) {
+        // Case A: Component punya children
+        let visibleChildren = component.children;
+        if (userFilterEnabled && userId) {
+          visibleChildren = component.children.filter(child => child.users.length > 0);
+        }
+
+        const childIds = visibleChildren.map(c => c.id);
+        const [allChildTargets, allChildRealizations, allProdis] = await Promise.all([
+          prisma.componentTarget.findMany({ where: { componentId: { in: childIds }, year: { in: years } } }),
+          prisma.componentRealization.findMany({
+            where: { idComponent: { in: childIds }, year: { in: years } },
+            include: { breakdowns: true }
+          }),
+          prisma.prodi.findMany({ orderBy: { name: "asc" } })
+        ]);
+
+        let childUserMappings: any[] = [];
+        if (userFilterEnabled && userId) {
+           childUserMappings = await prisma.componentUser.findMany({
+             where: { componentId: { in: childIds }, userId }
+           });
+        }
+
+        const formattedChildren = visibleChildren.map(child => {
+          const childInfo = {
+            id: child.id,
+            code: child.code,
+            name: child.name,
+            periodType: child.periodType,
+            dataType: child.dataType,
+            sourceType: child.sourceType,
+            hasBreakdown: child.hasBreakdown,
+          };
+
+          const childTargets = allChildTargets.filter(t => t.componentId === child.id);
+          const targetByYear = new Map(childTargets.map((t) => [t.year, t]));
+          
+          const childRealizations = allChildRealizations.filter(r => r.idComponent === child.id);
+          const realizationsByYear = new Map<number, Map<number, typeof childRealizations[0]>>();
+          for (const r of childRealizations) {
+            if (!realizationsByYear.has(r.year)) realizationsByYear.set(r.year, new Map());
+            realizationsByYear.get(r.year)!.set(r.month ?? 0, r);
+          }
+
+          const buildRow = (byMonth: Map<number, typeof childRealizations[0]>, year: number, monthKey: number, extra: object, breakdownProdiId?: string) => {
+            const r = byMonth.get(monthKey);
+            let value = r ? Number(r.value) : null;
+            if (r && breakdownProdiId && r.breakdowns?.length) {
+               const b = r.breakdowns.find(br => br.prodiId === breakdownProdiId);
+               value = b ? Number(b.value) : null;
+            }
+            return {
+              id: r?.idRealization ?? null,
+              year,
+              value,
+              _action: r ? "PUT" : "POST",
+              ...extra,
+            };
+          };
+
+          const buildRows = (byMonth: Map<number, typeof childRealizations[0]>, year: number, breakdownProdiId?: string): object[] => {
+            const row = (monthKey: number, extra: object) => buildRow(byMonth, year, monthKey, extra, breakdownProdiId);
+            switch (child.periodType) {
+              case "yearly": return [row(0, {})];
+              case "quarter": return [row(3, { quarter: "Q1", month: 3 }), row(6, { quarter: "Q2", month: 6 }), row(9, { quarter: "Q3", month: 9 }), row(12, { quarter: "Q4", month: 12 })];
+              case "semester": return [row(6, { semester: "S1", month: 6 }), row(12, { semester: "S2", month: 12 })];
+              case "monthly":
+              default:
+                return Array.from({ length: 12 }, (_, i) => {
+                  const month = i + 1;
+                  return row(month, { month, monthName: MONTH_NAMES[i] });
+                });
+            }
+          };
+
+          if (child.hasBreakdown) {
+            let visibleProdis = allProdis;
+            if (userFilterEnabled && userId) {
+              const mappings = childUserMappings.filter(m => m.componentId === child.id);
+              const hasGlobalAccess = mappings.some(m => !m.prodiId);
+              if (!hasGlobalAccess) {
+                const allowedProdiIds = mappings.map(m => m.prodiId).filter(Boolean);
+                visibleProdis = allProdis.filter(p => allowedProdiIds.includes(p.id));
+              }
+            }
+            
+            // if id had prodiId filtered it
+            if (prodiId) {
+              visibleProdis = visibleProdis.filter(p => p.id === prodiId);
+            }
+
+            const breakdown = visibleProdis.map(prodi => {
+               const data = years.map(year => {
+                 const target = targetByYear.get(year) ?? null;
+                 const byMonth = realizationsByYear.get(year) ?? new Map();
+                 return {
+                   year,
+                   target: {
+                     id: target?.id ?? null,
+                     targetQ1: target ? Number(target.targetQ1) : null,
+                     targetQ2: target ? Number(target.targetQ2) : null,
+                     targetQ3: target ? Number(target.targetQ3) : null,
+                     targetQ4: target ? Number(target.targetQ4) : null,
+                     targetYear: target ? Number(target.targetYear) : null,
+                     _action: target ? "PUT" : "POST",
+                   },
+                   realizations: buildRows(byMonth, year, prodi.id),
+                 };
+               });
+               return {
+                 prodi: { id: prodi.id, code: prodi.code, name: prodi.name },
+                 data
+               }
+            });
+            return { component: childInfo, breakdown };
+          } else {
+             const data = years.map(year => {
+               const target = targetByYear.get(year) ?? null;
+               const byMonth = realizationsByYear.get(year) ?? new Map();
+               return {
+                 year,
+                 target: {
+                   id: target?.id ?? null,
+                   targetQ1: target ? Number(target.targetQ1) : null,
+                   targetQ2: target ? Number(target.targetQ2) : null,
+                   targetQ3: target ? Number(target.targetQ3) : null,
+                   targetQ4: target ? Number(target.targetQ4) : null,
+                   targetYear: target ? Number(target.targetYear) : null,
+                   _action: target ? "PUT" : "POST",
+                 },
+                 realizations: buildRows(byMonth, year),
+               };
+             });
+             return { component: childInfo, data };
+          }
+        });
+        
+        return res.json(successResponse({
+          metric: metricInfo,
+          years,
+          children: formattedChildren,
+        }));
+      }
+
+      // Component NO CHILDREN
       const [allTargets, allRealizations] = await Promise.all([
         prisma.componentTarget.findMany({ where: { componentId: id, year: { in: years } } }),
         prisma.componentRealization.findMany({
           where: { idComponent: id, year: { in: years } },
-          include: { breakdowns: prodiId ? { where: { prodiId } } : false }
+          include: { breakdowns: true }
         }),
       ]);
 
@@ -256,11 +392,12 @@ export const getRealizationView = async (
         realizationsByYear.get(r.year)!.set(r.month ?? 0, r);
       }
 
-      const buildRow = (byMonth: Map<number, typeof allRealizations[0]>, year: number, monthKey: number, extra: object) => {
+      const buildRow = (byMonth: Map<number, typeof allRealizations[0]>, year: number, monthKey: number, extra: object, breakdownProdiId?: string) => {
         const r = byMonth.get(monthKey);
         let value = r ? Number(r.value) : null;
-        if (r && prodiId && (r as any).breakdowns?.length) {
-          value = Number((r as any).breakdowns[0].value);
+        if (r && breakdownProdiId && r.breakdowns?.length) {
+          const b = r.breakdowns.find(br => br.prodiId === breakdownProdiId);
+          value = b ? Number(b.value) : null;
         }
         return {
           id: r?.idRealization ?? null,
@@ -271,8 +408,8 @@ export const getRealizationView = async (
         };
       };
 
-      const buildRows = (byMonth: Map<number, typeof allRealizations[0]>, year: number): object[] => {
-        const row = (monthKey: number, extra: object) => buildRow(byMonth, year, monthKey, extra);
+      const buildRows = (byMonth: Map<number, typeof allRealizations[0]>, year: number, breakdownProdiId?: string): object[] => {
+        const row = (monthKey: number, extra: object) => buildRow(byMonth, year, monthKey, extra, breakdownProdiId);
         switch (component.periodType) {
           case "yearly": return [row(0, {})];
           case "quarter": return [row(3, { quarter: "Q1", month: 3 }), row(6, { quarter: "Q2", month: 6 }), row(9, { quarter: "Q3", month: 9 }), row(12, { quarter: "Q4", month: 12 })];
@@ -286,6 +423,57 @@ export const getRealizationView = async (
         }
       };
 
+      if (component.hasBreakdown) {
+        // Case B: Component hasBreakdown
+        const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+        let visibleProdis = allProdis;
+        if (userFilterEnabled && userId) {
+          const userMappings = await prisma.componentUser.findMany({
+            where: { componentId: id, userId }
+          });
+          const hasGlobalAccess = userMappings.some(m => !m.prodiId);
+          if (!hasGlobalAccess) {
+            const allowedProdiIds = userMappings.map(m => m.prodiId).filter(Boolean);
+            visibleProdis = allProdis.filter(p => allowedProdiIds.includes(p.id));
+          }
+        }
+        
+        if (prodiId) {
+          visibleProdis = visibleProdis.filter(p => p.id === prodiId);
+        }
+
+        const breakdown = visibleProdis.map(prodi => {
+           const data = years.map(year => {
+             const target = targetByYear.get(year) ?? null;
+             const byMonth = realizationsByYear.get(year) ?? new Map();
+             return {
+               year,
+               target: {
+                 id: target?.id ?? null,
+                 targetQ1: target ? Number(target.targetQ1) : null,
+                 targetQ2: target ? Number(target.targetQ2) : null,
+                 targetQ3: target ? Number(target.targetQ3) : null,
+                 targetQ4: target ? Number(target.targetQ4) : null,
+                 targetYear: target ? Number(target.targetYear) : null,
+                 _action: target ? "PUT" : "POST",
+               },
+               realizations: buildRows(byMonth, year, prodi.id),
+             };
+           });
+           return {
+             prodi: { id: prodi.id, code: prodi.code, name: prodi.name },
+             data
+           }
+        });
+
+        return res.json(successResponse({
+          metric: metricInfo,
+          years,
+          breakdown,
+        }));
+      }
+
+      // Case C: Simple component
       const data = years.map((year) => {
         const target = targetByYear.get(year) ?? null;
         const byMonth = realizationsByYear.get(year) ?? new Map();
@@ -305,18 +493,7 @@ export const getRealizationView = async (
       });
 
       return res.json(successResponse({
-        metric: {
-          id: component.id,
-          type: "COMPONENT",
-          code: component.code,
-          name: component.name,
-          description: component.description,
-          dataType: component.dataType,
-          sourceType: component.sourceType,
-          periodType: component.periodType,
-          tags: component.tags.map((ct) => ct.tag),
-          ikus: component.ikus.map((ci) => ci.iku),
-        },
+        metric: metricInfo,
         years,
         data,
       }));
