@@ -2078,6 +2078,52 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/components/{id}/structure": {
+      get: {
+        tags: ["Component"],
+        summary: "Get component tree structure with descendants and breakdowns",
+        description: "Returns the component details along with a recursive hierarchy of all its child components. For any component (parent or child) in the tree that has breakdown enabled (hasBreakdown: true), it includes realization breakdown per study program (prodi).",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "Root Component ID",
+          },
+          {
+            name: "year",
+            in: "query",
+            schema: { type: "integer", default: 2026 },
+            description: "Filter realization values by year (defaults to current year)",
+          },
+          {
+            name: "month",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 12 },
+            description: "Filter realization values by specific month",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Component hierarchy and breakdown tree retrieved successfully",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponseSingle" },
+              },
+            },
+          },
+          "404": {
+            description: "Component not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/iku-formulas": {
       security: [{ bearerAuth: [] }],
       get: {

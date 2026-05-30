@@ -8,6 +8,7 @@ import {
   listComponentTags,
   assignTagToComponent,
   unassignTagFromComponent,
+  getComponentStructure,
 } from "../controllers/component.controller";
 import { validateBody } from "../middleware/validate";
 import { authenticate } from "../middleware/auth";
@@ -20,6 +21,7 @@ const router = Router();
 
 router.get("/", listComponents);
 router.get("/:id", getComponentById);
+router.get("/:id/structure", getComponentStructure);
 router.post("/", validateBody(ComponentCreateDto), createComponent);
 router.put("/:id", validateBody(ComponentUpdateDto), updateComponent);
 router.delete("/:id", deleteComponent);

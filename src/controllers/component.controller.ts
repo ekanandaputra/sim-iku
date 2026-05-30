@@ -457,3 +457,152 @@ export const unassignTagFromComponent = async (
     next(error);
   }
 };
+
+/**
+ * Helper: Recursive function to fetch a component's tree with child components and breakdown details
+ */
+async function getComponentTreeRecursive(id: string, year: number, month?: number): Promise<any> {
+  const component = await prisma.component.findUnique({
+    where: { id },
+    include: {
+      children: {
+        select: { id: true },
+        orderBy: { code: "asc" },
+      },
+      tags: {
+        where: { tag: { deletedAt: null } },
+        include: { tag: true },
+      },
+      ikus: {
+        include: { iku: { select: { id: true, code: true, name: true } } },
+      },
+    },
+  });
+
+  if (!component) return null;
+
+  let realizationData: any = null;
+  let breakdownData: any[] = [];
+
+  const whereRealization: any = {
+    idComponent: id,
+    year,
+  };
+  if (month !== undefined) {
+    whereRealization.month = month;
+  }
+
+  // Fetch realization
+  const realization = await prisma.componentRealization.findFirst({
+    where: whereRealization,
+    include: {
+      breakdowns: {
+        include: { prodi: true },
+      },
+    },
+  });
+
+  if (realization) {
+    realizationData = {
+      id: realization.idRealization,
+      value: Number(realization.value),
+      month: realization.month,
+      year: realization.year,
+    };
+
+    if (component.hasBreakdown) {
+      const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+      const breakdownMap = new Map(realization.breakdowns.map((b) => [b.prodiId, b]));
+
+      breakdownData = allProdis.map((prodi) => {
+        const b = breakdownMap.get(prodi.id);
+        return {
+          prodi: {
+            id: prodi.id,
+            code: prodi.code,
+            name: prodi.name,
+          },
+          value: b ? Number(b.value) : null,
+        };
+      });
+    }
+  } else if (component.hasBreakdown) {
+    // Even if no realization exists, return all prodis with null values
+    const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+    breakdownData = allProdis.map((prodi) => ({
+      prodi: {
+        id: prodi.id,
+        code: prodi.code,
+        name: prodi.name,
+      },
+      value: null,
+    }));
+  }
+
+  const children = [];
+  for (const child of component.children) {
+    const childTree = await getComponentTreeRecursive(child.id, year, month);
+    if (childTree) {
+      children.push(childTree);
+    }
+  }
+
+  return {
+    id: component.id,
+    code: component.code,
+    name: component.name,
+    description: component.description,
+    dataType: component.dataType,
+    sourceType: component.sourceType,
+    periodType: component.periodType,
+    hasBreakdown: component.hasBreakdown,
+    parentId: component.parentId,
+    tags: component.tags.map((t) => t.tag),
+    ikus: component.ikus.map((i) => i.iku),
+    realization: realizationData,
+    breakdown: component.hasBreakdown ? breakdownData : undefined,
+    children,
+  };
+}
+
+type StructureQuery = {
+  year?: string;
+  month?: string;
+};
+
+/**
+ * GET COMPONENT STRUCTURE WITH DESCENDANTS AND BREAKDOWNS
+ * GET /api/components/:id/structure?year=2024&month=6
+ */
+export const getComponentStructure = async (
+  req: Request<ComponentParams, {}, {}, StructureQuery>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const id = req.params.id;
+    const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month) : undefined;
+
+    if (isNaN(year)) {
+      return res.status(400).json(errorResponse("Invalid year format"));
+    }
+    if (month !== undefined && isNaN(month)) {
+      return res.status(400).json(errorResponse("Invalid month format"));
+    }
+
+    const rootComponent = await prisma.component.findUnique({
+      where: { id },
+    });
+
+    if (!rootComponent) {
+      return res.status(404).json(errorResponse("Component not found"));
+    }
+
+    const tree = await getComponentTreeRecursive(id, year, month);
+
+    res.json(successResponse(tree));
+  } catch (error) {
+    next(error);
+  }
+};
