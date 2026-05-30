@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { filterProdisByComponent } from "../utils/prodiFilter";
 
 type ComponentParams = {
   id: string;
@@ -179,7 +180,7 @@ export const createComponent = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, dataType, sourceType, periodType, tagIds, parentId, hasBreakdown } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, tagIds, parentId, hasBreakdown, filterByLevel } = req.body;
 
     // Cek kode unik
     const existing = await prisma.component.findUnique({ where: { code } });
@@ -218,6 +219,7 @@ export const createComponent = async (
       periodType,
       parentId: parentId ?? null,
       hasBreakdown: hasBreakdown ?? false,
+      filterByLevel: filterByLevel ?? false,
     };
 
     if (dataType !== undefined) componentData.dataType = dataType;
@@ -260,7 +262,7 @@ export const updateComponent = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, dataType, sourceType, periodType, parentId, hasBreakdown } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, parentId, hasBreakdown, filterByLevel } = req.body;
 
     const existing = await prisma.component.findUnique({
       where: { id },
@@ -319,6 +321,7 @@ export const updateComponent = async (
     if (dataType !== undefined) updateData.dataType = dataType;
     if (sourceType !== undefined) updateData.sourceType = sourceType;
     if (hasBreakdown !== undefined) updateData.hasBreakdown = hasBreakdown;
+    if (filterByLevel !== undefined) updateData.filterByLevel = filterByLevel;
 
     // parentId: undefined berarti tidak diubah, null berarti dijadikan root, string berarti diubah
     if (parentId !== undefined) updateData.parentId = parentId;
@@ -487,6 +490,7 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
   const component = await prisma.component.findUnique({
     where: { id },
     include: {
+      parent: { select: { id: true, code: true, name: true } },
       children: {
         select: { id: true },
         orderBy: { code: "asc" },
@@ -533,7 +537,10 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
     };
 
     if (component.hasBreakdown) {
-      const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+      const allProdisRaw = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+      const allProdis = component.filterByLevel
+        ? filterProdisByComponent(allProdisRaw, component.code, component.name, component.parent)
+        : allProdisRaw;
       const breakdownMap = new Map(realization.breakdowns.map((b) => [b.prodiId, b]));
 
       breakdownData = allProdis.map((prodi) => {
@@ -550,7 +557,10 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
     }
   } else if (component.hasBreakdown) {
     // Even if no realization exists, return all prodis with null values
-    const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+    const allProdisRaw = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+    const allProdis = component.filterByLevel
+      ? filterProdisByComponent(allProdisRaw, component.code, component.name, component.parent)
+      : allProdisRaw;
     breakdownData = allProdis.map((prodi) => ({
       prodi: {
         id: prodi.id,
@@ -578,6 +588,7 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
     sourceType: component.sourceType,
     periodType: component.periodType,
     hasBreakdown: component.hasBreakdown,
+    filterByLevel: component.filterByLevel,
     parentId: component.parentId,
     tags: component.tags.map((t) => t.tag),
     ikus: component.ikus.map((i) => i.iku),

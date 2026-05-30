@@ -65,9 +65,10 @@ model Component {
   description  String?
   dataType     ComponentDataType?     @map("data_type")
   sourceType   ComponentSourceType?   @map("source_type")
-  periodType   ComponentPeriodType    @default(yearly) @map("period_type")
-  hasBreakdown Boolean                @default(false) @map("has_breakdown")
-  parentId     String?                @map("parent_id") @db.VarChar(36)
+  periodType    ComponentPeriodType    @default(yearly) @map("period_type")
+  hasBreakdown  Boolean                @default(false) @map("has_breakdown")
+  filterByLevel Boolean                @default(false) @map("filter_by_level")
+  parentId      String?                @map("parent_id") @db.VarChar(36)
   createdAt    DateTime               @default(now()) @map("created_at")
   updatedAt    DateTime               @updatedAt @map("updated_at")
 
@@ -333,6 +334,7 @@ model Prodi {
   id         String   @id @default(uuid()) @db.VarChar(36)
   code       String   @unique
   name       String
+  level      String   @default("")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   breakdowns ComponentRealizationBreakdown[]

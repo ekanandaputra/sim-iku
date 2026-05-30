@@ -34,6 +34,10 @@ export class ComponentCreateDto {
   hasBreakdown?: boolean;
 
   @IsOptional()
+  @IsBoolean({ message: "filterByLevel must be a boolean" })
+  filterByLevel?: boolean;
+
+  @IsOptional()
   @IsArray({ message: "tagIds must be an array" })
   @IsUUID(undefined, { each: true, message: "Each tagId must be a valid UUID" })
   tagIds?: string[];
@@ -74,6 +78,10 @@ export class ComponentUpdateDto {
   @IsOptional()
   @IsBoolean({ message: "hasBreakdown must be a boolean" })
   hasBreakdown?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: "filterByLevel must be a boolean" })
+  filterByLevel?: boolean;
 
   @IsOptional()
   @IsUUID("4", { message: "parentId must be a valid UUID" })

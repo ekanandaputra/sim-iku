@@ -55,13 +55,14 @@ export const downloadMasterTemplate = (req: Request, res: Response) => {
     "ikp_source_type",
     "ikp_period_type",
     "ikp_has_breakdown",
+    "ikp_filter_by_level",
     "ikp_parent_code",
   ];
 
   const samples = [
-    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "FALSE", ""],
-    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "TRUE", "COMP001"],
-    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", "", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "FALSE", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "TRUE", "TRUE", "COMP001"],
+    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", "", "FALSE", "FALSE", ""],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -182,6 +183,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
             sourceType: (toString(r[col("ikp_source_type")]).toLowerCase() as any) || null,
             periodType: (toString(r[col("ikp_period_type")]).toLowerCase() as any) || "yearly",
             hasBreakdown: toBool(r[col("ikp_has_breakdown")]),
+            filterByLevel: toBool(r[col("ikp_filter_by_level")]),
           },
           create: {
             code: ikpCode,
@@ -191,6 +193,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
             sourceType: (toString(r[col("ikp_source_type")]).toLowerCase() as any) || null,
             periodType: (toString(r[col("ikp_period_type")]).toLowerCase() as any) || "yearly",
             hasBreakdown: toBool(r[col("ikp_has_breakdown")]),
+            filterByLevel: toBool(r[col("ikp_filter_by_level")]),
           },
         });
         ikpUpdated++;
@@ -429,6 +432,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
       "ikp_source_type",
       "ikp_period_type",
       "ikp_has_breakdown",
+      "ikp_filter_by_level",
       "ikp_parent_code",
     ];
 
@@ -472,6 +476,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
             comp.sourceType || "",
             comp.periodType || "",
             comp.hasBreakdown ? "TRUE" : "FALSE",
+            comp.filterByLevel ? "TRUE" : "FALSE",
             comp.parent ? comp.parent.code : "",
           ]);
         }
@@ -482,6 +487,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
           iku.description || "",
           iku.isDirectInput ? "TRUE" : "FALSE",
           iku.unit,
+          "",
           "",
           "",
           "",

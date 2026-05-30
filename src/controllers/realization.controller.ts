@@ -4,6 +4,7 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { calculateIkuResultsForComponentRealization, calculateParentComponentSum } from "./componentRealization.controller";
 import { BulkSaveRealizationDto } from "../dtos/realization.dto";
+import { filterProdisByComponent } from "../utils/prodiFilter";
 
 const YEARS_RANGE = 6;
 const MONTH_NAMES = [
@@ -236,6 +237,7 @@ export const getRealizationView = async (
       const component = await prisma.component.findUnique({
         where: { id },
         include: {
+          parent: { select: { id: true, code: true, name: true } },
           tags: { where: { tag: { deletedAt: null } }, include: { tag: true }, orderBy: { tag: { name: "asc" } } },
           ikus: { include: { iku: { select: { id: true, code: true, name: true } } } },
           users: userFilterEnabled && userId ? { where: { userId } } : true,
@@ -367,7 +369,10 @@ export const getRealizationView = async (
               });
               return { component: { ...childInfo, isAssigned: isProdiAssigned }, prodiId, isAssigned: isProdiAssigned, data };
             } else {
-              const breakdown = allProdis.map(prodi => {
+              const filteredProdis = child.filterByLevel
+                ? filterProdisByComponent(allProdis, child.code, child.name, component)
+                : allProdis;
+              const breakdown = filteredProdis.map(prodi => {
                  const isProdiAssigned = userFilterEnabled && userId 
                    ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
                    : true;
@@ -474,7 +479,10 @@ export const getRealizationView = async (
 
       if (component.hasBreakdown) {
         // Case B: Component hasBreakdown
-        const allProdis = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+        const allProdisRaw = await prisma.prodi.findMany({ orderBy: { name: "asc" } });
+        const allProdis = component.filterByLevel
+          ? filterProdisByComponent(allProdisRaw, component.code, component.name, component.parent)
+          : allProdisRaw;
         let userMappings: any[] = [];
         if (userFilterEnabled && userId) {
           userMappings = await prisma.componentUser.findMany({

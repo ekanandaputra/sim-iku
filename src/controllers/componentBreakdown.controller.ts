@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { filterProdisByComponent } from "../utils/prodiFilter";
 import { SaveBreakdownDto } from "../dtos/componentBreakdown.dto";
 import { calculateIkuResultsForComponentRealization, calculateParentComponentSum } from "./componentRealization.controller";
 
@@ -81,7 +82,7 @@ export const saveBreakdown = async (
     // Validate realization exists and component has breakdown enabled
     const realization = await prisma.componentRealization.findUnique({
       where: { idRealization: realizationId },
-      include: { component: true },
+      include: { component: { include: { parent: true } } },
     });
     if (!realization) {
       return res.status(404).json(errorResponse("Component realization not found"));
@@ -94,7 +95,7 @@ export const saveBreakdown = async (
     const prodiIds = breakdowns.map((b) => b.prodiId);
     const existingProdi = await prisma.prodi.findMany({
       where: { id: { in: prodiIds } },
-      select: { id: true },
+      select: { id: true, code: true, name: true, level: true },
     });
     const existingProdiIds = new Set(existingProdi.map((p) => p.id));
     const invalidIds = prodiIds.filter((id) => !existingProdiIds.has(id));
@@ -102,6 +103,19 @@ export const saveBreakdown = async (
       return res.status(400).json(
         errorResponse(`Prodi not found: ${invalidIds.join(", ")}`)
       );
+    }
+
+    if (realization.component.filterByLevel) {
+      const invalidProdis = existingProdi.filter(prodi => {
+        const matching = filterProdisByComponent([prodi], realization.component.code, realization.component.name, realization.component.parent);
+        return matching.length === 0;
+      });
+
+      if (invalidProdis.length > 0) {
+        return res.status(400).json(
+          errorResponse(`Study program(s) do not match component level: ${invalidProdis.map(p => p.name).join(", ")}`)
+        );
+      }
     }
 
     // Upsert each breakdown entry
