@@ -179,7 +179,7 @@ export const createComponent = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, dataType, sourceType, periodType, tagIds, parentId } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, tagIds, parentId, hasBreakdown } = req.body;
 
     // Cek kode unik
     const existing = await prisma.component.findUnique({ where: { code } });
@@ -192,6 +192,11 @@ export const createComponent = async (
       const parent = await prisma.component.findUnique({ where: { id: parentId } });
       if (!parent) {
         return res.status(404).json(errorResponse("Parent component not found"));
+      }
+      if (parent.hasBreakdown) {
+        return res.status(400).json(
+          errorResponse("Komponen dengan breakdown aktif tidak dapat dijadikan parent")
+        );
       }
     }
 
@@ -212,6 +217,7 @@ export const createComponent = async (
       description,
       periodType,
       parentId: parentId ?? null,
+      hasBreakdown: hasBreakdown ?? false,
     };
 
     if (dataType !== undefined) componentData.dataType = dataType;
@@ -254,11 +260,20 @@ export const updateComponent = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, dataType, sourceType, periodType, parentId } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, parentId, hasBreakdown } = req.body;
 
-    const existing = await prisma.component.findUnique({ where: { id } });
+    const existing = await prisma.component.findUnique({
+      where: { id },
+      include: { children: { select: { id: true } } },
+    });
     if (!existing) {
       return res.status(404).json(errorResponse("Component not found"));
+    }
+
+    if (hasBreakdown === true && existing.children.length > 0) {
+      return res.status(400).json(
+        errorResponse("Komponen yang memiliki sub-komponen tidak dapat mengaktifkan breakdown")
+      );
     }
 
     // Cek kode unik (jika berubah)
@@ -283,6 +298,12 @@ export const updateComponent = async (
           return res.status(404).json(errorResponse("Parent component not found"));
         }
 
+        if (parent.hasBreakdown) {
+          return res.status(400).json(
+            errorResponse("Komponen dengan breakdown aktif tidak dapat dijadikan parent")
+          );
+        }
+
         // Circular reference check
         const isCircular = await hasCircularReference(parentId, id);
         if (isCircular) {
@@ -297,6 +318,7 @@ export const updateComponent = async (
 
     if (dataType !== undefined) updateData.dataType = dataType;
     if (sourceType !== undefined) updateData.sourceType = sourceType;
+    if (hasBreakdown !== undefined) updateData.hasBreakdown = hasBreakdown;
 
     // parentId: undefined berarti tidak diubah, null berarti dijadikan root, string berarti diubah
     if (parentId !== undefined) updateData.parentId = parentId;
