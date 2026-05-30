@@ -54,12 +54,14 @@ export const downloadMasterTemplate = (req: Request, res: Response) => {
     "ikp_data_type",
     "ikp_source_type",
     "ikp_period_type",
+    "ikp_has_breakdown",
+    "ikp_parent_code",
   ];
 
   const samples = [
-    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly"],
-    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP002", "Kadar COD", "", "number", "manual", "monthly"],
-    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", ""],
+    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "TRUE", "COMP001"],
+    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", "", "FALSE", ""],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -179,6 +181,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
             dataType: (toString(r[col("ikp_data_type")]).toLowerCase() as any) || null,
             sourceType: (toString(r[col("ikp_source_type")]).toLowerCase() as any) || null,
             periodType: (toString(r[col("ikp_period_type")]).toLowerCase() as any) || "yearly",
+            hasBreakdown: toBool(r[col("ikp_has_breakdown")]),
           },
           create: {
             code: ikpCode,
@@ -187,6 +190,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
             dataType: (toString(r[col("ikp_data_type")]).toLowerCase() as any) || null,
             sourceType: (toString(r[col("ikp_source_type")]).toLowerCase() as any) || null,
             periodType: (toString(r[col("ikp_period_type")]).toLowerCase() as any) || "yearly",
+            hasBreakdown: toBool(r[col("ikp_has_breakdown")]),
           },
         });
         ikpUpdated++;
@@ -201,6 +205,44 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
         } else {
           mappingSkipped++;
         }
+      }
+    }
+
+    // Pass 2: Resolve parent relationships using ikp_parent_code
+    for (let i = 1; i < raw.length; i++) {
+      const r = raw[i];
+      const ikpCode = toString(r[col("ikp_code")]);
+      const parentCode = toString(r[col("ikp_parent_code")]);
+
+      if (ikpCode && parentCode) {
+        if (ikpCode === parentCode) {
+          parseErrors.push({ row: i + 1, error: `Component '${ikpCode}' cannot be its own parent` });
+          continue;
+        }
+
+        const parent = await prisma.component.findUnique({
+          where: { code: parentCode }
+        });
+
+        if (parent) {
+          if (parent.hasBreakdown) {
+            parseErrors.push({ row: i + 1, error: `Parent component '${parentCode}' has breakdown enabled and cannot be a parent` });
+            continue;
+          }
+
+          await prisma.component.update({
+            where: { code: ikpCode },
+            data: { parentId: parent.id }
+          });
+        } else {
+          parseErrors.push({ row: i + 1, error: `Parent component with code '${parentCode}' not found` });
+        }
+      } else if (ikpCode && col("ikp_parent_code") !== -1 && r[col("ikp_parent_code")] !== undefined && parentCode === "") {
+        // If parent code is explicitly set to empty, remove parentId (promote to root)
+        await prisma.component.update({
+          where: { code: ikpCode },
+          data: { parentId: null }
+        });
       }
     }
 
@@ -386,13 +428,19 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
       "ikp_data_type",
       "ikp_source_type",
       "ikp_period_type",
+      "ikp_has_breakdown",
+      "ikp_parent_code",
     ];
 
     const ikus = await prisma.iKU.findMany({
       include: {
         components: {
           include: {
-            component: true
+            component: {
+              include: {
+                parent: true
+              }
+            }
           }
         }
       }
@@ -416,6 +464,8 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
             comp.dataType || "",
             comp.sourceType || "",
             comp.periodType || "",
+            comp.hasBreakdown ? "TRUE" : "FALSE",
+            comp.parent ? comp.parent.code : "",
           ]);
         }
       } else {
@@ -425,6 +475,8 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
           iku.description || "",
           iku.isDirectInput ? "TRUE" : "FALSE",
           iku.unit,
+          "",
+          "",
           "",
           "",
           "",

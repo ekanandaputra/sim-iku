@@ -3191,7 +3191,7 @@ const swaggerDefinition = {
       post: {
         tags: ["Import"],
         summary: "Import master data from Excel",
-        description: "Upload an .xlsx file with sheet 'MasterData'. Columns: iku_code, iku_name, iku_description, iku_is_direct_input, iku_unit, ikp_code, ikp_name, ikp_description, ikp_data_type, ikp_source_type, ikp_period_type.",
+        description: "Upload an .xlsx file with sheet 'MasterData'. Columns: iku_code, iku_name, iku_description, iku_is_direct_input, iku_unit, ikp_code, ikp_name, ikp_description, ikp_data_type, ikp_source_type, ikp_period_type, ikp_has_breakdown, ikp_parent_code.",
         requestBody: {
           required: true,
           content: {
