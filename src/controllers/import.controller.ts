@@ -433,6 +433,9 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
     ];
 
     const ikus = await prisma.iKU.findMany({
+      orderBy: {
+        code: "asc",
+      },
       include: {
         components: {
           include: {
@@ -450,7 +453,11 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
 
     for (const iku of ikus) {
       if (iku.components.length > 0) {
-        for (const mapping of iku.components) {
+        // Sort components by code ascending
+        const sortedComponents = [...iku.components].sort((a, b) =>
+          a.component.code.localeCompare(b.component.code)
+        );
+        for (const mapping of sortedComponents) {
           const comp = mapping.component;
           data.push([
             iku.code,
