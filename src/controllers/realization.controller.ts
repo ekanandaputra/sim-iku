@@ -88,15 +88,43 @@ export const getRealizationMetrics = async (
         },
       };
     }
+
+    let userAssignedComponentIds = new Set<string>();
+    const childrenMap = new Map<string, string[]>();
+
     if (userFilterEnabled && userId) {
-      // Only Components where this user is assigned directly, or assigned to one of its children
-      compWhere.OR = [
-        { users: { some: { userId } } },
-        { children: { some: { users: { some: { userId } } } } }
-      ];
+      const [userAssignments, allComponents] = await Promise.all([
+        prisma.componentUser.findMany({
+          where: { userId },
+          select: { componentId: true }
+        }),
+        prisma.component.findMany({
+          select: { id: true, parentId: true }
+        })
+      ]);
+
+      userAssignedComponentIds = new Set(userAssignments.map(a => a.componentId));
+
+      for (const c of allComponents) {
+        if (c.parentId) {
+          if (!childrenMap.has(c.parentId)) {
+            childrenMap.set(c.parentId, []);
+          }
+          childrenMap.get(c.parentId)!.push(c.id);
+        }
+      }
     }
 
-    const components = await prisma.component.findMany({
+    const isComponentOrDescendantAssigned = (compId: string): boolean => {
+      if (userAssignedComponentIds.has(compId)) return true;
+      const children = childrenMap.get(compId) || [];
+      for (const childId of children) {
+        if (isComponentOrDescendantAssigned(childId)) return true;
+      }
+      return false;
+    };
+
+    let components = await prisma.component.findMany({
       where: compWhere,
       include: {
         tags: {
@@ -116,6 +144,10 @@ export const getRealizationMetrics = async (
       },
       orderBy: { code: "asc" },
     });
+
+    if (userFilterEnabled && userId) {
+      components = components.filter(c => isComponentOrDescendantAssigned(c.id));
+    }
 
     // Merge and format the responses
     const merged: any[] = [
@@ -307,43 +339,63 @@ export const getRealizationView = async (
           };
 
           if (child.hasBreakdown) {
-            let prodisToRender = allProdis;
-            if (prodiId) {
-              prodisToRender = allProdis.filter(p => p.id === prodiId);
-            }
-
             const mappings = childUserMappings.filter(m => m.componentId === child.id);
             const hasGlobalAccess = mappings.some(m => !m.prodiId);
             const allowedProdiIds = mappings.map(m => m.prodiId).filter(Boolean);
 
-            const breakdown = prodisToRender.map(prodi => {
-               const isProdiAssigned = userFilterEnabled && userId 
-                 ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
-                 : true;
+            if (prodiId) {
+              const isProdiAssigned = userFilterEnabled && userId 
+                ? (hasGlobalAccess || allowedProdiIds.includes(prodiId))
+                : true;
 
-               const data = years.map(year => {
-                 const target = targetByYear.get(year) ?? null;
-                 const byMonth = realizationsByYear.get(year) ?? new Map();
+              const data = years.map(year => {
+                const target = targetByYear.get(year) ?? null;
+                const byMonth = realizationsByYear.get(year) ?? new Map();
+                return {
+                  year,
+                  target: {
+                    id: target?.id ?? null,
+                    targetQ1: target ? Number(target.targetQ1) : null,
+                    targetQ2: target ? Number(target.targetQ2) : null,
+                    targetQ3: target ? Number(target.targetQ3) : null,
+                    targetQ4: target ? Number(target.targetQ4) : null,
+                    targetYear: target ? Number(target.targetYear) : null,
+                    _action: target ? "PUT" : "POST",
+                  },
+                  realizations: buildRows(byMonth, year, prodiId),
+                };
+              });
+              return { component: { ...childInfo, isAssigned: isProdiAssigned }, prodiId, isAssigned: isProdiAssigned, data };
+            } else {
+              const breakdown = allProdis.map(prodi => {
+                 const isProdiAssigned = userFilterEnabled && userId 
+                   ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
+                   : true;
+
+                 const data = years.map(year => {
+                   const target = targetByYear.get(year) ?? null;
+                   const byMonth = realizationsByYear.get(year) ?? new Map();
+                   return {
+                     year,
+                     target: {
+                       id: target?.id ?? null,
+                       targetQ1: target ? Number(target.targetQ1) : null,
+                       targetQ2: target ? Number(target.targetQ2) : null,
+                       targetQ3: target ? Number(target.targetQ3) : null,
+                       targetQ4: target ? Number(target.targetQ4) : null,
+                       targetYear: target ? Number(target.targetYear) : null,
+                       _action: target ? "PUT" : "POST",
+                     },
+                     realizations: buildRows(byMonth, year, prodi.id),
+                   };
+                 });
                  return {
-                   year,
-                   target: {
-                     id: target?.id ?? null,
-                     targetQ1: target ? Number(target.targetQ1) : null,
-                     targetQ2: target ? Number(target.targetQ2) : null,
-                     targetQ3: target ? Number(target.targetQ3) : null,
-                     targetQ4: target ? Number(target.targetQ4) : null,
-                     targetYear: target ? Number(target.targetYear) : null,
-                     _action: target ? "PUT" : "POST",
-                   },
-                   realizations: buildRows(byMonth, year, prodi.id),
-                 };
-               });
-               return {
-                 prodi: { id: prodi.id, code: prodi.code, name: prodi.name, isAssigned: isProdiAssigned },
-                 data
-               }
-            });
-            return { component: childInfo, breakdown };
+                   prodi: { id: prodi.id, code: prodi.code, name: prodi.name, isAssigned: isProdiAssigned },
+                   data
+                 }
+              });
+              return { component: childInfo, breakdown };
+            }
           } else {
              const data = years.map(year => {
                const target = targetByYear.get(year) ?? null;
@@ -429,48 +481,75 @@ export const getRealizationView = async (
             where: { componentId: id, userId }
           });
         }
-        
-        let prodisToRender = allProdis;
-        if (prodiId) {
-          prodisToRender = allProdis.filter(p => p.id === prodiId);
-        }
 
         const hasGlobalAccess = userMappings.some(m => !m.prodiId);
         const allowedProdiIds = userMappings.map(m => m.prodiId).filter(Boolean);
 
-        const breakdown = prodisToRender.map(prodi => {
-           const isProdiAssigned = userFilterEnabled && userId
-             ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
-             : true;
+        if (prodiId) {
+          const isProdiAssigned = userFilterEnabled && userId
+            ? (hasGlobalAccess || allowedProdiIds.includes(prodiId))
+            : true;
 
-           const data = years.map(year => {
-             const target = targetByYear.get(year) ?? null;
-             const byMonth = realizationsByYear.get(year) ?? new Map();
+          const data = years.map(year => {
+            const target = targetByYear.get(year) ?? null;
+            const byMonth = realizationsByYear.get(year) ?? new Map();
+            return {
+              year,
+              target: {
+                id: target?.id ?? null,
+                targetQ1: target ? Number(target.targetQ1) : null,
+                targetQ2: target ? Number(target.targetQ2) : null,
+                targetQ3: target ? Number(target.targetQ3) : null,
+                targetQ4: target ? Number(target.targetQ4) : null,
+                targetYear: target ? Number(target.targetYear) : null,
+                _action: target ? "PUT" : "POST",
+              },
+              realizations: buildRows(byMonth, year, prodiId),
+            };
+          });
+
+          return res.json(successResponse({
+            metric: { ...metricInfo, isAssigned: isProdiAssigned },
+            years,
+            prodiId,
+            isAssigned: isProdiAssigned,
+            data,
+          }));
+        } else {
+          const breakdown = allProdis.map(prodi => {
+             const isProdiAssigned = userFilterEnabled && userId
+               ? (hasGlobalAccess || allowedProdiIds.includes(prodi.id))
+               : true;
+
+             const data = years.map(year => {
+               const target = targetByYear.get(year) ?? null;
+               const byMonth = realizationsByYear.get(year) ?? new Map();
+               return {
+                 year,
+                 target: {
+                   id: target?.id ?? null,
+                   targetQ1: target ? Number(target.targetQ1) : null,
+                   targetQ2: target ? Number(target.targetQ2) : null,
+                   targetQ3: target ? Number(target.targetQ3) : null,
+                   targetQ4: target ? Number(target.targetQ4) : null,
+                   targetYear: target ? Number(target.targetYear) : null,
+                   _action: target ? "PUT" : "POST",
+                 },
+                 realizations: buildRows(byMonth, year, prodi.id),
+               };
+             });
              return {
-               year,
-               target: {
-                 id: target?.id ?? null,
-                 targetQ1: target ? Number(target.targetQ1) : null,
-                 targetQ2: target ? Number(target.targetQ2) : null,
-                 targetQ3: target ? Number(target.targetQ3) : null,
-                 targetQ4: target ? Number(target.targetQ4) : null,
-                 targetYear: target ? Number(target.targetYear) : null,
-                 _action: target ? "PUT" : "POST",
-               },
-               realizations: buildRows(byMonth, year, prodi.id),
-             };
-           });
-           return {
-             prodi: { id: prodi.id, code: prodi.code, name: prodi.name, isAssigned: isProdiAssigned },
-             data
-           }
-        });
+               prodi: { id: prodi.id, code: prodi.code, name: prodi.name, isAssigned: isProdiAssigned },
+               data
+             }
+          });
 
-        return res.json(successResponse({
-          metric: metricInfo,
-          years,
-          breakdown,
-        }));
+          return res.json(successResponse({
+            metric: metricInfo,
+            years,
+            breakdown,
+          }));
+        }
       }
 
       // Case C: Simple component
@@ -547,6 +626,14 @@ export const getRealizationView = async (
         };
       });
 
+      let isIkuAssigned = true;
+      if (userFilterEnabled && userId) {
+        const userMappingCount = await prisma.ikuUser.count({
+          where: { ikuId: id, userId }
+        });
+        isIkuAssigned = userMappingCount > 0;
+      }
+
       return res.json(successResponse({
         metric: {
           id: iku.id,
@@ -556,6 +643,7 @@ export const getRealizationView = async (
           description: iku.description,
           unit: iku.unit,
           isDirectInput: iku.isDirectInput,
+          isAssigned: isIkuAssigned,
           tags: [],
         },
         years,
