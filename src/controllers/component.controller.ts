@@ -484,9 +484,20 @@ export const unassignTagFromComponent = async (
 };
 
 /**
- * Helper: Recursive function to fetch a component's tree with child components and breakdown details
+ * Helper: Recursive function to fetch a component's tree with child components and breakdown details.
+ * @param id - Component ID
+ * @param year - Tahun realisasi
+ * @param month - Bulan realisasi (opsional)
+ * @param assignedComponentIds - Set of componentId yang sudah di-assign ke user (null = skip isAssigned)
+ * @param assignedProdiIds - Map<componentId, Set<prodiId>> untuk breakdown per komponen
  */
-async function getComponentTreeRecursive(id: string, year: number, month?: number): Promise<any> {
+async function getComponentTreeRecursive(
+  id: string,
+  year: number,
+  month?: number,
+  assignedComponentIds?: Set<string> | null,
+  assignedProdiIds?: Map<string, Set<string>> | null
+): Promise<any> {
   const component = await prisma.component.findUnique({
     where: { id },
     include: {
@@ -506,6 +517,11 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
   });
 
   if (!component) return null;
+
+  // Tentukan isAssigned untuk node ini
+  const isAssigned = assignedComponentIds != null
+    ? assignedComponentIds.has(id)
+    : undefined;
 
   let realizationData: any = null;
   let breakdownData: any[] = [];
@@ -542,10 +558,12 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
         ? filterProdisByComponent(allProdisRaw, component.code, component.name, component.parent)
         : allProdisRaw;
       const breakdownMap = new Map(realization.breakdowns.map((b) => [b.prodiId, b]));
+      // Set prodi yang sudah di-assign untuk komponen ini
+      const prodiAssignedSet = assignedProdiIds?.get(id) ?? null;
 
       breakdownData = allProdis.map((prodi) => {
         const b = breakdownMap.get(prodi.id);
-        return {
+        const breakdownItem: any = {
           prodi: {
             id: prodi.id,
             code: prodi.code,
@@ -553,6 +571,10 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
           },
           value: b ? Number(b.value) : null,
         };
+        if (prodiAssignedSet != null) {
+          breakdownItem.isAssigned = prodiAssignedSet.has(prodi.id);
+        }
+        return breakdownItem;
       });
     }
   } else if (component.hasBreakdown) {
@@ -561,25 +583,39 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
     const allProdis = component.filterByLevel
       ? filterProdisByComponent(allProdisRaw, component.code, component.name, component.parent)
       : allProdisRaw;
-    breakdownData = allProdis.map((prodi) => ({
-      prodi: {
-        id: prodi.id,
-        code: prodi.code,
-        name: prodi.name,
-      },
-      value: null,
-    }));
+    const prodiAssignedSet = assignedProdiIds?.get(id) ?? null;
+
+    breakdownData = allProdis.map((prodi) => {
+      const breakdownItem: any = {
+        prodi: {
+          id: prodi.id,
+          code: prodi.code,
+          name: prodi.name,
+        },
+        value: null,
+      };
+      if (prodiAssignedSet != null) {
+        breakdownItem.isAssigned = prodiAssignedSet.has(prodi.id);
+      }
+      return breakdownItem;
+    });
   }
 
   const children = [];
   for (const child of component.children) {
-    const childTree = await getComponentTreeRecursive(child.id, year, month);
+    const childTree = await getComponentTreeRecursive(
+      child.id,
+      year,
+      month,
+      assignedComponentIds,
+      assignedProdiIds
+    );
     if (childTree) {
       children.push(childTree);
     }
   }
 
-  return {
+  const node: any = {
     id: component.id,
     code: component.code,
     name: component.name,
@@ -596,6 +632,12 @@ async function getComponentTreeRecursive(id: string, year: number, month?: numbe
     breakdown: component.hasBreakdown ? breakdownData : undefined,
     children,
   };
+
+  if (isAssigned !== undefined) {
+    node.isAssigned = isAssigned;
+  }
+
+  return node;
 }
 
 type StructureQuery = {
@@ -606,6 +648,12 @@ type StructureQuery = {
 /**
  * GET COMPONENT STRUCTURE WITH DESCENDANTS AND BREAKDOWNS
  * GET /api/components/:id/structure?year=2024&month=6
+ *
+ * Jika ENABLE_USER_FILTER=true dan Bearer token valid disertakan, setiap node di tree
+ * akan memiliki property `isAssigned: boolean` yang menunjukkan apakah user tersebut
+ * telah di-assign ke komponen tersebut.
+ * Untuk komponen dengan breakdown, setiap item breakdown juga memiliki `isAssigned: boolean`
+ * yang menunjukkan apakah user di-assign ke prodi tersebut pada komponen ini.
  */
 export const getComponentStructure = async (
   req: Request<ComponentParams, {}, {}, StructureQuery>,
@@ -616,6 +664,8 @@ export const getComponentStructure = async (
     const id = req.params.id;
     const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
     const month = req.query.month ? parseInt(req.query.month) : undefined;
+    const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    const userId = userFilterEnabled ? (req as any).user?.id : null;
 
     if (isNaN(year)) {
       return res.status(400).json(errorResponse("Invalid year format"));
@@ -632,7 +682,38 @@ export const getComponentStructure = async (
       return res.status(404).json(errorResponse("Component not found"));
     }
 
-    const tree = await getComponentTreeRecursive(id, year, month);
+    // Pre-fetch semua assignment milik userId (sekali saja, tidak per-node)
+    let assignedComponentIds: Set<string> | null = null;
+    let assignedProdiIds: Map<string, Set<string>> | null = null;
+
+    if (userId) {
+      const assignments = await prisma.componentUser.findMany({
+        where: { userId },
+        select: { componentId: true, prodiId: true },
+      });
+
+      assignedComponentIds = new Set<string>();
+      assignedProdiIds = new Map<string, Set<string>>();
+
+      for (const a of assignments) {
+        assignedComponentIds.add(a.componentId);
+
+        if (a.prodiId) {
+          if (!assignedProdiIds.has(a.componentId)) {
+            assignedProdiIds.set(a.componentId, new Set<string>());
+          }
+          assignedProdiIds.get(a.componentId)!.add(a.prodiId);
+        }
+      }
+    }
+
+    const tree = await getComponentTreeRecursive(
+      id,
+      year,
+      month,
+      assignedComponentIds,
+      assignedProdiIds
+    );
 
     res.json(successResponse(tree));
   } catch (error) {

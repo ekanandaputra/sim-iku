@@ -11,7 +11,7 @@ import {
   getComponentStructure,
 } from "../controllers/component.controller";
 import { validateBody } from "../middleware/validate";
-import { authenticate } from "../middleware/auth";
+import { authenticate, optionalAuthenticate } from "../middleware/auth";
 import { ComponentCreateDto, ComponentUpdateDto } from "../dtos/component.dto";
 
 const router = Router();
@@ -21,7 +21,7 @@ const router = Router();
 
 router.get("/", listComponents);
 router.get("/:id", getComponentById);
-router.get("/:id/structure", getComponentStructure);
+router.get("/:id/structure", optionalAuthenticate, getComponentStructure);
 router.post("/", validateBody(ComponentCreateDto), createComponent);
 router.put("/:id", validateBody(ComponentUpdateDto), updateComponent);
 router.delete("/:id", deleteComponent);
