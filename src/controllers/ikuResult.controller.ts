@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { Prisma } from "../generated/prisma/client";
+import { IkuResultType } from "../generated/prisma/enums";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 
@@ -9,6 +10,8 @@ type IkuResultQuery = {
   idIku?: string;
   month?: string;
   year?: string;
+  resultType?: string;
+  quarter?: string;
   page?: string;
   limit?: string;
 };
@@ -62,6 +65,8 @@ export const listIkuResults = async (
     if (req.query.idIku) where.idIku = req.query.idIku;
     if (req.query.month) where.month = Number(req.query.month);
     if (req.query.year) where.year = Number(req.query.year);
+    if (req.query.resultType) where.resultType = req.query.resultType as IkuResultType;
+    if (req.query.quarter) where.quarter = Number(req.query.quarter);
 
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
@@ -118,21 +123,25 @@ export const createIkuResult = async (
   next: NextFunction
 ) => {
   try {
-    const { idIku, month, year, calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt } = req.body;
+    const { idIku, month, year, resultType, quarter, calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt } = req.body;
 
     const validationError = await validateValueByUnit(idIku, calculatedValue, textValue, documentIds, metadata);
     if (validationError) {
       return res.status(400).json(errorResponse(validationError));
     }
 
+    const resolvedResultType: IkuResultType = resultType ?? IkuResultType.monthly;
+
     const record = await prisma.ikuResult.upsert({
       where: {
-        idIku_month_year: { idIku, month, year },
+        idIku_month_year_resultType: { idIku, month, year, resultType: resolvedResultType },
       },
       create: {
         idIku,
         month,
         year,
+        resultType: resolvedResultType,
+        quarter: quarter ?? null,
         calculatedValue: calculatedValue ?? null,
         textValue: textValue ?? null,
         documentIds: documentIds ?? Prisma.JsonNull,
@@ -141,6 +150,7 @@ export const createIkuResult = async (
         calculatedAt: calculatedAt ? new Date(calculatedAt) : new Date(),
       },
       update: {
+        quarter: quarter ?? null,
         calculatedValue: calculatedValue ?? null,
         textValue: textValue ?? null,
         documentIds: documentIds ?? Prisma.JsonNull,

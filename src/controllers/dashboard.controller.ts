@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { IkuResultType } from "../generated/prisma/enums";
 
 const quarterMonths: Record<number, number[]> = {
   1: [1, 2, 3],
@@ -20,33 +21,40 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
       return res.status(400).json(errorResponse("Invalid year format"));
     }
 
-    const ikus = await prisma.iKU.findMany({ orderBy: { code: 'asc' } });
+    const ikus = await prisma.iKU.findMany({ orderBy: { code: "asc" } });
 
     const targets = await prisma.ikuTarget.findMany({ where: { year } });
     const targetMap = new Map(targets.map(t => [t.ikuId, t]));
 
+    // Ambil semua iku_result untuk tahun ini (monthly + quarterly + yearly)
     const results = await prisma.ikuResult.findMany({
       where: { year },
       orderBy: [{ idIku: "asc" }, { month: "asc" }],
     });
 
-    const resultMap = new Map<string, any[]>();
+    // Kelompokkan per IKU
+    const resultsByIku = new Map<string, typeof results>();
     for (const r of results) {
-      if (!resultMap.has(r.idIku)) resultMap.set(r.idIku, []);
-      resultMap.get(r.idIku)!.push(r);
+      if (!resultsByIku.has(r.idIku)) resultsByIku.set(r.idIku, []);
+      resultsByIku.get(r.idIku)!.push(r);
     }
 
     const dashboardData = ikus.map(iku => {
       const target = targetMap.get(iku.id);
-      const ikuResults = resultMap.get(iku.id) || [];
+      const ikuResults = resultsByIku.get(iku.id) || [];
 
-      const getRealization = (periodType: string, periodValue: number) => {
-        const filtered = periodType === "year"
-          ? ikuResults
-          : ikuResults.filter(r => quarterMonths[periodValue]?.includes(r.month));
+      // Quarterly: month = nomor kuartal (1-4), resultType = quarterly
+      const getQuarterRealization = (quarter: number): number | null => {
+        const row = ikuResults.find(
+          r => r.resultType === IkuResultType.quarterly && r.month === quarter
+        );
+        return row?.calculatedValue != null ? Number(row.calculatedValue) : null;
+      };
 
-        if (!filtered.length) return null;
-        return filtered.reduce((sum, item) => sum + Number(item.calculatedValue), 0);
+      // Yearly: resultType = yearly, month = 0
+      const getYearlyRealization = (): number | null => {
+        const row = ikuResults.find(r => r.resultType === IkuResultType.yearly);
+        return row?.calculatedValue != null ? Number(row.calculatedValue) : null;
       };
 
       return {
@@ -57,27 +65,27 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
           {
             period: "Q1",
             target: target && target.targetQ1 !== null ? Number(target.targetQ1) : null,
-            realization: getRealization("quarter", 1),
+            realization: getQuarterRealization(1),
           },
           {
             period: "Q2",
             target: target && target.targetQ2 !== null ? Number(target.targetQ2) : null,
-            realization: getRealization("quarter", 2),
+            realization: getQuarterRealization(2),
           },
           {
             period: "Q3",
             target: target && target.targetQ3 !== null ? Number(target.targetQ3) : null,
-            realization: getRealization("quarter", 3),
+            realization: getQuarterRealization(3),
           },
           {
             period: "Q4",
             target: target && target.targetQ4 !== null ? Number(target.targetQ4) : null,
-            realization: getRealization("quarter", 4),
+            realization: getQuarterRealization(4),
           },
           {
             period: "Year",
             target: target && target.targetYear !== null ? Number(target.targetYear) : null,
-            realization: getRealization("year", 1),
+            realization: getYearlyRealization(),
           },
         ],
       };
@@ -88,6 +96,7 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
     next(error);
   }
 };
+
 
 export const getComponentDashboard = async (req: Request, res: Response, next: NextFunction) => {
   try {

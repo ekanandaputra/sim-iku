@@ -40,6 +40,12 @@ enum IkuUnitType {
   file
 }
 
+enum IkuResultType {
+  monthly
+  quarterly
+  yearly
+}
+
 model IKU {
   id            String         @id @default(uuid()) @db.VarChar(36)
   code          String         @unique
@@ -179,25 +185,28 @@ model ComponentRealization {
 }
 
 model IkuResult {
-  idResult        String   @id @default(uuid()) @map("id") @db.VarChar(36)
-  idIku           String   @map("id_iku")
+  idResult        String        @id @default(uuid()) @map("id") @db.VarChar(36)
+  idIku           String        @map("id_iku")
   month           Int
   year            Int
-  calculatedValue Decimal? @map("calculated_value") @db.Decimal(18, 4)
-  textValue       String?  @map("text_value") @db.Text
-  documentIds     Json?    @map("document_ids")
-  metadata        Json?    @map("metadata")
-  formulaVersion  String?  @map("formula_version")
-  calculatedAt    DateTime @default(now()) @map("calculated_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  resultType      IkuResultType @default(monthly) @map("result_type")
+  quarter         Int?          @map("quarter")
+  calculatedValue Decimal?      @map("calculated_value") @db.Decimal(18, 4)
+  textValue       String?       @map("text_value") @db.Text
+  documentIds     Json?         @map("document_ids")
+  metadata        Json?         @map("metadata")
+  formulaVersion  String?       @map("formula_version")
+  calculatedAt    DateTime      @default(now()) @map("calculated_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
 
   iku IKU @relation(fields: [idIku], references: [id])
 
-  @@unique([idIku, month, year])
+  @@unique([idIku, month, year, resultType])
   @@index([idIku])
   @@index([year])
   @@index([month])
+  @@index([resultType])
   @@map("iku_results")
 }
 

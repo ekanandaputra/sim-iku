@@ -790,11 +790,12 @@ export const bulkSaveRealization = async (
       const results = [];
       for (const item of realizations) {
         const record = await prisma.ikuResult.upsert({
-          where: { idIku_month_year: { idIku: id, month: item.month, year } },
+          where: { idIku_month_year_resultType: { idIku: id, month: item.month, year, resultType: "monthly" as any } },
           create: {
             idIku: id,
             month: item.month,
             year,
+            resultType: "monthly" as any,
             calculatedValue: item.value ?? null,
             metadata: item.metadata ?? Prisma.JsonNull,
           },
