@@ -58,9 +58,9 @@ export const listComponentUsers = async (
 };
 
 /**
- * ASSIGN USERS TO A COMPONENT (bulk)
+ * ASSIGN USERS TO A COMPONENT (sync)
  * POST /api/component-users/:componentId/assign
- * body: { userIds: string[] }
+ * body: { userIds: string[], prodiId?: string }
  */
 export const assignUsers = async (
   req: Request<ComponentParams>,
@@ -78,28 +78,41 @@ export const assignUsers = async (
       return res.status(404).json(errorResponse("Component not found"));
     }
 
-    // Upsert each userId (skip if already assigned)
-    const created = await prisma.$transaction(async (tx) => {
-      const results = [];
-      for (const userId of userIds) {
-        let existing = await tx.componentUser.findFirst({
-          where: { componentId, userId, prodiId: prodiId || null },
-          select: { id: true, userId: true, prodiId: true, createdAt: true },
-        });
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Delete existing users in this prodi scope that are NOT in the payload
+      await tx.componentUser.deleteMany({
+        where: {
+          componentId,
+          prodiId: prodiId || null,
+          userId: { notIn: userIds },
+        },
+      });
 
-        if (!existing) {
-          existing = await tx.componentUser.create({
-            data: { componentId, userId, prodiId: prodiId || null },
-            select: { id: true, userId: true, prodiId: true, createdAt: true },
-          });
-        }
-        results.push(existing);
+      // 2. Add users that don't exist yet
+      const existingUsers = await tx.componentUser.findMany({
+        where: { componentId, prodiId: prodiId || null },
+        select: { userId: true },
+      });
+      const existingUserIds = new Set(existingUsers.map((u) => u.userId));
+      const newUserIds = userIds.filter((id) => !existingUserIds.has(id));
+
+      if (newUserIds.length > 0) {
+        await tx.componentUser.createMany({
+          data: newUserIds.map((userId) => ({
+            componentId,
+            userId,
+            prodiId: prodiId || null,
+          })),
+        });
       }
-      return results;
+
+      return await tx.componentUser.findMany({
+        where: { componentId, prodiId: prodiId || null },
+      });
     });
 
-    res.status(201).json(
-      successResponse(created, `${created.length} user(s) assigned to component`)
+    res.status(200).json(
+      successResponse(result, `Component users synced successfully`)
     );
   } catch (error) {
     next(error);
