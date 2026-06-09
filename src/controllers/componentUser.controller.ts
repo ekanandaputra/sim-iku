@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { fetchAuthUsers } from "../utils/authService";
 
 type ComponentParams = { componentId: string };
 
@@ -41,7 +42,16 @@ export const listComponentUsers = async (
       },
     });
 
-    res.json(successResponse({ component, assignments }));
+    // Fetch data user dari auth service secara paralel
+    const userIds = assignments.map((a) => a.userId);
+    const userMap = await fetchAuthUsers(userIds);
+
+    const assignmentsWithUser = assignments.map((a) => ({
+      ...a,
+      user: userMap.get(a.userId) ?? null,
+    }));
+
+    res.json(successResponse({ component, assignments: assignmentsWithUser }));
   } catch (error) {
     next(error);
   }
