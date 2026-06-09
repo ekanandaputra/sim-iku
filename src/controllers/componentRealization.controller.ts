@@ -39,21 +39,8 @@ async function evaluateFormulaForMonths(
   codeToInfo: Map<string, { id: string; code: string; periodType: string }>,
   formulaCodes: string[],
   year: number,
-  monthsFilter: number[] | null // null = semua bulan di tahun tersebut
+  monthsFilter: number[] | null // null = 1-12
 ): Promise<number | null> {
-  const realizations = await prisma.componentRealization.findMany({
-    where: {
-      idComponent: { in: componentIds },
-      year,
-      ...(monthsFilter ? { month: { in: monthsFilter } } : {}),
-    },
-  });
-
-  const byCompId = new Map<string, number>();
-  for (const r of realizations) {
-    byCompId.set(r.idComponent, (byCompId.get(r.idComponent) ?? 0) + Number(r.value));
-  }
-
   const componentValues: ComponentValues = {};
   let hasAnyData = false;
 
@@ -63,9 +50,29 @@ async function evaluateFormulaForMonths(
       componentValues[code] = 0;
       continue;
     }
-    const val = byCompId.get(info.id) ?? 0;
-    if (val !== 0) hasAnyData = true;
-    componentValues[code] = val;
+
+    let compMonthsFilter: number[] | undefined = undefined;
+    if (info.periodType === "yearly") {
+      // Komponen tahunan: selalu ambil semua datanya tanpa filter bulan
+      compMonthsFilter = undefined;
+    } else {
+      // Komponen bulanan/kuartalan: filter sesuai bulan yang diminta, 
+      // default 1-12 (menghindari data nyangkut di month=0)
+      compMonthsFilter = monthsFilter ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }
+
+    const realizations = await prisma.componentRealization.findMany({
+      where: {
+        idComponent: info.id,
+        year,
+        ...(compMonthsFilter ? { month: { in: compMonthsFilter } } : {}),
+      },
+    });
+
+    if (realizations.length > 0) hasAnyData = true;
+
+    const sum = realizations.reduce((acc, r) => acc + Number(r.value), 0);
+    componentValues[code] = sum;
   }
 
   if (!hasAnyData) return null;
@@ -407,16 +414,31 @@ export const createComponentRealization = async (
       return res.status(400).json(errorResponse("prodiId is mandatory for components with breakdowns"));
     }
 
+    // --- LANGKAH PREVENTIF: Validasi `month` berdasarkan periodType ---
+    let validatedMonth = month;
+    if (component.periodType === "yearly") {
+      // Untuk komponen tahunan, paksakan month = 0 agar tidak terfragmentasi
+      validatedMonth = 0;
+    } else {
+      // Untuk monthly, quarterly, semester -> wajib kirim month (1-12)
+      if (validatedMonth === undefined || validatedMonth === null || validatedMonth < 1 || validatedMonth > 12) {
+        return res.status(400).json(
+          errorResponse(`Bulan (month) 1-12 wajib diisi untuk komponen dengan tipe periode ${component.periodType}`)
+        );
+      }
+    }
+    // ------------------------------------------------------------------
+
     let record: any;
 
     if (prodiId) {
       record = await prisma.componentRealization.findUnique({
-        where: { idComponent_month_year: { idComponent, month, year } },
+        where: { idComponent_month_year: { idComponent, month: validatedMonth, year } },
       });
 
       if (!record) {
         record = await prisma.componentRealization.create({
-          data: { idComponent, month, year, value: 0 },
+          data: { idComponent, month: validatedMonth, year, value: 0 },
         });
       }
 
@@ -438,8 +460,8 @@ export const createComponentRealization = async (
       });
     } else {
       record = await prisma.componentRealization.upsert({
-        where: { idComponent_month_year: { idComponent, month, year } },
-        create: { idComponent, month, year, value },
+        where: { idComponent_month_year: { idComponent, month: validatedMonth, year } },
+        create: { idComponent, month: validatedMonth, year, value },
         update: { value },
         include: { component: true },
       });
@@ -454,11 +476,15 @@ export const createComponentRealization = async (
       }
     }
 
-    if (month != null) {
-      await calculateIkuResultsForComponentRealization(idComponent, month, year);
+    if (validatedMonth !== 0) {
+      await calculateIkuResultsForComponentRealization(idComponent, validatedMonth, year);
+    } else {
+      // Jika yearly (month=0), trigger ulang menggunakan salah satu dummy bulan (misal 12) 
+      // agar fungsi eval berjalan secara full
+      await calculateIkuResultsForComponentRealization(idComponent, 12, year);
     }
 
-    await calculateParentComponentSum(idComponent, month ?? null, year);
+    await calculateParentComponentSum(idComponent, validatedMonth === 0 ? null : validatedMonth, year);
 
     res.status(201).json(successResponse(record, "Component realization created or updated successfully"));
   } catch (error) {
