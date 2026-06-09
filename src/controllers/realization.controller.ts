@@ -17,6 +17,7 @@ type PaginationQuery = {
   limit?: string;
   name?: string;
   tag?: string;
+  ikuId?: string;
 };
 
 /**
@@ -40,6 +41,7 @@ export const getRealizationMetrics = async (
 
     const nameFilter = req.query.name?.trim();
     const tagFilter = req.query.tag?.trim();
+    const ikuIdFilter = req.query.ikuId?.trim();
 
     const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
@@ -61,6 +63,9 @@ export const getRealizationMetrics = async (
       const ikuWhere: any = { isDirectInput: true };
       if (nameFilter) {
         ikuWhere.name = { contains: nameFilter };
+      }
+      if (ikuIdFilter) {
+        ikuWhere.id = ikuIdFilter;
       }
       if (userFilterEnabled && userId) {
         // Only IKUs where this user is assigned
@@ -86,6 +91,13 @@ export const getRealizationMetrics = async (
             deletedAt: null,
             name: { contains: tagFilter },
           },
+        },
+      };
+    }
+    if (ikuIdFilter) {
+      compWhere.ikus = {
+        some: {
+          ikuId: ikuIdFilter,
         },
       };
     }
