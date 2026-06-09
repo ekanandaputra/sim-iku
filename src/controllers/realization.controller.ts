@@ -92,19 +92,31 @@ export const getRealizationMetrics = async (
 
     let userAssignedComponentIds = new Set<string>();
     const childrenMap = new Map<string, string[]>();
+    const ikuComponentAccessEnabled = process.env.ENABLE_IKU_COMPONENT_ACCESS === "true";
 
     if (userFilterEnabled && userId) {
-      const [userAssignments, allComponents] = await Promise.all([
+      const queries: [Promise<{ componentId: string }[]>, Promise<{ componentId: string }[]>, Promise<{ id: string; parentId: string | null }[]>] = [
         prisma.componentUser.findMany({
           where: { userId },
-          select: { componentId: true }
+          select: { componentId: true },
         }),
+        ikuComponentAccessEnabled
+          ? prisma.iKUComponent.findMany({
+              where: { iku: { users: { some: { userId } } } },
+              select: { componentId: true },
+            })
+          : Promise.resolve([]),
         prisma.component.findMany({
-          select: { id: true, parentId: true }
-        })
-      ]);
+          select: { id: true, parentId: true },
+        }),
+      ];
 
-      userAssignedComponentIds = new Set(userAssignments.map(a => a.componentId));
+      const [userAssignments, ikuComponentAssignments, allComponents] = await Promise.all(queries);
+
+      userAssignedComponentIds = new Set([
+        ...userAssignments.map((a) => a.componentId),
+        ...ikuComponentAssignments.map((a) => a.componentId),
+      ]);
 
       for (const c of allComponents) {
         if (c.parentId) {
