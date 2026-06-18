@@ -60,6 +60,7 @@ model IKU {
   iku_results   IkuResult[]
   targets       IkuTarget[]
   users         IkuUser[]
+  bidangs       BidangIKU[]
 
   @@map("ikus")
 }
@@ -86,6 +87,7 @@ model Component {
   documents    ComponentDocument[]
   tags         ComponentTag[]
   users        ComponentUser[]
+  bidangs      BidangComponent[]
 
   @@map("components")
 }
@@ -366,4 +368,57 @@ model ComponentRealizationBreakdown {
   @@unique([realizationId, prodiId])
   @@index([realizationId])
   @@map("component_realization_breakdowns")
+}
+
+model Bidang {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users      BidangUser[]
+  ikus       BidangIKU[]
+  components BidangComponent[]
+
+  @@map("bidang")
+}
+
+model BidangUser {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  bidangId  String   @map("bidang_id") @db.VarChar(36)
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  bidang Bidang @relation(fields: [bidangId], references: [id], onDelete: Cascade)
+
+  @@unique([bidangId, userId])
+  @@map("bidang_users")
+}
+
+model BidangIKU {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  bidangId  String   @map("bidang_id") @db.VarChar(36)
+  ikuId     String   @map("iku_id") @db.VarChar(36)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  bidang Bidang @relation(fields: [bidangId], references: [id], onDelete: Cascade)
+  iku    IKU    @relation(fields: [ikuId], references: [id], onDelete: Cascade)
+
+  @@unique([bidangId, ikuId])
+  @@map("bidang_iku")
+}
+
+model BidangComponent {
+  id          String   @id @default(uuid()) @db.VarChar(36)
+  bidangId    String   @map("bidang_id") @db.VarChar(36)
+  componentId String   @map("component_id") @db.VarChar(36)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  bidang    Bidang    @relation(fields: [bidangId], references: [id], onDelete: Cascade)
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@unique([bidangId, componentId])
+  @@map("bidang_components")
 }

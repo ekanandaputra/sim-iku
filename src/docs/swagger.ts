@@ -31,6 +31,7 @@ const swaggerDefinition = {
     { name: "Prodi", description: "Master data Program Studi" },
     { name: "ComponentBreakdown", description: "Breakdown realisasi komponen per prodi (nilai total = sum breakdown)" },
     { name: "Import", description: "Import master data (IKU, IKP, Mapping) from Excel" },
+    { name: "Bidang", description: "Manajemen Bidang (unit kerja) — pengelompokan user ke IKU dan IKP/Komponen" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -923,6 +924,165 @@ const swaggerDefinition = {
             },
           },
           total: { type: "number" },
+        },
+      },
+
+      // ─── Bidang Schemas ──────────────────────────────────────────────────────
+      Bidang: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string", example: "BID-001" },
+          name: { type: "string", example: "Bidang Akademik" },
+          description: { type: "string", nullable: true, example: "Menangani urusan akademik" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "code", "name"],
+      },
+      BidangWithCount: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string", example: "BID-001" },
+          name: { type: "string", example: "Bidang Akademik" },
+          description: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          _count: {
+            type: "object",
+            properties: {
+              users: { type: "integer", description: "Jumlah user terdaftar" },
+              ikus: { type: "integer", description: "Jumlah IKU terkait" },
+              components: { type: "integer", description: "Jumlah IKP/Komponen terkait" },
+            },
+          },
+        },
+        required: ["id", "code", "name"],
+      },
+      BidangDetail: {
+        type: "object",
+        description: "Detail Bidang lengkap dengan relasi users, IKUs, dan Components",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          code: { type: "string" },
+          name: { type: "string" },
+          description: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          users: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                userId: { type: "string" },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
+          ikus: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                ikuId: { type: "string", format: "uuid" },
+                createdAt: { type: "string", format: "date-time" },
+                iku: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    code: { type: "string" },
+                    name: { type: "string" },
+                    unit: { type: "string" },
+                    isDirectInput: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          components: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                componentId: { type: "string", format: "uuid" },
+                createdAt: { type: "string", format: "date-time" },
+                component: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string", format: "uuid" },
+                    code: { type: "string" },
+                    name: { type: "string" },
+                    dataType: { type: "string" },
+                    sourceType: { type: "string" },
+                    periodType: { type: "string" },
+                    hasBreakdown: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        required: ["id", "code", "name"],
+      },
+      BidangCreate: {
+        type: "object",
+        required: ["code", "name"],
+        properties: {
+          code: { type: "string", maxLength: 50, example: "BID-001" },
+          name: { type: "string", maxLength: 200, example: "Bidang Akademik" },
+          description: { type: "string", maxLength: 500, example: "Menangani urusan akademik" },
+        },
+      },
+      BidangUpdate: {
+        type: "object",
+        properties: {
+          code: { type: "string", maxLength: 50 },
+          name: { type: "string", maxLength: 200 },
+          description: { type: "string", maxLength: 500 },
+        },
+      },
+      BidangUserAssignment: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          userId: { type: "string", description: "ID user dari auth service" },
+          createdAt: { type: "string", format: "date-time" },
+          user: {
+            nullable: true,
+            description: "Data user dari auth service (null jika tidak ditemukan)",
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              email: { type: "string" },
+              name: { type: "string" },
+            },
+          },
+        },
+      },
+      IkuIdsBody: {
+        type: "object",
+        required: ["ikuIds"],
+        properties: {
+          ikuIds: {
+            type: "array",
+            items: { type: "string", format: "uuid" },
+            example: ["iku-uuid-1", "iku-uuid-2"],
+          },
+        },
+      },
+      ComponentIdsBody: {
+        type: "object",
+        required: ["componentIds"],
+        properties: {
+          componentIds: {
+            type: "array",
+            items: { type: "string", format: "uuid" },
+            example: ["component-uuid-1", "component-uuid-2"],
+          },
         },
       },
     },
@@ -3613,6 +3773,541 @@ const swaggerDefinition = {
         responses: {
           "200": { description: "Entry deleted and total updated" },
           "404": { description: "Realization or breakdown entry not found" },
+        },
+      },
+    },
+
+    // ─── Bidang ────────────────────────────────────────────────────────────────
+    "/api/bidang": {
+      get: {
+        tags: ["Bidang"],
+        summary: "Daftar semua Bidang",
+        description: "Mengembalikan seluruh Bidang beserta jumlah user, IKU, dan IKP/Komponen terkait.",
+        responses: {
+          "200": {
+            description: "Daftar Bidang berhasil dimuat",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: { type: "array", items: { $ref: "#/components/schemas/BidangWithCount" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Bidang"],
+        summary: "Buat Bidang baru",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/BidangCreate" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Bidang berhasil dibuat",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Bidang created successfully" },
+                    data: { $ref: "#/components/schemas/Bidang" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Validation error" },
+          "409": { description: "Kode Bidang sudah digunakan" },
+        },
+      },
+    },
+    "/api/bidang/by-user/{userId}": {
+      get: {
+        tags: ["Bidang"],
+        summary: "Daftar Bidang yang diikuti oleh seorang user",
+        parameters: [
+          {
+            name: "userId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "ID user dari auth service",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Daftar Bidang milik user",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: { type: "array", items: { $ref: "#/components/schemas/Bidang" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/bidang/{id}": {
+      get: {
+        tags: ["Bidang"],
+        summary: "Detail Bidang lengkap",
+        description: "Mengembalikan data Bidang beserta daftar user, IKU, dan IKP/Komponen yang terkait.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": {
+            description: "Detail Bidang",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: { $ref: "#/components/schemas/BidangDetail" },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Bidang not found" },
+        },
+      },
+      put: {
+        tags: ["Bidang"],
+        summary: "Update Bidang",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/BidangUpdate" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Bidang berhasil diupdate",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Bidang updated successfully" },
+                    data: { $ref: "#/components/schemas/Bidang" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang not found" },
+          "409": { description: "Kode Bidang sudah digunakan" },
+        },
+      },
+      delete: {
+        tags: ["Bidang"],
+        summary: "Hapus Bidang",
+        description: "Menghapus Bidang beserta seluruh relasi user, IKU, dan IKP (cascade).",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Bidang berhasil dihapus" },
+          "404": { description: "Bidang not found" },
+        },
+      },
+    },
+
+    // ─── Bidang ↔ Users ────────────────────────────────────────────────────────
+    "/api/bidang/{id}/users": {
+      get: {
+        tags: ["Bidang"],
+        summary: "Daftar user di Bidang",
+        description: "Mengembalikan daftar user yang terdaftar di Bidang, termasuk data user dari auth service.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": {
+            description: "Daftar user berhasil dimuat",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        bidang: { $ref: "#/components/schemas/Bidang" },
+                        assignments: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/BidangUserAssignment" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Bidang not found" },
+        },
+      },
+      put: {
+        tags: ["Bidang"],
+        summary: "Sync (replace) semua user di Bidang",
+        description: "Mengganti seluruh daftar user di Bidang dengan daftar baru. User yang tidak ada di payload akan dihapus.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Daftar user berhasil diperbarui" },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang not found" },
+        },
+      },
+    },
+    "/api/bidang/{id}/users/assign": {
+      post: {
+        tags: ["Bidang"],
+        summary: "Tambahkan user ke Bidang (additive)",
+        description: "Menambahkan satu atau lebih user ke Bidang tanpa menghapus user yang sudah ada (idempotent — upsert).",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "User berhasil ditambahkan ke Bidang" },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang not found" },
+        },
+      },
+    },
+    "/api/bidang/{id}/users/unassign": {
+      delete: {
+        tags: ["Bidang"],
+        summary: "Hapus user dari Bidang",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UserIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "User berhasil dihapus dari Bidang",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: { deletedCount: { type: "integer" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang not found" },
+        },
+      },
+    },
+
+    // ─── Bidang ↔ IKU ──────────────────────────────────────────────────────────
+    "/api/bidang/{id}/ikus": {
+      get: {
+        tags: ["Bidang"],
+        summary: "Daftar IKU yang dikaitkan ke Bidang",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": {
+            description: "Daftar IKU terkait",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        bidang: { $ref: "#/components/schemas/Bidang" },
+                        ikus: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              ikuId: { type: "string", format: "uuid" },
+                              createdAt: { type: "string", format: "date-time" },
+                              iku: { $ref: "#/components/schemas/Iku" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Bidang not found" },
+        },
+      },
+      put: {
+        tags: ["Bidang"],
+        summary: "Sync (replace) IKU yang dikaitkan ke Bidang",
+        description: "Mengganti seluruh kaitan IKU di Bidang. IKU yang tidak ada di payload akan dihapus.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Kaitan IKU berhasil diperbarui" },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang atau IKU tidak ditemukan" },
+        },
+      },
+    },
+    "/api/bidang/{id}/ikus/assign": {
+      post: {
+        tags: ["Bidang"],
+        summary: "Tambahkan IKU ke Bidang (additive)",
+        description: "Menambahkan satu atau lebih IKU ke Bidang tanpa menghapus kaitan yang sudah ada (idempotent — upsert).",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "IKU berhasil dikaitkan ke Bidang" },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang atau IKU tidak ditemukan" },
+        },
+      },
+    },
+    "/api/bidang/{id}/ikus/unassign": {
+      delete: {
+        tags: ["Bidang"],
+        summary: "Hapus kaitan IKU dari Bidang",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Kaitan IKU berhasil dihapus",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: { deletedCount: { type: "integer" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang not found" },
+        },
+      },
+    },
+
+    // ─── Bidang ↔ Component (IKP) ───────────────────────────────────────────────
+    "/api/bidang/{id}/components": {
+      get: {
+        tags: ["Bidang"],
+        summary: "Daftar IKP/Komponen yang dikaitkan ke Bidang",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": {
+            description: "Daftar IKP/Komponen terkait",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        bidang: { $ref: "#/components/schemas/Bidang" },
+                        components: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              componentId: { type: "string", format: "uuid" },
+                              createdAt: { type: "string", format: "date-time" },
+                              component: { $ref: "#/components/schemas/Component" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Bidang not found" },
+        },
+      },
+      put: {
+        tags: ["Bidang"],
+        summary: "Sync (replace) IKP/Komponen yang dikaitkan ke Bidang",
+        description: "Mengganti seluruh kaitan IKP/Komponen di Bidang. Komponen yang tidak ada di payload akan dihapus.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ComponentIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Kaitan IKP berhasil diperbarui" },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang atau Component tidak ditemukan" },
+        },
+      },
+    },
+    "/api/bidang/{id}/components/assign": {
+      post: {
+        tags: ["Bidang"],
+        summary: "Tambahkan IKP/Komponen ke Bidang (additive)",
+        description: "Menambahkan satu atau lebih IKP/Komponen ke Bidang tanpa menghapus kaitan yang sudah ada (idempotent — upsert).",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ComponentIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "IKP/Komponen berhasil dikaitkan ke Bidang" },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang atau Component tidak ditemukan" },
+        },
+      },
+    },
+    "/api/bidang/{id}/components/unassign": {
+      delete: {
+        tags: ["Bidang"],
+        summary: "Hapus kaitan IKP/Komponen dari Bidang",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ComponentIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Kaitan IKP/Komponen berhasil dihapus",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: { deletedCount: { type: "integer" } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Validation error" },
+          "404": { description: "Bidang not found" },
         },
       },
     },
