@@ -3781,8 +3781,28 @@ const swaggerDefinition = {
     "/api/bidang": {
       get: {
         tags: ["Bidang"],
-        summary: "Daftar semua Bidang",
-        description: "Mengembalikan seluruh Bidang beserta jumlah user, IKU, dan IKP/Komponen terkait.",
+        summary: "Daftar semua Bidang (paginated)",
+        description: "Mengembalikan daftar Bidang secara paginated beserta jumlah user, IKU, dan IKP/Komponen terkait. Gunakan query `search` untuk filter berdasarkan nama atau kode.",
+        parameters: [
+          {
+            name: "page",
+            in: "query",
+            schema: { type: "integer", minimum: 1, default: 1 },
+            description: "Nomor halaman (1-based)",
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+            description: "Jumlah item per halaman",
+          },
+          {
+            name: "search",
+            in: "query",
+            schema: { type: "string" },
+            description: "Filter berdasarkan nama atau kode Bidang (substring match)",
+          },
+        ],
         responses: {
           "200": {
             description: "Daftar Bidang berhasil dimuat",
@@ -3792,7 +3812,16 @@ const swaggerDefinition = {
                   type: "object",
                   properties: {
                     success: { type: "boolean", example: true },
-                    data: { type: "array", items: { $ref: "#/components/schemas/BidangWithCount" } },
+                    data: {
+                      type: "object",
+                      properties: {
+                        data: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/BidangWithCount" },
+                        },
+                        pagination: { $ref: "#/components/schemas/PaginationMeta" },
+                      },
+                    },
                   },
                 },
               },
@@ -3800,6 +3829,7 @@ const swaggerDefinition = {
           },
         },
       },
+
       post: {
         tags: ["Bidang"],
         summary: "Buat Bidang baru",

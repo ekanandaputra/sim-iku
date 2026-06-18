@@ -4,25 +4,57 @@ import { successResponse, errorResponse } from "../utils/response";
 
 type BidangParams = { id: string };
 
+type BidangListQuery = {
+  page?: string;
+  limit?: string;
+  search?: string;
+};
+
 /**
- * LIST ALL BIDANG
- * GET /api/bidang
+ * LIST ALL BIDANG (with pagination + search)
+ * GET /api/bidang?page=1&limit=20&search=akademik
  */
 export const listBidang = async (
-  req: Request,
+  req: Request<{}, {}, {}, BidangListQuery>,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const bidangs = await prisma.bidang.findMany({
-      orderBy: { createdAt: "asc" },
-      include: {
-        _count: {
-          select: { users: true, ikus: true, components: true },
+    const page  = Math.max(1, Number(req.query.page)  || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip  = (page - 1) * limit;
+    const searchFilter = req.query.search?.trim();
+
+    const where: any = {};
+    if (searchFilter) {
+      where.OR = [
+        { name: { contains: searchFilter } },
+        { code: { contains: searchFilter } },
+      ];
+    }
+
+    const [bidangs, total] = await Promise.all([
+      prisma.bidang.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          _count: { select: { users: true, ikus: true, components: true } },
         },
+      }),
+      prisma.bidang.count({ where }),
+    ]);
+
+    res.json(successResponse({
+      data: bidangs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-    });
-    res.json(successResponse(bidangs));
+    }));
   } catch (error) {
     next(error);
   }
