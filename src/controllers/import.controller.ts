@@ -13,11 +13,13 @@ const VALID_IKU_UNITS = ["percentage", "text", "number", "file"] as const;
 const VALID_DATA_TYPES = ["number", "percentage", "integer"] as const;
 const VALID_SOURCE_TYPES = ["database", "api", "manual"] as const;
 const VALID_PERIOD_TYPES = ["monthly", "quarter", "semester", "yearly"] as const;
+const VALID_AGGREGATION_TYPES = ["SUM", "LAST"] as const;
 
 type IkuUnit = typeof VALID_IKU_UNITS[number];
 type DataType = typeof VALID_DATA_TYPES[number];
 type SourceType = typeof VALID_SOURCE_TYPES[number];
 type PeriodType = typeof VALID_PERIOD_TYPES[number];
+type AggregationType = typeof VALID_AGGREGATION_TYPES[number];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,15 +56,16 @@ export const downloadMasterTemplate = (req: Request, res: Response) => {
     "ikp_data_type",
     "ikp_source_type",
     "ikp_period_type",
+    "ikp_aggregation_type",
     "ikp_has_breakdown",
     "ikp_filter_by_level",
     "ikp_parent_code",
   ];
 
   const samples = [
-    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "FALSE", "FALSE", ""],
-    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "TRUE", "TRUE", "COMP001"],
-    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", "", "FALSE", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "SUM", "FALSE", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "LAST", "TRUE", "TRUE", "COMP001"],
+    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", "", "", "FALSE", "FALSE", ""],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -174,6 +177,11 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
         const ikpName = toString(r[col("ikp_name")]);
         if (!ikpName) continue;
 
+        const rawAggregationType = toString(r[col("ikp_aggregation_type")]).toUpperCase();
+        const aggregationType = (VALID_AGGREGATION_TYPES as readonly string[]).includes(rawAggregationType)
+          ? (rawAggregationType as AggregationType)
+          : "SUM";
+
         const component = await prisma.component.upsert({
           where: { code: ikpCode },
           update: {
@@ -182,6 +190,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
             dataType: (toString(r[col("ikp_data_type")]).toLowerCase() as any) || null,
             sourceType: (toString(r[col("ikp_source_type")]).toLowerCase() as any) || null,
             periodType: (toString(r[col("ikp_period_type")]).toLowerCase() as any) || "yearly",
+            aggregationType: aggregationType as any,
             hasBreakdown: toBool(r[col("ikp_has_breakdown")]),
             filterByLevel: toBool(r[col("ikp_filter_by_level")]),
           },
@@ -192,6 +201,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
             dataType: (toString(r[col("ikp_data_type")]).toLowerCase() as any) || null,
             sourceType: (toString(r[col("ikp_source_type")]).toLowerCase() as any) || null,
             periodType: (toString(r[col("ikp_period_type")]).toLowerCase() as any) || "yearly",
+            aggregationType: aggregationType as any,
             hasBreakdown: toBool(r[col("ikp_has_breakdown")]),
             filterByLevel: toBool(r[col("ikp_filter_by_level")]),
           },
@@ -431,6 +441,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
       "ikp_data_type",
       "ikp_source_type",
       "ikp_period_type",
+      "ikp_aggregation_type",
       "ikp_has_breakdown",
       "ikp_filter_by_level",
       "ikp_parent_code",
@@ -475,6 +486,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
             comp.dataType || "",
             comp.sourceType || "",
             comp.periodType || "",
+            comp.aggregationType || "SUM",
             comp.hasBreakdown ? "TRUE" : "FALSE",
             comp.filterByLevel ? "TRUE" : "FALSE",
             comp.parent ? comp.parent.code : "",
@@ -487,6 +499,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
           iku.description || "",
           iku.isDirectInput ? "TRUE" : "FALSE",
           iku.unit,
+          "",
           "",
           "",
           "",
