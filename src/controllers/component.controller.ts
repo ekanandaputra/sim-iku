@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { filterProdisByComponent } from "../utils/prodiFilter";
+import { writeAuditLog } from "../utils/auditLog";
+import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 
 type ComponentParams = {
   id: string;
@@ -241,6 +243,17 @@ export const createComponent = async (
       include: componentInclude,
     });
 
+    await writeAuditLog({
+      entityType: AuditEntityType.COMPONENT,
+      entityId: component.id,
+      entityCode: component.code,
+      entityName: component.name,
+      action: AuditAction.CREATE,
+      userId: (req as any).user?.id ?? null,
+      newValues: { code: component.code, name: component.name, description: component.description, dataType: component.dataType, sourceType: component.sourceType, periodType: component.periodType, aggregationType: component.aggregationType, hasBreakdown: component.hasBreakdown, filterByLevel: component.filterByLevel, parentId: component.parentId },
+      req,
+    });
+
     res.status(201).json(successResponse({
       ...result,
       tags: result!.tags.map((ct) => ct.tag),
@@ -334,6 +347,18 @@ export const updateComponent = async (
       include: componentInclude,
     });
 
+    await writeAuditLog({
+      entityType: AuditEntityType.COMPONENT,
+      entityId: updated.id,
+      entityCode: updated.code,
+      entityName: updated.name,
+      action: AuditAction.UPDATE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, dataType: existing.dataType, sourceType: existing.sourceType, periodType: existing.periodType, aggregationType: existing.aggregationType, hasBreakdown: existing.hasBreakdown, filterByLevel: existing.filterByLevel, parentId: existing.parentId },
+      newValues: { code: updated.code, name: updated.name, description: updated.description, dataType: updated.dataType, sourceType: updated.sourceType, periodType: updated.periodType, aggregationType: updated.aggregationType, hasBreakdown: updated.hasBreakdown, filterByLevel: updated.filterByLevel, parentId: updated.parentId },
+      req,
+    });
+
     res.json(successResponse({
       ...updated,
       tags: updated.tags.map((ct) => ct.tag),
@@ -374,6 +399,17 @@ export const deleteComponent = async (
     }
 
     await prisma.component.delete({ where: { id } });
+
+    await writeAuditLog({
+      entityType: AuditEntityType.COMPONENT,
+      entityId: existing.id,
+      entityCode: existing.code,
+      entityName: existing.name,
+      action: AuditAction.DELETE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, dataType: existing.dataType, sourceType: existing.sourceType, periodType: existing.periodType, aggregationType: existing.aggregationType, hasBreakdown: existing.hasBreakdown, filterByLevel: existing.filterByLevel, parentId: existing.parentId },
+      req,
+    });
 
     res.json(successResponse(null, "Component deleted successfully"));
   } catch (error) {

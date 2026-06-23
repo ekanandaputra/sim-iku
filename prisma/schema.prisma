@@ -428,3 +428,36 @@ model BidangComponent {
   @@unique([bidangId, componentId])
   @@map("bidang_components")
 }
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum AuditEntityType {
+  IKU
+  COMPONENT
+  COMPONENT_REALIZATION
+  IKU_RESULT
+}
+
+model AuditLog {
+  id         String          @id @default(uuid()) @db.VarChar(36)
+  entityType AuditEntityType @map("entity_type")
+  entityId   String          @map("entity_id") @db.VarChar(36)
+  entityCode String?         @map("entity_code") @db.VarChar(100)
+  entityName String?         @map("entity_name") @db.VarChar(255)
+  action     AuditAction
+  userId     String?         @map("user_id") @db.VarChar(36)
+  oldValues  Json?           @map("old_values")
+  newValues  Json?           @map("new_values")
+  ipAddress  String?         @map("ip_address") @db.VarChar(45)
+  userAgent  String?         @map("user_agent") @db.Text
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

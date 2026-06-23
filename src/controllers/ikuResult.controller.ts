@@ -3,6 +3,8 @@ import { Prisma } from "../generated/prisma/client";
 import { IkuResultType } from "../generated/prisma/enums";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { writeAuditLog } from "../utils/auditLog";
+import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 
 type IkuResultParams = { id: string };
 
@@ -161,6 +163,17 @@ export const createIkuResult = async (
       include: { iku: true },
     });
 
+    await writeAuditLog({
+      entityType: AuditEntityType.IKU_RESULT,
+      entityId: record.idResult,
+      entityCode: record.iku?.code,
+      entityName: record.iku?.name,
+      action: AuditAction.CREATE,
+      userId: (req as any).user?.id ?? null,
+      newValues: { idIku, month, year, resultType: resolvedResultType, calculatedValue, textValue, quarter },
+      req,
+    });
+
     res.status(201).json(successResponse(record, "IKU result created or updated successfully"));
   } catch (error) {
     next(error);
@@ -204,6 +217,18 @@ export const updateIkuResult = async (
       },
     });
 
+    await writeAuditLog({
+      entityType: AuditEntityType.IKU_RESULT,
+      entityId: updated.idResult,
+      entityCode: existing.idIku,
+      entityName: null,
+      action: AuditAction.UPDATE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { calculatedValue: existing.calculatedValue, textValue: existing.textValue, documentIds: existing.documentIds, metadata: existing.metadata, formulaVersion: existing.formulaVersion },
+      newValues: { calculatedValue: updated.calculatedValue, textValue: updated.textValue, documentIds: updated.documentIds, metadata: updated.metadata, formulaVersion: updated.formulaVersion },
+      req,
+    });
+
     res.json(successResponse(updated, "IKU result updated successfully"));
   } catch (error) {
     next(error);
@@ -222,6 +247,18 @@ export const deleteIkuResult = async (
       return res.status(404).json(errorResponse("IKU result not found"));
     }
     await prisma.ikuResult.delete({ where: { idResult: id } });
+
+    await writeAuditLog({
+      entityType: AuditEntityType.IKU_RESULT,
+      entityId: id,
+      entityCode: existing.idIku,
+      entityName: null,
+      action: AuditAction.DELETE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { idIku: existing.idIku, month: existing.month, year: existing.year, resultType: existing.resultType, calculatedValue: existing.calculatedValue },
+      req,
+    });
+
     res.json(successResponse(null, "IKU result deleted successfully"));
   } catch (error) {
     next(error);

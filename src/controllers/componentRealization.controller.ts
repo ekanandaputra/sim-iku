@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { evaluateFormula, ComponentValues, getFormulaRequiredComponentCodes } from "../utils/formula";
 import { IkuResultType } from "../generated/prisma/enums";
+import { writeAuditLog } from "../utils/auditLog";
+import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 
 type RealizationParams = { id: string };
 
@@ -506,6 +508,17 @@ export const createComponentRealization = async (
 
     await calculateParentComponentSum(idComponent, validatedMonth === 0 ? null : validatedMonth, year);
 
+    await writeAuditLog({
+      entityType: AuditEntityType.COMPONENT_REALIZATION,
+      entityId: record.idRealization,
+      entityCode: component.code,
+      entityName: component.name,
+      action: AuditAction.CREATE,
+      userId: (req as any).user?.id ?? null,
+      newValues: { idComponent, month: validatedMonth, year, value: record.value },
+      req,
+    });
+
     res.status(201).json(successResponse(record, "Component realization created or updated successfully"));
   } catch (error) {
     next(error);
@@ -575,6 +588,18 @@ export const updateComponentRealization = async (
 
     await calculateParentComponentSum(updated.idComponent, updated.month ?? null, updated.year);
 
+    await writeAuditLog({
+      entityType: AuditEntityType.COMPONENT_REALIZATION,
+      entityId: updated.idRealization,
+      entityCode: existing.component.code,
+      entityName: existing.component.name,
+      action: AuditAction.UPDATE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { month: existing.month, year: existing.year, value: existing.value },
+      newValues: { month: updated.month, year: updated.year, value: updated.value },
+      req,
+    });
+
     res.json(successResponse(updated, "Component realization updated successfully"));
   } catch (error) {
     next(error);
@@ -588,9 +613,24 @@ export const deleteComponentRealization = async (
 ) => {
   try {
     const id = req.params.id;
-    const existing = await prisma.componentRealization.findUnique({ where: { idRealization: id } });
+    const existing = await prisma.componentRealization.findUnique({
+      where: { idRealization: id },
+      include: { component: { select: { code: true, name: true } } },
+    });
     if (!existing) return res.status(404).json(errorResponse("Component realization not found"));
     await prisma.componentRealization.delete({ where: { idRealization: id } });
+
+    await writeAuditLog({
+      entityType: AuditEntityType.COMPONENT_REALIZATION,
+      entityId: id,
+      entityCode: existing.component.code,
+      entityName: existing.component.name,
+      action: AuditAction.DELETE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { idComponent: existing.idComponent, month: existing.month, year: existing.year, value: existing.value },
+      req,
+    });
+
     res.json(successResponse(null, "Component realization deleted successfully"));
   } catch (error) {
     next(error);

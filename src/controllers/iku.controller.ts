@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
+import { writeAuditLog } from "../utils/auditLog";
+import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 
 type IkuParams = {
   id: string;
@@ -125,6 +127,17 @@ export const createIku = async (
       data: ikuData,
     });
 
+    await writeAuditLog({
+      entityType: AuditEntityType.IKU,
+      entityId: iku.id,
+      entityCode: iku.code,
+      entityName: iku.name,
+      action: AuditAction.CREATE,
+      userId: (req as any).user?.id ?? null,
+      newValues: { code: iku.code, name: iku.name, description: iku.description, isDirectInput: iku.isDirectInput, unit: iku.unit },
+      req,
+    });
+
     res.status(201).json(successResponse(iku, "IKU created successfully"));
   } catch (error) {
     next(error);
@@ -179,6 +192,18 @@ export const updateIku = async (
     const updated = await prisma.iKU.update({
       where: { id },
       data: updateData,
+    });
+
+    await writeAuditLog({
+      entityType: AuditEntityType.IKU,
+      entityId: updated.id,
+      entityCode: updated.code,
+      entityName: updated.name,
+      action: AuditAction.UPDATE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit },
+      newValues: { code: updated.code, name: updated.name, description: updated.description, isDirectInput: updated.isDirectInput, unit: updated.unit },
+      req,
     });
 
     res.json(successResponse(updated, "IKU updated successfully"));
@@ -373,6 +398,17 @@ export const deleteIku = async (
 
     await prisma.iKU.delete({
       where: { id },
+    });
+
+    await writeAuditLog({
+      entityType: AuditEntityType.IKU,
+      entityId: existing.id,
+      entityCode: existing.code,
+      entityName: existing.name,
+      action: AuditAction.DELETE,
+      userId: (req as any).user?.id ?? null,
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit },
+      req,
     });
 
     res.json(successResponse(null, "IKU deleted successfully"));

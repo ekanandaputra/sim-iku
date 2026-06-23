@@ -5,6 +5,8 @@ import { successResponse, errorResponse } from "../utils/response";
 import { calculateIkuResultsForComponentRealization, calculateParentComponentSum } from "./componentRealization.controller";
 import { BulkSaveRealizationDto } from "../dtos/realization.dto";
 import { filterProdisByComponent } from "../utils/prodiFilter";
+import { writeAuditLog } from "../utils/auditLog";
+import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 
 const YEARS_RANGE = 6;
 const MONTH_NAMES = [
@@ -771,6 +773,17 @@ export const bulkSaveRealization = async (
         // Cascade naik ke parent (jika ada)
         await calculateParentComponentSum(id, item.month ?? null, year);
 
+        await writeAuditLog({
+          entityType: AuditEntityType.COMPONENT_REALIZATION,
+          entityId: record.idRealization,
+          entityCode: component.code,
+          entityName: component.name,
+          action: AuditAction.CREATE,
+          userId: (req as any).user?.id ?? null,
+          newValues: { idComponent: id, month: item.month, year, value: item.value },
+          req,
+        });
+
         results.push(record);
       }
 
@@ -817,6 +830,17 @@ export const bulkSaveRealization = async (
           },
         });
         results.push(record);
+
+        await writeAuditLog({
+          entityType: AuditEntityType.IKU_RESULT,
+          entityId: record.idResult,
+          entityCode: iku.code,
+          entityName: iku.name,
+          action: AuditAction.CREATE,
+          userId: (req as any).user?.id ?? null,
+          newValues: { idIku: id, month: item.month, year, value: item.value, metadata: item.metadata },
+          req,
+        });
       }
 
       return res.json(successResponse(results, "Bulk save IKU results successful"));

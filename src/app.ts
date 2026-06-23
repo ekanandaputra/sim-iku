@@ -22,6 +22,7 @@ import componentUserRouter from "./routes/componentUser.route";
 import ikuUserRouter from "./routes/ikuUser.route";
 import prodiRouter from "./routes/prodi.route";
 import bidangRouter from "./routes/bidang.route";
+import auditLogRouter from "./routes/auditLog.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -54,6 +55,7 @@ app.use("/api/component-users", componentUserRouter);
 app.use("/api/iku-users", ikuUserRouter);
 app.use("/api/prodi", prodiRouter);
 app.use("/api/bidang", bidangRouter);
+app.use("/api/audit-logs", auditLogRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
