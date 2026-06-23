@@ -32,6 +32,7 @@ const swaggerDefinition = {
     { name: "ComponentBreakdown", description: "Breakdown realisasi komponen per prodi (nilai total = sum breakdown)" },
     { name: "Import", description: "Import master data (IKU, IKP, Mapping) from Excel" },
     { name: "Bidang", description: "Manajemen Bidang (unit kerja) — pengelompokan user ke IKU dan IKP/Komponen" },
+    { name: "AuditLog", description: "Audit log — riwayat perubahan data IKU, IKP, Realisasi Komponen, dan IKU Result" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -89,6 +90,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          aggregationType: { type: "string", enum: ["SUM", "LAST"], default: "SUM", description: "Cara agregasi nilai komponen: SUM (jumlahkan) atau LAST (nilai bulan terakhir)" },
           hasBreakdown: { type: "boolean", default: false, description: "Jika true, nilai realisasi dihitung otomatis dari breakdown per prodi" },
           parentId: { type: "string", format: "uuid", nullable: true, description: "ID parent component (null jika root)" },
           parent: {
@@ -130,6 +132,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          aggregationType: { type: "string", enum: ["SUM", "LAST"], default: "SUM", description: "Cara agregasi nilai komponen" },
           hasBreakdown: { type: "boolean", default: false },
           parentId: { type: "string", format: "uuid", nullable: true, description: "Optional: jadikan komponen ini sub-komponen dari parent yang ditentukan" },
           tagIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Array of Tag IDs to assign" },
@@ -145,6 +148,7 @@ const swaggerDefinition = {
           dataType: { type: "string", enum: ["number", "percentage", "integer"] },
           sourceType: { type: "string", enum: ["database", "api", "manual"] },
           periodType: { type: "string", enum: ["monthly", "quarter", "semester", "yearly"] },
+          aggregationType: { type: "string", enum: ["SUM", "LAST"], description: "Cara agregasi nilai komponen" },
           hasBreakdown: { type: "boolean" },
           parentId: { type: "string", format: "uuid", nullable: true, description: "Set null untuk jadikan root; omit untuk tidak mengubah; set string UUID untuk set parent baru" },
         },
@@ -1082,6 +1086,58 @@ const swaggerDefinition = {
             type: "array",
             items: { type: "string", format: "uuid" },
             example: ["component-uuid-1", "component-uuid-2"],
+          },
+        },
+      },
+
+      // ─── AuditLog Schemas ──────────────────────────────────────────────────
+      AuditLog: {
+        type: "object",
+        description: "Rekam jejak perubahan data (IKU, IKP/Component, Realisasi Komponen, IKU Result)",
+        properties: {
+          id: { type: "string", format: "uuid", description: "ID audit log" },
+          entityType: {
+            type: "string",
+            enum: ["IKU", "COMPONENT", "COMPONENT_REALIZATION", "IKU_RESULT"],
+            description: "Jenis entitas yang diubah",
+          },
+          entityId: { type: "string", format: "uuid", description: "ID entitas yang diubah" },
+          entityCode: { type: "string", nullable: true, description: "Kode entitas (code IKU / IKP) saat aksi terjadi" },
+          entityName: { type: "string", nullable: true, description: "Nama entitas saat aksi terjadi" },
+          action: {
+            type: "string",
+            enum: ["CREATE", "UPDATE", "DELETE"],
+            description: "Jenis aksi yang dilakukan",
+          },
+          userId: { type: "string", nullable: true, description: "ID user pelaku aksi (null jika tidak terautentikasi)" },
+          oldValues: {
+            type: "object",
+            nullable: true,
+            description: "Snapshot nilai field sebelum UPDATE/DELETE",
+            additionalProperties: true,
+          },
+          newValues: {
+            type: "object",
+            nullable: true,
+            description: "Snapshot nilai field setelah CREATE/UPDATE",
+            additionalProperties: true,
+          },
+          ipAddress: { type: "string", nullable: true, description: "IP address client" },
+          userAgent: { type: "string", nullable: true, description: "User-agent browser/client" },
+          createdAt: { type: "string", format: "date-time", description: "Waktu aksi terjadi" },
+        },
+        required: ["id", "entityType", "entityId", "action", "createdAt"],
+      },
+      AuditLogListResponse: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/AuditLog" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
           },
         },
       },
@@ -4343,6 +4399,111 @@ const swaggerDefinition = {
     },
   },
 };
+
+// ─── Append AuditLog paths ────────────────────────────────────────────────────
+(swaggerDefinition as any).paths["/api/audit-logs"] = {
+  get: {
+    tags: ["AuditLog"],
+    summary: "List audit logs",
+    description:
+      "Mengembalikan daftar audit log dengan paginasi dan filter.\n\n" +
+      "Mencatat semua aksi CREATE, UPDATE, DELETE pada entitas: IKU, Component (IKP), ComponentRealization, dan IkuResult.",
+    parameters: [
+      {
+        in: "query",
+        name: "entityType",
+        schema: { type: "string", enum: ["IKU", "COMPONENT", "COMPONENT_REALIZATION", "IKU_RESULT"] },
+        description: "Filter berdasarkan jenis entitas",
+      },
+      {
+        in: "query",
+        name: "entityId",
+        schema: { type: "string", format: "uuid" },
+        description: "Filter berdasarkan ID entitas tertentu",
+      },
+      {
+        in: "query",
+        name: "action",
+        schema: { type: "string", enum: ["CREATE", "UPDATE", "DELETE"] },
+        description: "Filter berdasarkan jenis aksi",
+      },
+      {
+        in: "query",
+        name: "userId",
+        schema: { type: "string" },
+        description: "Filter berdasarkan ID user pelaku aksi",
+      },
+      {
+        in: "query",
+        name: "startDate",
+        schema: { type: "string", format: "date", example: "2026-01-01" },
+        description: "Filter log mulai tanggal ini (inclusive)",
+      },
+      {
+        in: "query",
+        name: "endDate",
+        schema: { type: "string", format: "date", example: "2026-12-31" },
+        description: "Filter log sampai tanggal ini (inclusive, sampai akhir hari)",
+      },
+      {
+        in: "query",
+        name: "page",
+        schema: { type: "integer", default: 1 },
+        description: "Halaman",
+      },
+      {
+        in: "query",
+        name: "limit",
+        schema: { type: "integer", default: 20, maximum: 100 },
+        description: "Jumlah data per halaman",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "List audit logs berhasil",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/AuditLogListResponse" },
+          },
+        },
+      },
+    },
+  },
+};
+
+(swaggerDefinition as any).paths["/api/audit-logs/{id}"] = {
+  get: {
+    tags: ["AuditLog"],
+    summary: "Get audit log by ID",
+    parameters: [
+      {
+        in: "path",
+        name: "id",
+        required: true,
+        schema: { type: "string", format: "uuid" },
+        description: "ID audit log",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Detail audit log",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                data: { $ref: "#/components/schemas/AuditLog" },
+              },
+            },
+          },
+        },
+      },
+      "404": { description: "Audit log not found" },
+    },
+  },
+};
+
 
 export const swaggerSpec = swaggerJSDoc({
   definition: swaggerDefinition,
