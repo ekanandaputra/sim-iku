@@ -1,5 +1,5 @@
 import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, Length } from "class-validator";
-import { ComponentDataType, ComponentSourceType, ComponentPeriodType } from "../generated/prisma/enums";
+import { ComponentDataType, ComponentSourceType, ComponentPeriodType, ComponentAggregationType } from "../generated/prisma/enums";
 
 export class ComponentCreateDto {
   @IsNotEmpty({ message: "Code is required" })
@@ -28,6 +28,10 @@ export class ComponentCreateDto {
   @IsOptional()
   @IsEnum(ComponentPeriodType, { message: "Period type must be one of: monthly, quarter, semester, yearly" })
   periodType?: ComponentPeriodType;
+
+  @IsOptional()
+  @IsEnum(ComponentAggregationType, { message: "Aggregation type must be one of: SUM, LAST" })
+  aggregationType?: ComponentAggregationType;
 
   @IsOptional()
   @IsBoolean({ message: "hasBreakdown must be a boolean" })
@@ -74,6 +78,10 @@ export class ComponentUpdateDto {
   @IsOptional()
   @IsEnum(ComponentPeriodType, { message: "Period type must be one of: monthly, quarter, semester, yearly" })
   periodType?: ComponentPeriodType;
+
+  @IsOptional()
+  @IsEnum(ComponentAggregationType, { message: "Aggregation type must be one of: SUM, LAST" })
+  aggregationType?: ComponentAggregationType;
 
   @IsOptional()
   @IsBoolean({ message: "hasBreakdown must be a boolean" })

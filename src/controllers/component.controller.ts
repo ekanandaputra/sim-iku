@@ -180,7 +180,7 @@ export const createComponent = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, dataType, sourceType, periodType, tagIds, parentId, hasBreakdown, filterByLevel } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, aggregationType, tagIds, parentId, hasBreakdown, filterByLevel } = req.body;
 
     // Cek kode unik
     const existing = await prisma.component.findUnique({ where: { code } });
@@ -224,6 +224,7 @@ export const createComponent = async (
 
     if (dataType !== undefined) componentData.dataType = dataType;
     if (sourceType !== undefined) componentData.sourceType = sourceType;
+    if (aggregationType !== undefined) componentData.aggregationType = aggregationType;
 
     const component = await prisma.component.create({ data: componentData });
 
@@ -262,7 +263,7 @@ export const updateComponent = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, dataType, sourceType, periodType, parentId, hasBreakdown, filterByLevel } = req.body;
+    const { code, name, description, dataType, sourceType, periodType, aggregationType, parentId, hasBreakdown, filterByLevel } = req.body;
 
     const existing = await prisma.component.findUnique({
       where: { id },
@@ -320,6 +321,7 @@ export const updateComponent = async (
 
     if (dataType !== undefined) updateData.dataType = dataType;
     if (sourceType !== undefined) updateData.sourceType = sourceType;
+    if (aggregationType !== undefined) updateData.aggregationType = aggregationType;
     if (hasBreakdown !== undefined) updateData.hasBreakdown = hasBreakdown;
     if (filterByLevel !== undefined) updateData.filterByLevel = filterByLevel;
 

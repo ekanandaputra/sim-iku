@@ -32,11 +32,14 @@ function getQuarterForMonth(month: number): number {
 /**
  * Helper: evaluasi formula dengan aggregate komponen dari bulan-bulan tertentu.
  * Mengembalikan null jika tidak ada data sama sekali.
+ * Mendukung aggregationType:
+ *   - SUM  → jumlahkan semua realisasi dalam rentang bulan
+ *   - LAST → ambil realisasi dengan bulan tertinggi (data terbaru)
  */
 async function evaluateFormulaForMonths(
   formula: { id: string; version: number; ikuId: string },
   componentIds: string[],
-  codeToInfo: Map<string, { id: string; code: string; periodType: string }>,
+  codeToInfo: Map<string, { id: string; code: string; periodType: string; aggregationType: string }>,
   formulaCodes: string[],
   year: number,
   monthsFilter: number[] | null // null = 1-12
@@ -67,12 +70,19 @@ async function evaluateFormulaForMonths(
         year,
         ...(compMonthsFilter ? { month: { in: compMonthsFilter } } : {}),
       },
+      orderBy: { month: "desc" },
     });
 
     if (realizations.length > 0) hasAnyData = true;
 
-    const sum = realizations.reduce((acc, r) => acc + Number(r.value), 0);
-    componentValues[code] = sum;
+    // Agregasi berdasarkan aggregationType
+    if (info.aggregationType === "LAST") {
+      // Ambil nilai dari record dengan month tertinggi
+      componentValues[code] = realizations.length > 0 ? Number(realizations[0].value) : 0;
+    } else {
+      // Default SUM
+      componentValues[code] = realizations.reduce((acc, r) => acc + Number(r.value), 0);
+    }
   }
 
   if (!hasAnyData) return null;
@@ -145,14 +155,15 @@ export async function calculateIkuResultsForComponentRealization(
     if (formulaCodes.length === 0) continue;
 
     const components = await prisma.component.findMany({ where: { code: { in: formulaCodes } } });
-    const codeToInfo = new Map<string, { id: string; code: string; periodType: string }>();
-    components.forEach(c => codeToInfo.set(c.code, { id: c.id, code: c.code, periodType: c.periodType }));
+    const codeToInfo = new Map<string, { id: string; code: string; periodType: string; aggregationType: string }>();
+    components.forEach(c => codeToInfo.set(c.code, { id: c.id, code: c.code, periodType: c.periodType, aggregationType: c.aggregationType }));
     const componentIds = components.map(c => c.id);
 
     // ── 1. MONTHLY ──────────────────────────────────────────────────────────
     {
       const monthRealizations = await prisma.componentRealization.findMany({
         where: { idComponent: { in: componentIds }, year, month },
+        orderBy: { month: "desc" },
       });
 
       const componentValues: ComponentValues = {};
@@ -167,7 +178,16 @@ export async function calculateIkuResultsForComponentRealization(
           : monthRealizations.filter(r => r.idComponent === info.id);
 
         if (selected.length) hasData = true;
-        componentValues[code] = selected.reduce((s, r) => s + Number(r.value), 0);
+
+        // Agregasi berdasarkan aggregationType
+        if (info.aggregationType === "LAST") {
+          // Untuk monthly: ada 1 record per bulan, ambil nilai-nya langsung
+          // (jika periodType=yearly dan LAST, ambil record pertama setelah sort)
+          const sortedSelected = [...selected].sort((a, b) => (b.month ?? 0) - (a.month ?? 0));
+          componentValues[code] = sortedSelected.length > 0 ? Number(sortedSelected[0].value) : 0;
+        } else {
+          componentValues[code] = selected.reduce((s, r) => s + Number(r.value), 0);
+        }
       }
 
       if (hasData) {
