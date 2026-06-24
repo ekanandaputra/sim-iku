@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse } from "../utils/response";
+import { fetchAuthUsers } from "../utils/authService";
 
 export const getPics = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -17,11 +18,10 @@ export const getPics = async (req: Request, res: Response, next: NextFunction) =
       ...compUsersList.map(u => u.userId)
     ]));
 
+    // Fetch all user details from auth service to apply name search and populate response
+    const userMap = await fetchAuthUsers(picUserIds);
+
     if (search) {
-      const matchedUsers = await prisma.user.findMany({
-        where: { name: { contains: search } },
-        select: { id: true },
-      });
       const matchedIkuUsers = await prisma.ikuUser.findMany({
         where: { iku: { name: { contains: search } } },
         select: { userId: true },
@@ -32,10 +32,16 @@ export const getPics = async (req: Request, res: Response, next: NextFunction) =
       });
 
       const searchMatchedUserIds = new Set([
-        ...matchedUsers.map(u => u.id),
         ...matchedIkuUsers.map(u => u.userId),
         ...matchedComponentUsers.map(u => u.userId),
       ]);
+
+      // Add users whose name matches the search term
+      for (const [userId, user] of userMap.entries()) {
+        if (user && user.name && user.name.toLowerCase().includes(search.toLowerCase())) {
+          searchMatchedUserIds.add(userId);
+        }
+      }
 
       picUserIds = picUserIds.filter(id => searchMatchedUserIds.has(id));
     }
@@ -44,15 +50,6 @@ export const getPics = async (req: Request, res: Response, next: NextFunction) =
     const totalPages = Math.ceil(total / limit);
 
     const paginatedUserIds = picUserIds.slice(skip, skip + limit);
-
-    const users = await prisma.user.findMany({
-      where: { id: { in: paginatedUserIds } },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
-    });
 
     const ikuUsers = await prisma.ikuUser.findMany({
       where: { userId: { in: paginatedUserIds } },
@@ -87,7 +84,7 @@ export const getPics = async (req: Request, res: Response, next: NextFunction) =
     });
 
     const pics = paginatedUserIds.map(userId => {
-      const user = users.find(u => u.id === userId);
+      const user = userMap.get(userId);
       if (!user) return null;
 
       const userIkus = ikuUsers
@@ -102,7 +99,9 @@ export const getPics = async (req: Request, res: Response, next: NextFunction) =
         }));
 
       return {
-        ...user,
+        id: user.id,
+        name: user.name,
+        email: user.email,
         ikus: userIkus,
         components: userComponents,
       };
