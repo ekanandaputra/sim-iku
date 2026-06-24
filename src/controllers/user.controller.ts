@@ -4,6 +4,7 @@ import { successResponse } from "../utils/response";
 
 export const getPics = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const search = (req.query.search as string) || "";
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
@@ -11,10 +12,33 @@ export const getPics = async (req: Request, res: Response, next: NextFunction) =
     const ikuUsersList = await prisma.ikuUser.findMany({ select: { userId: true } });
     const compUsersList = await prisma.componentUser.findMany({ select: { userId: true } });
 
-    const picUserIds = Array.from(new Set([
+    let picUserIds = Array.from(new Set([
       ...ikuUsersList.map(u => u.userId),
       ...compUsersList.map(u => u.userId)
     ]));
+
+    if (search) {
+      const matchedUsers = await prisma.user.findMany({
+        where: { name: { contains: search } },
+        select: { id: true },
+      });
+      const matchedIkuUsers = await prisma.ikuUser.findMany({
+        where: { iku: { name: { contains: search } } },
+        select: { userId: true },
+      });
+      const matchedComponentUsers = await prisma.componentUser.findMany({
+        where: { component: { name: { contains: search } } },
+        select: { userId: true },
+      });
+
+      const searchMatchedUserIds = new Set([
+        ...matchedUsers.map(u => u.id),
+        ...matchedIkuUsers.map(u => u.userId),
+        ...matchedComponentUsers.map(u => u.userId),
+      ]);
+
+      picUserIds = picUserIds.filter(id => searchMatchedUserIds.has(id));
+    }
 
     const total = picUserIds.length;
     const totalPages = Math.ceil(total / limit);
