@@ -61,6 +61,7 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
     const payload = verifyJwt(token);
     const userId = payload.userId || payload.user?.id;
     if (userId) {
+      console.log(payload);
       const extractedRoles = payload.roles || payload.user?.roles || [];
       const roleKeys = extractedRoles.map((r: any) => r.key);
       const combinedPermissions = [...(payload.permissions || []), ...roleKeys];
