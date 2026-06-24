@@ -21,16 +21,20 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
 
   try {
     const payload = verifyJwt(token);
-    // validasi payload
-    if (!payload.userId) {
+    const userId = payload.userId || payload.user?.id;
+    if (!userId) {
       return res.status(401).json(errorResponse("Invalid token payload"));
     }
 
+    const extractedRoles = payload.roles || payload.user?.roles || [];
+    const roleKeys = extractedRoles.map((r: any) => r.key);
+    const combinedPermissions = [...(payload.permissions || []), ...roleKeys];
+
     // attach user ke request
     req.user = {
-      id: payload.userId,
-      email: payload.email || "",
-      permissions: payload.permissions || [],
+      id: userId,
+      email: payload.email || payload.user?.email || "",
+      permissions: combinedPermissions,
     };
     next();
   } catch (err) {
@@ -55,11 +59,16 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
 
   try {
     const payload = verifyJwt(token);
-    if (payload.userId) {
+    const userId = payload.userId || payload.user?.id;
+    if (userId) {
+      const extractedRoles = payload.roles || payload.user?.roles || [];
+      const roleKeys = extractedRoles.map((r: any) => r.key);
+      const combinedPermissions = [...(payload.permissions || []), ...roleKeys];
+
       (req as AuthRequest).user = {
-        id: payload.userId,
-        email: payload.email || "",
-        permissions: payload.permissions || [],
+        id: userId,
+        email: payload.email || payload.user?.email || "",
+        permissions: combinedPermissions,
       };
     }
   } catch {
