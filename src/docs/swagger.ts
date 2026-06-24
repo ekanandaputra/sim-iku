@@ -4515,7 +4515,7 @@ const swaggerDefinition = {
         in: "query",
         name: "search",
         schema: { type: "string" },
-        description: "Pencarian berdasarkan nama user, nama IKU, atau nama IKP (Komponen)",
+        description: "Pencarian berdasarkan nama user (langsung dari auth service)",
       },
       {
         in: "query",
