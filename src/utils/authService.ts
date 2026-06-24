@@ -105,17 +105,18 @@ export async function searchAuthUsers(
 
     const body = await response.json() as {
       success: boolean;
-      data: {
-        data: AuthUser[];
-        pagination: { page: number; limit: number; total: number; totalPages: number };
-      };
+      data: AuthUser[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
     };
 
-    if (!body.success || !body.data) {
+    if (!body.success || !body.data || !body.pagination) {
       return null;
     }
 
-    return body.data;
+    return {
+      data: body.data,
+      pagination: body.pagination
+    };
   } catch (err) {
     console.error(`[authService] Error searching users:`, err);
     return null;
