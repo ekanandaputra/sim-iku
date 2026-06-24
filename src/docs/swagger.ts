@@ -33,6 +33,7 @@ const swaggerDefinition = {
     { name: "Import", description: "Import master data (IKU, IKP, Mapping) from Excel" },
     { name: "Bidang", description: "Manajemen Bidang (unit kerja) — pengelompokan user ke IKU dan IKP/Komponen" },
     { name: "AuditLog", description: "Audit log — riwayat perubahan data IKU, IKP, Realisasi Komponen, dan IKU Result" },
+    { name: "Users", description: "User management and PIC endpoints" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -4504,6 +4505,91 @@ const swaggerDefinition = {
   },
 };
 
+
+(swaggerDefinition as any).paths["/api/users/pics"] = {
+  get: {
+    tags: ["Users"],
+    summary: "Get list of PICs (Users with their assigned IKUs and Components) with pagination",
+    parameters: [
+      {
+        in: "query",
+        name: "page",
+        schema: { type: "integer", default: 1 },
+        description: "Halaman",
+      },
+      {
+        in: "query",
+        name: "limit",
+        schema: { type: "integer", default: 10, maximum: 100 },
+        description: "Jumlah data per halaman",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "List of PICs",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: { type: "string", example: "Successfully fetched PICs" },
+                data: {
+                  type: "object",
+                  properties: {
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", format: "uuid" },
+                          name: { type: "string", nullable: true },
+                          email: { type: "string", format: "email" },
+                          ikus: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                id: { type: "string", format: "uuid" },
+                                code: { type: "string" },
+                                name: { type: "string" },
+                              }
+                            }
+                          },
+                          components: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                id: { type: "string", format: "uuid" },
+                                code: { type: "string" },
+                                name: { type: "string" },
+                                prodi: {
+                                  type: "object",
+                                  nullable: true,
+                                  properties: {
+                                    id: { type: "string", format: "uuid" },
+                                    name: { type: "string" },
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    pagination: { $ref: "#/components/schemas/PaginationMeta" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "401": { description: "Unauthorized" }
+    }
+  }
+};
 
 export const swaggerSpec = swaggerJSDoc({
   definition: swaggerDefinition,
