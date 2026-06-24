@@ -45,7 +45,11 @@ export const getRealizationMetrics = async (
     const tagFilter = req.query.tag?.trim();
     const ikuIdFilter = req.query.ikuId?.trim();
 
-    const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    let userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    const permissions = (req as any).user?.permissions || [];
+    if (permissions.includes("admin_sim_iku")) {
+      userFilterEnabled = false;
+    }
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
     console.log(req.user);
     // When user filter is active but token is missing / invalid, return empty result
@@ -256,7 +260,11 @@ export const getRealizationView = async (
     }
     const baseYear = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
     const years = Array.from({ length: YEARS_RANGE }, (_, i) => baseYear - i);
-    const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    let userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    const permissions = (req as any).user?.permissions || [];
+    if (permissions.includes("admin_sim_iku")) {
+      userFilterEnabled = false;
+    }
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
 
     if (type.toLowerCase() === "component") {

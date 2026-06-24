@@ -702,7 +702,11 @@ export const getComponentStructure = async (
     const id = req.params.id;
     const year = req.query.year ? parseInt(req.query.year) : new Date().getFullYear();
     const month = req.query.month ? parseInt(req.query.month) : undefined;
-    const userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    let userFilterEnabled = process.env.ENABLE_USER_FILTER === "true";
+    const permissions = (req as any).user?.permissions || [];
+    if (permissions.includes("admin_sim_iku")) {
+      userFilterEnabled = false;
+    }
     const userId = userFilterEnabled ? (req as any).user?.id : null;
 
     if (isNaN(year)) {

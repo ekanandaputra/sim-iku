@@ -6,6 +6,7 @@ interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
+    permissions?: string[];
   };
 }
 
@@ -29,6 +30,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
     req.user = {
       id: payload.userId,
       email: payload.email || "",
+      permissions: payload.permissions || [],
     };
     next();
   } catch (err) {
@@ -57,6 +59,7 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
       (req as AuthRequest).user = {
         id: payload.userId,
         email: payload.email || "",
+        permissions: payload.permissions || [],
       };
     }
   } catch {

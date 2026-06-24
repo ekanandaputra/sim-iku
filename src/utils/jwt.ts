@@ -6,6 +6,7 @@ const JWT_EXPIRES_IN: SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN as 
 export interface JwtPayload {
   userId: string;
   email?: string;
+  permissions?: string[];
 }
 
 export function signJwt(payload: JwtPayload) {
