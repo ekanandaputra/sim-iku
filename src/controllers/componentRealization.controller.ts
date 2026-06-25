@@ -416,7 +416,7 @@ export const createComponentRealization = async (
   next: NextFunction
 ) => {
   try {
-    const { idComponent, month, year, value, documentIds, prodiId } = req.body;
+    const { idComponent, month, year, value, documentIds, prodiId, narrative } = req.body;
 
     const component = await prisma.component.findUnique({
       where: { id: idComponent },
@@ -460,7 +460,7 @@ export const createComponentRealization = async (
 
       if (!record) {
         record = await prisma.componentRealization.create({
-          data: { idComponent, month: validatedMonth, year, value: 0 },
+          data: { idComponent, month: validatedMonth, year, value: 0, narrative },
         });
       }
 
@@ -477,14 +477,14 @@ export const createComponentRealization = async (
 
       record = await prisma.componentRealization.update({
         where: { idRealization: record.idRealization },
-        data: { value: totalValue },
+        data: { value: totalValue, narrative },
         include: { component: true },
       });
     } else {
       record = await prisma.componentRealization.upsert({
         where: { idComponent_month_year: { idComponent, month: validatedMonth, year } },
-        create: { idComponent, month: validatedMonth, year, value },
-        update: { value },
+        create: { idComponent, month: validatedMonth, year, value, narrative },
+        update: { value, narrative },
         include: { component: true },
       });
     }
@@ -515,7 +515,7 @@ export const createComponentRealization = async (
       entityName: component.name,
       action: AuditAction.CREATE,
       userId: (req as any).user?.id ?? null,
-      newValues: { idComponent, month: validatedMonth, year, value: record.value },
+      newValues: { idComponent, month: validatedMonth, year, value: record.value, narrative: record.narrative },
       req,
     });
 
@@ -532,7 +532,7 @@ export const updateComponentRealization = async (
 ) => {
   try {
     const id = req.params.id;
-    const { value, documentIds, prodiId } = req.body;
+    const { value, documentIds, prodiId, narrative } = req.body;
 
     const existing = await prisma.componentRealization.findUnique({
       where: { idRealization: id },
@@ -564,12 +564,12 @@ export const updateComponentRealization = async (
 
       updated = await prisma.componentRealization.update({
         where: { idRealization: id },
-        data: { value: totalValue },
+        data: { value: totalValue, narrative },
       });
     } else {
       updated = await prisma.componentRealization.update({
         where: { idRealization: id },
-        data: { value },
+        data: { value, narrative },
       });
     }
 
@@ -595,8 +595,8 @@ export const updateComponentRealization = async (
       entityName: existing.component.name,
       action: AuditAction.UPDATE,
       userId: (req as any).user?.id ?? null,
-      oldValues: { month: existing.month, year: existing.year, value: existing.value },
-      newValues: { month: updated.month, year: updated.year, value: updated.value },
+      oldValues: { month: existing.month, year: existing.year, value: existing.value, narrative: existing.narrative },
+      newValues: { month: updated.month, year: updated.year, value: updated.value, narrative: updated.narrative },
       req,
     });
 

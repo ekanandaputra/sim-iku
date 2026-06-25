@@ -180,6 +180,7 @@ model ComponentRealization {
   month         Int?
   year          Int
   value         Decimal  @db.Decimal(18, 4)
+  narrative     String?  @db.Text
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -201,6 +202,7 @@ model IkuResult {
   quarter         Int?          @map("quarter")
   calculatedValue Decimal?      @map("calculated_value") @db.Decimal(18, 4)
   textValue       String?       @map("text_value") @db.Text
+  narrative       String?       @db.Text
   documentIds     Json?         @map("document_ids")
   metadata        Json?         @map("metadata")
   formulaVersion  String?       @map("formula_version")

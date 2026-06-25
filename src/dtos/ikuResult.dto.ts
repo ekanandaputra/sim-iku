@@ -37,6 +37,10 @@ export class IkuResultCreateDto {
   @IsOptional()
   @IsDateString({}, { message: "calculatedAt must be an ISO datetime string" })
   calculatedAt?: string;
+
+  @IsOptional()
+  @IsString({ message: "narrative must be a string" })
+  narrative?: string;
 }
 
 export class IkuResultUpdateDto {
@@ -64,4 +68,8 @@ export class IkuResultUpdateDto {
   @IsOptional()
   @IsDateString({}, { message: "calculatedAt must be an ISO datetime string" })
   calculatedAt?: string;
+
+  @IsOptional()
+  @IsString({ message: "narrative must be a string" })
+  narrative?: string;
 }

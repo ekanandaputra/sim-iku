@@ -125,7 +125,7 @@ export const createIkuResult = async (
   next: NextFunction
 ) => {
   try {
-    const { idIku, month, year, resultType, quarter, calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt } = req.body;
+    const { idIku, month, year, resultType, quarter, calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt, narrative } = req.body;
 
     const validationError = await validateValueByUnit(idIku, calculatedValue, textValue, documentIds, metadata);
     if (validationError) {
@@ -149,6 +149,7 @@ export const createIkuResult = async (
         documentIds: documentIds ?? Prisma.JsonNull,
         metadata: metadata ?? Prisma.JsonNull,
         formulaVersion: formulaVersion ?? null,
+        narrative: narrative ?? null,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : new Date(),
       },
       update: {
@@ -158,6 +159,7 @@ export const createIkuResult = async (
         documentIds: documentIds ?? Prisma.JsonNull,
         metadata: metadata ?? Prisma.JsonNull,
         formulaVersion: formulaVersion ?? undefined,
+        narrative: narrative ?? undefined,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : undefined,
       },
       include: { iku: true },
@@ -170,7 +172,7 @@ export const createIkuResult = async (
       entityName: record.iku?.name,
       action: AuditAction.CREATE,
       userId: (req as any).user?.id ?? null,
-      newValues: { idIku, month, year, resultType: resolvedResultType, calculatedValue, textValue, quarter },
+      newValues: { idIku, month, year, resultType: resolvedResultType, calculatedValue, textValue, quarter, narrative },
       req,
     });
 
@@ -187,7 +189,7 @@ export const updateIkuResult = async (
 ) => {
   try {
     const id = req.params.id;
-    const { calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt } = req.body;
+    const { calculatedValue, textValue, documentIds, metadata, formulaVersion, calculatedAt, narrative } = req.body;
 
     const existing = await prisma.ikuResult.findUnique({ where: { idResult: id } });
     if (!existing) {
@@ -213,6 +215,7 @@ export const updateIkuResult = async (
         documentIds: documentIds !== undefined ? documentIds : existing.documentIds,
         metadata: metadata !== undefined ? metadata : existing.metadata,
         formulaVersion: formulaVersion ?? existing.formulaVersion,
+        narrative: narrative !== undefined ? narrative : existing.narrative,
         calculatedAt: calculatedAt ? new Date(calculatedAt) : existing.calculatedAt,
       },
     });
@@ -224,8 +227,8 @@ export const updateIkuResult = async (
       entityName: null,
       action: AuditAction.UPDATE,
       userId: (req as any).user?.id ?? null,
-      oldValues: { calculatedValue: existing.calculatedValue, textValue: existing.textValue, documentIds: existing.documentIds, metadata: existing.metadata, formulaVersion: existing.formulaVersion },
-      newValues: { calculatedValue: updated.calculatedValue, textValue: updated.textValue, documentIds: updated.documentIds, metadata: updated.metadata, formulaVersion: updated.formulaVersion },
+      oldValues: { calculatedValue: existing.calculatedValue, textValue: existing.textValue, documentIds: existing.documentIds, metadata: existing.metadata, formulaVersion: existing.formulaVersion, narrative: existing.narrative },
+      newValues: { calculatedValue: updated.calculatedValue, textValue: updated.textValue, documentIds: updated.documentIds, metadata: updated.metadata, formulaVersion: updated.formulaVersion, narrative: updated.narrative },
       req,
     });
 

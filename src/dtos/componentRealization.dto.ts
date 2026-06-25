@@ -28,6 +28,10 @@ export class ComponentRealizationCreateDto {
   @IsOptional()
   @IsString()
   prodiId?: string;
+
+  @IsOptional()
+  @IsString()
+  narrative?: string;
 }
 
 export class ComponentRealizationUpdateDto {
@@ -43,4 +47,8 @@ export class ComponentRealizationUpdateDto {
   @IsOptional()
   @IsString()
   prodiId?: string;
+
+  @IsOptional()
+  @IsString()
+  narrative?: string;
 }
