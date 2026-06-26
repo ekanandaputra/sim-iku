@@ -1,0 +1,115 @@
+name: Deploy Backend Service
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on:
+      group: sim-iku
+      labels: [sim-iku]
+    environment: production
+
+    steps:
+      - name: Extract PR number
+        id: pr
+        run: |
+          PR_NUMBER=$(echo "${{ github.event.head_commit.message }}" \
+            | grep -oP '(?<=Merge pull request #)\d+' || echo "")
+          echo "number=${PR_NUMBER:-${GITHUB_SHA:0:7}}" >> $GITHUB_OUTPUT
+
+      - name: Notify - Deployment Started
+        if: vars.TELEGRAM_NOTIFY == 'true'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${{ secrets.TELEGRAM_CHAT_ID }}\",\"text\":\"Deploy started: sim-iku-backend #${{ steps.pr.outputs.number }}\"}"
+
+      - name: Fetch latest code
+        run: |
+          mkdir -p /webdata/sim-iku/backend
+          GIT_CRED='!f() { echo username=x-access-token; echo password=${{ secrets.GITHUB_TOKEN }}; }; f'
+          if [ ! -d "/webdata/sim-iku/backend/.git" ]; then
+            git init /webdata/sim-iku/backend
+            git -C /webdata/sim-iku/backend remote add origin https://github.com/ppns-id/sim-iku-backend.git
+          fi
+          git -C /webdata/sim-iku/backend -c credential.helper="$GIT_CRED" fetch origin master
+
+      - name: Apply latest code
+        run: git -C /webdata/sim-iku/backend reset --hard origin/master
+
+      - name: Gather build info
+        id: build_info
+        run: |
+          RAW=$(git -C /webdata/sim-iku/backend log ${{ github.event.before }}..${{ github.sha }} \
+            --pretty="%h %s - %an" 2>/dev/null)
+          if [ -z "$RAW" ]; then
+            RAW=$(git -C /webdata/sim-iku/backend log -5 --pretty="%h %s - %an")
+          fi
+          CHANGES=$(echo "$RAW" | sed 's/^/• /')
+          {
+            echo "changes<<EOF"
+            echo "$CHANGES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Ensure shared network exists
+        run: docker network create sim-iku-net 2>/dev/null || true
+
+      - name: Build backend image
+        working-directory: /webdata/sim-iku/backend
+        env:
+          CACHE_BUST: ${{ github.sha }}
+        run: docker compose -f docker-compose.prod.yml build backend
+
+      - name: Run database migrations
+        working-directory: /webdata/sim-iku/backend
+        run: docker compose -f docker-compose.prod.yml run --rm backend npx prisma migrate deploy
+
+      - name: Deploy backend service
+        working-directory: /webdata/sim-iku/backend
+        run: docker compose -f docker-compose.prod.yml up -d --no-deps backend
+
+      - name: Clean up old Docker images
+        run: docker image prune -f
+
+      - name: Verify deployment
+        working-directory: /webdata/sim-iku/backend
+        run: |
+          sleep 10
+          docker compose -f docker-compose.prod.yml ps
+
+      - name: Notify - Deployment Succeeded
+        if: success() && vars.TELEGRAM_NOTIFY == 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          CHANGES: ${{ steps.build_info.outputs.changes }}
+        run: |
+          {
+            echo "sim-iku-backend #${PR_NUMBER} deployed"
+            echo ""
+            echo "Changes:"
+            echo "${CHANGES}"
+          } | jq -Rs "{chat_id:\"${{ secrets.TELEGRAM_CHAT_ID }}\",text:.}" \
+            | curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+                -H "Content-Type: application/json" \
+                -d @-
+
+      - name: Notify - Deployment Failed
+        if: failure() && vars.TELEGRAM_NOTIFY == 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          CHANGES: ${{ steps.build_info.outputs.changes }}
+        run: |
+          {
+            echo "sim-iku-backend #${PR_NUMBER} FAILED"
+            echo ""
+            echo "Changes:"
+            echo "${CHANGES}"
+          } | jq -Rs "{chat_id:\"${{ secrets.TELEGRAM_CHAT_ID }}\",text:.}" \
+            | curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+                -H "Content-Type: application/json" \
+                -d @-
