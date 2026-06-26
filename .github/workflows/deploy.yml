@@ -33,11 +33,10 @@ jobs:
           mkdir -p /webdata/sim-iku/backend
           GIT_CRED='!f() { echo username=x-access-token; echo password=${{ secrets.GITHUB_TOKEN }}; }; f'
           if [ ! -d "/webdata/sim-iku/backend/.git" ]; then
-            git -c credential.helper="$GIT_CRED" \
-              clone https://github.com/ppns-id/sim-iku-backend.git /webdata/sim-iku/backend
-          else
-            git -C /webdata/sim-iku/backend -c credential.helper="$GIT_CRED" fetch origin master
+            git init /webdata/sim-iku/backend
+            git -C /webdata/sim-iku/backend remote add origin https://github.com/ppns-id/sim-iku-backend.git
           fi
+          git -C /webdata/sim-iku/backend -c credential.helper="$GIT_CRED" fetch origin master
 
       - name: Apply latest code
         run: git -C /webdata/sim-iku/backend reset --hard origin/master
