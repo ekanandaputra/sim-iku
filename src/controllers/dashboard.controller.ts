@@ -28,7 +28,6 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
     }
 
     const ikus = await prisma.iKU.findMany({ 
-      where: { unit: { in: ["percentage", "number"] } },
       orderBy: { code: "asc" } 
     });
 
@@ -66,12 +65,37 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         return formatDecimal(row?.calculatedValue);
       };
 
+      // Helper for text/file table data
+      const getQuarterTextRealization = (quarter: number) => {
+        const qRow = ikuResults.find(
+          r => r.resultType === IkuResultType.quarterly && r.month === quarter
+        );
+        if (qRow) {
+          if (iku.unit === "file") return qRow.documentIds ? "File Terlampir" : "-";
+          return qRow.textValue || "-";
+        }
+
+        const monthsInQuarter = quarterMonths[quarter];
+        for (let i = monthsInQuarter.length - 1; i >= 0; i--) {
+          const mRow = ikuResults.find(
+            r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]
+          );
+          if (mRow) {
+            if (iku.unit === "file") return mRow.documentIds ? "File Terlampir" : "-";
+            return mRow.textValue || "-";
+          }
+        }
+        return "-";
+      };
+
+      const isChart = ["percentage", "number"].includes(iku.unit);
+
       return {
         ikuId: iku.id,
         ikuCode: iku.code,
         ikuName: iku.name,
         unit: iku.unit,
-        chartData: [
+        chartData: isChart ? [
           {
             period: "Q1",
             target: formatDecimal(target?.targetQ1),
@@ -97,7 +121,13 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
             target: formatDecimal(target?.targetYear),
             realization: getYearlyRealization(),
           },
-        ],
+        ] : [],
+        tableData: !isChart ? [
+          { period: "Q1", realization: getQuarterTextRealization(1) },
+          { period: "Q2", realization: getQuarterTextRealization(2) },
+          { period: "Q3", realization: getQuarterTextRealization(3) },
+          { period: "Q4", realization: getQuarterTextRealization(4) },
+        ] : []
       };
     });
 
