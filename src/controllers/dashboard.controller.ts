@@ -3,6 +3,12 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { IkuResultType } from "../generated/prisma/enums";
 
+const formatDecimal = (val: any): number | null => {
+  if (val == null) return null;
+  const num = Number(val);
+  return isNaN(num) ? null : Number(num.toFixed(2));
+};
+
 const quarterMonths: Record<number, number[]> = {
   1: [1, 2, 3],
   2: [4, 5, 6],
@@ -48,13 +54,13 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         const row = ikuResults.find(
           r => r.resultType === IkuResultType.quarterly && r.month === quarter
         );
-        return row?.calculatedValue != null ? Number(row.calculatedValue) : null;
+        return formatDecimal(row?.calculatedValue);
       };
 
       // Yearly: resultType = yearly, month = 0
       const getYearlyRealization = (): number | null => {
         const row = ikuResults.find(r => r.resultType === IkuResultType.yearly);
-        return row?.calculatedValue != null ? Number(row.calculatedValue) : null;
+        return formatDecimal(row?.calculatedValue);
       };
 
       return {
@@ -64,27 +70,27 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         chartData: [
           {
             period: "Q1",
-            target: target && target.targetQ1 !== null ? Number(target.targetQ1) : null,
+            target: formatDecimal(target?.targetQ1),
             realization: getQuarterRealization(1),
           },
           {
             period: "Q2",
-            target: target && target.targetQ2 !== null ? Number(target.targetQ2) : null,
+            target: formatDecimal(target?.targetQ2),
             realization: getQuarterRealization(2),
           },
           {
             period: "Q3",
-            target: target && target.targetQ3 !== null ? Number(target.targetQ3) : null,
+            target: formatDecimal(target?.targetQ3),
             realization: getQuarterRealization(3),
           },
           {
             period: "Q4",
-            target: target && target.targetQ4 !== null ? Number(target.targetQ4) : null,
+            target: formatDecimal(target?.targetQ4),
             realization: getQuarterRealization(4),
           },
           {
             period: "Year",
-            target: target && target.targetYear !== null ? Number(target.targetYear) : null,
+            target: formatDecimal(target?.targetYear),
             realization: getYearlyRealization(),
           },
         ],
@@ -154,7 +160,8 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
         }
 
         if (!filtered.length) return null;
-        return filtered.reduce((sum, item) => sum + Number(item.value), 0);
+        const sum = filtered.reduce((sum, item) => sum + Number(item.value), 0);
+        return formatDecimal(sum);
       };
 
       return {
@@ -164,27 +171,27 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
         chartData: [
           {
             period: "Q1",
-            target: target && target.targetQ1 !== null ? Number(target.targetQ1) : null,
+            target: formatDecimal(target?.targetQ1),
             realization: getRealization("quarter", 1),
           },
           {
             period: "Q2",
-            target: target && target.targetQ2 !== null ? Number(target.targetQ2) : null,
+            target: formatDecimal(target?.targetQ2),
             realization: getRealization("quarter", 2),
           },
           {
             period: "Q3",
-            target: target && target.targetQ3 !== null ? Number(target.targetQ3) : null,
+            target: formatDecimal(target?.targetQ3),
             realization: getRealization("quarter", 3),
           },
           {
             period: "Q4",
-            target: target && target.targetQ4 !== null ? Number(target.targetQ4) : null,
+            target: formatDecimal(target?.targetQ4),
             realization: getRealization("quarter", 4),
           },
           {
             period: "Year",
-            target: target && target.targetYear !== null ? Number(target.targetYear) : null,
+            target: formatDecimal(target?.targetYear),
             realization: getRealization("year", 1),
           },
         ],
