@@ -28,7 +28,7 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
     }
 
     const ikus = await prisma.iKU.findMany({ 
-      where: { unit: "percentage" },
+      where: { unit: { in: ["percentage", "number"] } },
       orderBy: { code: "asc" } 
     });
 
