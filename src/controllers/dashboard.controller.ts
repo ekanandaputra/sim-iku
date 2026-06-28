@@ -41,11 +41,23 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
     });
 
     // Kelompokkan per IKU
+    const docIds = new Set<string>();
     const resultsByIku = new Map<string, typeof results>();
     for (const r of results) {
       if (!resultsByIku.has(r.idIku)) resultsByIku.set(r.idIku, []);
       resultsByIku.get(r.idIku)!.push(r);
+      if (r.documentIds && Array.isArray(r.documentIds)) {
+        for (const id of r.documentIds) {
+          if (typeof id === "string") docIds.add(id);
+        }
+      }
     }
+
+    const documents = await prisma.document.findMany({
+      where: { id: { in: Array.from(docIds) } },
+      select: { id: true, url: true, originalName: true }
+    });
+    const docMap = new Map(documents.map(d => [d.id, d]));
 
     const dashboardData = ikus.map(iku => {
       const target = targetMap.get(iku.id);
@@ -66,13 +78,24 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
       };
 
       // Helper for text/file table data
+      const getFiles = (docIds: any) => {
+        if (!Array.isArray(docIds) || docIds.length === 0) return [];
+        return docIds
+          .map(id => docMap.get(id))
+          .filter(Boolean)
+          .map((d: any) => ({ name: d.originalName, url: d.url }));
+      };
+
       const getQuarterTextRealization = (quarter: number) => {
         const qRow = ikuResults.find(
           r => r.resultType === IkuResultType.quarterly && r.month === quarter
         );
         if (qRow) {
-          if (iku.unit === "file") return qRow.documentIds ? "File Terlampir" : "-";
-          return qRow.textValue || "-";
+          if (iku.unit === "file") {
+            const files = getFiles(qRow.documentIds);
+            return { realization: files.length > 0 ? "File Terlampir" : "-", files };
+          }
+          return { realization: qRow.textValue || "-" };
         }
 
         const monthsInQuarter = quarterMonths[quarter];
@@ -81,11 +104,14 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
             r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]
           );
           if (mRow) {
-            if (iku.unit === "file") return mRow.documentIds ? "File Terlampir" : "-";
-            return mRow.textValue || "-";
+            if (iku.unit === "file") {
+              const files = getFiles(mRow.documentIds);
+              return { realization: files.length > 0 ? "File Terlampir" : "-", files };
+            }
+            return { realization: mRow.textValue || "-" };
           }
         }
-        return "-";
+        return { realization: "-" };
       };
 
       const isChart = ["percentage", "number"].includes(iku.unit);
@@ -123,10 +149,10 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
           },
         ] : [],
         tableData: !isChart ? [
-          { period: "Q1", realization: getQuarterTextRealization(1) },
-          { period: "Q2", realization: getQuarterTextRealization(2) },
-          { period: "Q3", realization: getQuarterTextRealization(3) },
-          { period: "Q4", realization: getQuarterTextRealization(4) },
+          { period: "Q1", ...getQuarterTextRealization(1) },
+          { period: "Q2", ...getQuarterTextRealization(2) },
+          { period: "Q3", ...getQuarterTextRealization(3) },
+          { period: "Q4", ...getQuarterTextRealization(4) },
         ] : []
       };
     });
