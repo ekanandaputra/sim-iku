@@ -684,6 +684,7 @@ export const getRealizationView = async (
           name: iku.name,
           description: iku.description,
           unit: iku.unit,
+          periodType: "monthly",
           isDirectInput: iku.isDirectInput,
           isAssigned: isIkuAssigned,
           tags: [],
