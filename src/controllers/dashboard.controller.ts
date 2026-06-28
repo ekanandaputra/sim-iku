@@ -27,7 +27,10 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
       return res.status(400).json(errorResponse("Invalid year format"));
     }
 
-    const ikus = await prisma.iKU.findMany({ orderBy: { code: "asc" } });
+    const ikus = await prisma.iKU.findMany({ 
+      where: { unit: "percentage" },
+      orderBy: { code: "asc" } 
+    });
 
     const targets = await prisma.ikuTarget.findMany({ where: { year } });
     const targetMap = new Map(targets.map(t => [t.ikuId, t]));
@@ -67,6 +70,7 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         ikuId: iku.id,
         ikuCode: iku.code,
         ikuName: iku.name,
+        unit: iku.unit,
         chartData: [
           {
             period: "Q1",
