@@ -38,6 +38,16 @@ function getQuarterForMonth(month: number): number {
  *   - SUM  → jumlahkan semua realisasi dalam rentang bulan
  *   - LAST → ambil realisasi dengan bulan tertinggi (data terbaru)
  */
+type FormulaEvaluationDebugInfo = {
+  result: number;
+  debugInfo: {
+    componentValues: ComponentValues;
+    componentAggregations: Record<string, { aggregationType: string; periodType: string; monthsUsed: number[] | null; realizationCount: number }>;
+    formulaSteps: { sequence: number; expression: string; result: number }[];
+    evaluatedAt: string;
+  };
+};
+
 async function evaluateFormulaForMonths(
   formula: { id: string; version: number; ikuId: string },
   componentIds: string[],
@@ -45,14 +55,16 @@ async function evaluateFormulaForMonths(
   formulaCodes: string[],
   year: number,
   monthsFilter: number[] | null // null = 1-12
-): Promise<number | null> {
+): Promise<FormulaEvaluationDebugInfo | null> {
   const componentValues: ComponentValues = {};
+  const componentAggregations: Record<string, { aggregationType: string; periodType: string; monthsUsed: number[] | null; realizationCount: number }> = {};
   let hasAnyData = false;
 
   for (const code of formulaCodes) {
     const info = codeToInfo.get(code);
     if (!info) {
       componentValues[code] = 0;
+      componentAggregations[code] = { aggregationType: "UNKNOWN", periodType: "UNKNOWN", monthsUsed: null, realizationCount: 0 };
       continue;
     }
 
@@ -77,6 +89,8 @@ async function evaluateFormulaForMonths(
 
     if (realizations.length > 0) hasAnyData = true;
 
+    const monthsUsed = realizations.map(r => r.month).filter((m): m is number => m !== null);
+
     // Agregasi berdasarkan aggregationType
     if (info.aggregationType === "LAST") {
       // Ambil nilai dari record dengan month tertinggi
@@ -85,13 +99,28 @@ async function evaluateFormulaForMonths(
       // Default SUM
       componentValues[code] = realizations.reduce((acc, r) => acc + Number(r.value), 0);
     }
+
+    componentAggregations[code] = {
+      aggregationType: info.aggregationType,
+      periodType: info.periodType,
+      monthsUsed,
+      realizationCount: realizations.length,
+    };
   }
 
   if (!hasAnyData) return null;
 
   try {
     const evaluation = await evaluateFormula(formula.id, componentValues);
-    return evaluation.result;
+    return {
+      result: evaluation.result,
+      debugInfo: {
+        componentValues,
+        componentAggregations,
+        formulaSteps: evaluation.steps,
+        evaluatedAt: new Date().toISOString(),
+      },
+    };
   } catch (err) {
     console.error(`[Formula] Evaluation failed for formula ${formula.id}:`, err);
     return null;
@@ -196,6 +225,11 @@ export async function calculateIkuResultsForComponentRealization(
         console.log("Evaluating formula [monthly]", { formulaId: formula.id, month, componentValues });
         try {
           const evaluation = await evaluateFormula(formula.id, componentValues);
+          const monthlyDebugInfo = {
+            componentValues,
+            formulaSteps: evaluation.steps,
+            evaluatedAt: new Date().toISOString(),
+          };
           await prisma.ikuResult.upsert({
             where: {
               idIku_month_year_resultType: {
@@ -206,11 +240,13 @@ export async function calculateIkuResultsForComponentRealization(
               idIku: formula.ikuId, month, year,
               resultType: IkuResultType.monthly,
               calculatedValue: evaluation.result,
+              debugInfo: monthlyDebugInfo,
               formulaVersion: formula.version.toString(),
               calculatedAt: new Date(),
             },
             update: {
               calculatedValue: evaluation.result,
+              debugInfo: monthlyDebugInfo,
               formulaVersion: formula.version.toString(),
               calculatedAt: new Date(),
             },
@@ -232,7 +268,7 @@ export async function calculateIkuResultsForComponentRealization(
       );
 
       if (result !== null) {
-        console.log("Evaluating formula [quarterly]", { formulaId: formula.id, quarter, result });
+        console.log("Evaluating formula [quarterly]", { formulaId: formula.id, quarter, result: result.result });
         await prisma.ikuResult.upsert({
           where: {
             idIku_month_year_resultType: {
@@ -244,12 +280,14 @@ export async function calculateIkuResultsForComponentRealization(
             idIku: formula.ikuId, month: quarter, year,
             resultType: IkuResultType.quarterly,
             quarter,
-            calculatedValue: result,
+            calculatedValue: result.result,
+            debugInfo: result.debugInfo,
             formulaVersion: formula.version.toString(),
             calculatedAt: new Date(),
           },
           update: {
-            calculatedValue: result,
+            calculatedValue: result.result,
+            debugInfo: result.debugInfo,
             formulaVersion: formula.version.toString(),
             calculatedAt: new Date(),
           },
@@ -264,7 +302,7 @@ export async function calculateIkuResultsForComponentRealization(
       );
 
       if (result !== null) {
-        console.log("Evaluating formula [yearly]", { formulaId: formula.id, result });
+        console.log("Evaluating formula [yearly]", { formulaId: formula.id, result: result.result });
         await prisma.ikuResult.upsert({
           where: {
             idIku_month_year_resultType: {
@@ -274,12 +312,14 @@ export async function calculateIkuResultsForComponentRealization(
           create: {
             idIku: formula.ikuId, month: 0, year,
             resultType: IkuResultType.yearly,
-            calculatedValue: result,
+            calculatedValue: result.result,
+            debugInfo: result.debugInfo,
             formulaVersion: formula.version.toString(),
             calculatedAt: new Date(),
           },
           update: {
-            calculatedValue: result,
+            calculatedValue: result.result,
+            debugInfo: result.debugInfo,
             formulaVersion: formula.version.toString(),
             calculatedAt: new Date(),
           },

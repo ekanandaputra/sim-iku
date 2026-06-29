@@ -693,6 +693,43 @@ const swaggerDefinition = {
             nullable: true,
             description: "JSON metadata for additional data",
           },
+          debugInfo: {
+            type: "object",
+            nullable: true,
+            description: "Debug info for calculation tracing",
+            properties: {
+              componentValues: {
+                type: "object",
+                description: "Input values per component code after aggregation",
+                additionalProperties: { type: "number" },
+              },
+              componentAggregations: {
+                type: "object",
+                description: "Aggregation details per component code",
+                additionalProperties: {
+                  type: "object",
+                  properties: {
+                    aggregationType: { type: "string" },
+                    periodType: { type: "string" },
+                    monthsUsed: { type: "array", items: { type: "integer" }, nullable: true },
+                    realizationCount: { type: "integer" },
+                  },
+                },
+              },
+              formulaSteps: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    sequence: { type: "integer" },
+                    expression: { type: "string" },
+                    result: { type: "number" },
+                  },
+                },
+              },
+              evaluatedAt: { type: "string", format: "date-time" },
+            },
+          },
           narrative: { type: "string", nullable: true, description: "Narrative description" },
           formulaVersion: { type: ["string", "null"] },
           calculatedAt: { type: "string", format: "date-time" },
@@ -739,6 +776,33 @@ const swaggerDefinition = {
           narrative: { type: "string", nullable: true },
           formulaVersion: { type: "string" },
           calculatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      RecalculateResult: {
+        type: "object",
+        description: "Result of recalculating an IKU for a given year",
+        properties: {
+          ikuId: { type: "string", format: "uuid" },
+          year: { type: "integer" },
+          formulaId: { type: "string", format: "uuid" },
+          formulaVersion: { type: "integer" },
+          status: { type: "string", enum: ["completed", "skipped", "error"], description: "Overall status of recalculation" },
+          reason: { type: "string", description: "Reason for skip or error (only present when status is not completed)" },
+          results: {
+            type: "array",
+            description: "Per-period calculation results",
+            items: {
+              type: "object",
+              properties: {
+                resultType: { type: "string", enum: ["monthly", "quarterly", "yearly"] },
+                month: { type: "integer", description: "Month number (1-12 for monthly, 1-4 for quarterly, 0 for yearly)" },
+                quarter: { type: "integer", description: "Quarter number (only for quarterly)" },
+                calculatedValue: { type: "number", nullable: true },
+                status: { type: "string", enum: ["ok", "no_data", "error"], description: "Status of this period's calculation" },
+                error: { type: "string", description: "Error message (only present when status is error)" },
+              },
+            },
+          },
         },
       },
       IkuTarget: {
@@ -3050,6 +3114,83 @@ const swaggerDefinition = {
         summary: "Delete IKU result",
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
         responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
+      },
+    },
+    "/api/iku-results/recalculate-all": {
+      post: {
+        tags: ["IKUResult"],
+        summary: "Recalculate all IKU results",
+        description: "Recalculate IKU results for ALL IKUs that have an active final formula. Processes monthly (1-12), quarterly (Q1-Q4), and yearly results. Each result includes debugInfo with component values, aggregation details, and formula evaluation steps.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "year", in: "query", required: true, schema: { type: "integer" }, description: "The year to recalculate results for" },
+        ],
+        responses: {
+          "200": {
+            description: "Recalculation completed",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    message: { type: "string" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        totalIkus: { type: "integer", description: "Total IKUs processed" },
+                        summary: {
+                          type: "object",
+                          properties: {
+                            success: { type: "integer" },
+                            skipped: { type: "integer" },
+                            errors: { type: "integer" },
+                          },
+                        },
+                        results: {
+                          type: "array",
+                          items: { $ref: "#/components/schemas/RecalculateResult" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Missing or invalid year parameter", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
+      },
+    },
+    "/api/iku-results/recalculate/{ikuId}": {
+      post: {
+        tags: ["IKUResult"],
+        summary: "Recalculate results for a single IKU",
+        description: "Recalculate IKU results for a specific IKU by ID. Processes monthly (1-12), quarterly (Q1-Q4), and yearly results. Each result includes debugInfo with component values, aggregation details, and formula evaluation steps.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "ikuId", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "The IKU ID to recalculate" },
+          { name: "year", in: "query", required: true, schema: { type: "integer" }, description: "The year to recalculate results for" },
+        ],
+        responses: {
+          "200": {
+            description: "Recalculation completed",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    message: { type: "string" },
+                    data: { $ref: "#/components/schemas/RecalculateResult" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Missing or invalid year parameter", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+          "404": { description: "IKU not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } },
+        },
       },
     },
     "/api/iku-targets": {
