@@ -645,9 +645,12 @@ export const getRealizationView = async (
         };
       };
 
-      // IKU is yearly (month 0)
+      // IKU is always monthly
       const buildRows = (byMonth: Map<number, typeof allRealizations[0]>, year: number): object[] => {
-        return [buildRow(byMonth, year, 0, {})];
+        return Array.from({ length: 12 }, (_, i) => {
+          const month = i + 1;
+          return buildRow(byMonth, year, month, { month, monthName: MONTH_NAMES[i] });
+        });
       };
 
       const data = years.map((year) => {
