@@ -636,10 +636,20 @@ export const getRealizationView = async (
 
       const buildRow = (byMonth: Map<number, typeof allRealizations[0]>, year: number, monthKey: number, extra: object) => {
         const r = byMonth.get(monthKey);
+        let value: any = null;
+        if (r) {
+          if (iku.unit === 'text') {
+            value = r.textValue;
+          } else if (iku.unit === 'file') {
+            value = r.documentIds;
+          } else {
+            value = Number(r.calculatedValue);
+          }
+        }
         return {
           id: r?.idResult ?? null,
           year,
-          value: r ? Number(r.calculatedValue) : null,
+          value,
           _action: r ? "PUT" : "POST",
           ...extra,
         };
