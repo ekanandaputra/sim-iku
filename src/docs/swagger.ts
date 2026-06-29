@@ -727,6 +727,33 @@ const swaggerDefinition = {
                   },
                 },
               },
+              allFormulas: {
+                type: "array",
+                description: "Evaluation results of ALL active formulas for this IKU (not just isFinal)",
+                items: {
+                  type: "object",
+                  properties: {
+                    formulaId: { type: "string", format: "uuid" },
+                    formulaName: { type: "string" },
+                    version: { type: "integer" },
+                    isFinal: { type: "boolean" },
+                    finalResultKey: { type: "string" },
+                    result: { type: "number", nullable: true },
+                    error: { type: "string", description: "Error message if evaluation failed" },
+                    steps: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          sequence: { type: "integer" },
+                          expression: { type: "string" },
+                          result: { type: "number" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
               evaluatedAt: { type: "string", format: "date-time" },
             },
           },
