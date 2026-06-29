@@ -38,12 +38,24 @@ function getQuarterForMonth(month: number): number {
  *   - SUM  → jumlahkan semua realisasi dalam rentang bulan
  *   - LAST → ambil realisasi dengan bulan tertinggi (data terbaru)
  */
+type FormulaDebugEntry = {
+  formulaId: string;
+  formulaName: string;
+  version: number;
+  isFinal: boolean;
+  finalResultKey: string;
+  result: number | null;
+  error?: string;
+  steps: { sequence: number; expression: string; result: number }[];
+};
+
 type FormulaEvaluationDebugInfo = {
   result: number;
   debugInfo: {
     componentValues: ComponentValues;
     componentAggregations: Record<string, { aggregationType: string; periodType: string; monthsUsed: number[] | null; realizationCount: number }>;
     formulaSteps: { sequence: number; expression: string; result: number }[];
+    allFormulas: FormulaDebugEntry[];
     evaluatedAt: string;
   };
 };
@@ -112,12 +124,48 @@ async function evaluateFormulaForMonths(
 
   try {
     const evaluation = await evaluateFormula(formula.id, componentValues);
+
+    // Evaluate ALL active formulas for this IKU (not just isFinal)
+    const allActiveFormulas = await prisma.iKUFormula.findMany({
+      where: { ikuId: formula.ikuId, isActive: true },
+      include: { details: { orderBy: { sequence: "asc" } } },
+      orderBy: [{ isFinal: "desc" }, { version: "desc" }],
+    });
+
+    const allFormulas: FormulaDebugEntry[] = [];
+    for (const f of allActiveFormulas) {
+      try {
+        const eval2 = await evaluateFormula(f.id, componentValues);
+        allFormulas.push({
+          formulaId: f.id,
+          formulaName: f.name,
+          version: f.version,
+          isFinal: f.isFinal,
+          finalResultKey: f.finalResultKey,
+          result: eval2.result,
+          steps: eval2.steps,
+        });
+      } catch (err: any) {
+        allFormulas.push({
+          formulaId: f.id,
+          formulaName: f.name,
+          version: f.version,
+          isFinal: f.isFinal,
+          finalResultKey: f.finalResultKey,
+          result: null,
+          error: err.message,
+          steps: [],
+        });
+      }
+    }
+
     return {
       result: evaluation.result,
       debugInfo: {
         componentValues,
         componentAggregations,
         formulaSteps: evaluation.steps,
+        allFormulas,
         evaluatedAt: new Date().toISOString(),
       },
     };
@@ -225,9 +273,45 @@ export async function calculateIkuResultsForComponentRealization(
         console.log("Evaluating formula [monthly]", { formulaId: formula.id, month, componentValues });
         try {
           const evaluation = await evaluateFormula(formula.id, componentValues);
+
+          // Evaluate ALL active formulas for this IKU (not just isFinal)
+          const allActiveFormulas = await prisma.iKUFormula.findMany({
+            where: { ikuId: formula.ikuId, isActive: true },
+            include: { details: { orderBy: { sequence: "asc" } } },
+            orderBy: [{ isFinal: "desc" }, { version: "desc" }],
+          });
+
+          const allFormulas: FormulaDebugEntry[] = [];
+          for (const f of allActiveFormulas) {
+            try {
+              const eval2 = await evaluateFormula(f.id, componentValues);
+              allFormulas.push({
+                formulaId: f.id,
+                formulaName: f.name,
+                version: f.version,
+                isFinal: f.isFinal,
+                finalResultKey: f.finalResultKey,
+                result: eval2.result,
+                steps: eval2.steps,
+              });
+            } catch (err: any) {
+              allFormulas.push({
+                formulaId: f.id,
+                formulaName: f.name,
+                version: f.version,
+                isFinal: f.isFinal,
+                finalResultKey: f.finalResultKey,
+                result: null,
+                error: err.message,
+                steps: [],
+              });
+            }
+          }
+
           const monthlyDebugInfo = {
             componentValues,
             formulaSteps: evaluation.steps,
+            allFormulas,
             evaluatedAt: new Date().toISOString(),
           };
           await prisma.ikuResult.upsert({
