@@ -95,6 +95,10 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
             const files = getFiles(qRow.documentIds);
             return { realization: files.length > 0 ? "File Terlampir" : "-", files };
           }
+          if (iku.unit === "number" || iku.unit === "percentage") {
+            const val = formatDecimal(qRow.calculatedValue);
+            return { realization: val !== null ? val : "-" };
+          }
           return { realization: qRow.textValue || "-" };
         }
 
@@ -107,6 +111,10 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
             if (iku.unit === "file") {
               const files = getFiles(mRow.documentIds);
               return { realization: files.length > 0 ? "File Terlampir" : "-", files };
+            }
+            if (iku.unit === "number" || iku.unit === "percentage") {
+              const val = formatDecimal(mRow.calculatedValue);
+              return { realization: val !== null ? val : "-" };
             }
             return { realization: mRow.textValue || "-" };
           }
@@ -148,12 +156,12 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
             realization: getYearlyRealization(),
           },
         ] : [],
-        tableData: !isChart ? [
+        tableData: [
           { period: "Q1", ...getQuarterTextRealization(1) },
           { period: "Q2", ...getQuarterTextRealization(2) },
           { period: "Q3", ...getQuarterTextRealization(3) },
           { period: "Q4", ...getQuarterTextRealization(4) },
-        ] : []
+        ]
       };
     });
 
