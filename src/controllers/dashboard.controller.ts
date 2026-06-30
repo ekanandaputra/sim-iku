@@ -27,8 +27,8 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
       return res.status(400).json(errorResponse("Invalid year format"));
     }
 
-    const ikus = await prisma.iKU.findMany({ 
-      orderBy: { code: "asc" } 
+    const ikus = await prisma.iKU.findMany({
+      orderBy: { code: "asc" }
     });
 
     const targets = await prisma.ikuTarget.findMany({ where: { year } });
@@ -68,13 +68,38 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         const row = ikuResults.find(
           r => r.resultType === IkuResultType.quarterly && r.month === quarter
         );
-        return formatDecimal(row?.calculatedValue);
+        if (row?.calculatedValue != null) return formatDecimal(row.calculatedValue);
+
+        if (iku.unit === "number") {
+          const monthsInQuarter = quarterMonths[quarter];
+          for (let i = monthsInQuarter.length - 1; i >= 0; i--) {
+            const mRow = ikuResults.find(
+              r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]
+            );
+            if (mRow && mRow.calculatedValue != null) {
+              return formatDecimal(mRow.calculatedValue);
+            }
+          }
+        }
+        return null;
       };
 
       // Yearly: resultType = yearly, month = 0
       const getYearlyRealization = (): number | null => {
         const row = ikuResults.find(r => r.resultType === IkuResultType.yearly);
-        return formatDecimal(row?.calculatedValue);
+        if (row?.calculatedValue != null) return formatDecimal(row.calculatedValue);
+
+        if (iku.unit === "number") {
+          for (let i = 12; i >= 1; i--) {
+            const mRow = ikuResults.find(
+              r => r.resultType === IkuResultType.monthly && r.month === i
+            );
+            if (mRow && mRow.calculatedValue != null) {
+              return formatDecimal(mRow.calculatedValue);
+            }
+          }
+        }
+        return null;
       };
 
       // Helper for text/file table data
@@ -156,12 +181,12 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
             realization: getYearlyRealization(),
           },
         ] : [],
-        tableData: [
+        tableData: !isChart ? [
           { period: "Q1", ...getQuarterTextRealization(1) },
           { period: "Q2", ...getQuarterTextRealization(2) },
           { period: "Q3", ...getQuarterTextRealization(3) },
           { period: "Q4", ...getQuarterTextRealization(4) },
-        ]
+        ] : []
       };
     });
 
