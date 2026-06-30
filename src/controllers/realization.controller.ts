@@ -844,14 +844,10 @@ export const bulkSaveRealization = async (
             year,
             resultType: "monthly" as any,
             calculatedValue: item.value ?? null,
-            textValue: item.metadata?.text ?? null,
-            documentIds: item.metadata?.files ?? Prisma.JsonNull,
             metadata: item.metadata ?? Prisma.JsonNull,
           },
           update: {
             calculatedValue: item.value ?? null,
-            textValue: item.metadata?.text ?? null,
-            documentIds: item.metadata?.files ?? Prisma.JsonNull,
             metadata: item.metadata ?? Prisma.JsonNull,
           },
         });
@@ -868,64 +864,6 @@ export const bulkSaveRealization = async (
           req,
         });
       }
-
-      // Calculate quarterly and yearly for direct input IKU
-      const allMonthly = await prisma.ikuResult.findMany({
-        where: { idIku: id, year, resultType: "monthly" as any },
-        orderBy: { month: "asc" }
-      });
-
-      const saveAggregated = async (monthKey: number, resultType: string, monthsFilter: number[]) => {
-        const rows = allMonthly.filter(r => monthsFilter.includes(r.month));
-        if (rows.length > 0) {
-           let calcValue: any = null;
-           let tValue: string | null = null;
-           let docIds: any = Prisma.JsonNull;
-           const lastRow = rows[rows.length - 1];
-
-           if (iku.unit === "number") {
-             calcValue = rows.reduce((acc, r) => acc + Number(r.calculatedValue || 0), 0);
-           } else if (iku.unit === "percentage") {
-             calcValue = Number(lastRow.calculatedValue || 0);
-           } else if (iku.unit === "text") {
-             tValue = lastRow.textValue;
-           } else if (iku.unit === "file") {
-             docIds = lastRow.documentIds;
-           }
-
-           await prisma.ikuResult.upsert({
-             where: { idIku_month_year_resultType: { idIku: id, month: monthKey, year, resultType: resultType as any } },
-             create: {
-               idIku: id, month: monthKey, year, resultType: resultType as any,
-               calculatedValue: calcValue,
-               textValue: tValue,
-               documentIds: docIds,
-               quarter: resultType === "quarterly" ? monthKey : null,
-               calculatedAt: new Date()
-             },
-             update: {
-               calculatedValue: calcValue,
-               textValue: tValue,
-               documentIds: docIds,
-               calculatedAt: new Date()
-             }
-           });
-        } else {
-           // Delete if exists and no monthly data
-           try {
-             await prisma.ikuResult.delete({
-               where: { idIku_month_year_resultType: { idIku: id, month: monthKey, year, resultType: resultType as any } }
-             });
-           } catch (e) {
-             // Ignore if not found
-           }
-        }
-      };
-
-      for (let q = 1; q <= 4; q++) {
-        await saveAggregated(q, "quarterly", [(q-1)*3 + 1, (q-1)*3 + 2, (q-1)*3 + 3]);
-      }
-      await saveAggregated(0, "yearly", [1,2,3,4,5,6,7,8,9,10,11,12]);
 
       return res.json(successResponse(results, "Bulk save IKU results successful"));
     } else {
