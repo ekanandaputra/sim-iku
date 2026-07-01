@@ -54,6 +54,7 @@ const swaggerDefinition = {
           description: { type: "string", nullable: true },
           isDirectInput: { type: "boolean", default: false },
           unit: { type: "string", enum: ["percentage", "text", "number", "file"], default: "percentage" },
+          type: { type: "string", enum: ["IKU_UTAMA", "IKU_SPEKTA"], default: "IKU_SPEKTA" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
         },
@@ -67,6 +68,7 @@ const swaggerDefinition = {
           description: { type: "string", maxLength: 500 },
           isDirectInput: { type: "boolean", default: false },
           unit: { type: "string", enum: ["percentage", "text", "number", "file"], default: "percentage" },
+          type: { type: "string", enum: ["IKU_UTAMA", "IKU_SPEKTA"], default: "IKU_SPEKTA" },
         },
         required: ["code", "name"],
       },
@@ -78,6 +80,7 @@ const swaggerDefinition = {
           description: { type: "string", maxLength: 500 },
           isDirectInput: { type: "boolean" },
           unit: { type: "string", enum: ["percentage", "text", "number", "file"] },
+          type: { type: "string", enum: ["IKU_UTAMA", "IKU_SPEKTA"] },
         },
         required: ["code", "name"],
       },
@@ -1431,7 +1434,7 @@ const swaggerDefinition = {
             description: "Dashboard Data",
             content: {
               "application/json": {
-                schema: { 
+                schema: {
                   type: "object",
                   properties: {
                     success: { type: "boolean", example: true },
@@ -1598,7 +1601,7 @@ const swaggerDefinition = {
             description: "Documents uploaded successfully",
             content: {
               "application/json": {
-                schema: { 
+                schema: {
                   type: "object",
                   properties: {
                     success: { type: "boolean" },
@@ -3083,20 +3086,20 @@ const swaggerDefinition = {
       get: {
         tags: ["ComponentRealization"],
         summary: "Get component realization by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: { "200": { description: "Details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
       put: {
         tags: ["ComponentRealization"],
         summary: "Update component realization value",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/ComponentRealizationUpdate" } } } },
         responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/ComponentRealization" } } } } } }, "400": { description: "Validation error, or no isFinal formula found for IKU", content: { "application/json": { schema: { oneOf: [{ $ref: "#/components/schemas/ValidationErrorResponse" }, { $ref: "#/components/schemas/BusinessErrorResponse" }] } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
       delete: {
         tags: ["ComponentRealization"],
         summary: "Delete component realization",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
     },
@@ -3126,20 +3129,20 @@ const swaggerDefinition = {
       get: {
         tags: ["IKUResult"],
         summary: "Get IKU result by ID",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: { "200": { description: "Details", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
       put: {
         tags: ["IKUResult"],
         summary: "Update IKU result",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         requestBody: { required: true, content: { "application/json": { schema: { $ref: "#/components/schemas/IkuResultUpdate" } } } },
         responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" }, data: { $ref: "#/components/schemas/IkuResult" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
       delete: {
         tags: ["IKUResult"],
         summary: "Delete IKU result",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }}],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { success: { type: "boolean" }, message: { type: "string" } } } } } }, "404": { description: "Not found", content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } } } },
       },
     },

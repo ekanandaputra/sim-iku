@@ -51,11 +51,17 @@ enum IkuResultType {
   yearly
 }
 
+enum IkuType {
+  IKU_UTAMA
+  IKU_SPEKTA
+}
+
 model IKU {
   id            String         @id @default(uuid()) @db.VarChar(36)
   code          String         @unique
   name          String
   description   String?
+  type          IkuType        @default(IKU_SPEKTA)
   isDirectInput Boolean        @default(false) @map("is_direct_input")
   unit          IkuUnitType    @default(percentage)
   createdAt     DateTime       @default(now()) @map("created_at")

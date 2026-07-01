@@ -23,6 +23,10 @@ export class IkuCreateDto {
   @IsOptional()
   @IsEnum(["percentage", "text", "number", "file"], { message: "Unit must be one of: percentage, text, number, file" })
   unit?: string;
+
+  @IsOptional()
+  @IsEnum(["IKU_UTAMA", "IKU_SPEKTA"], { message: "Type must be one of: IKU_UTAMA, IKU_SPEKTA" })
+  type?: string;
 }
 
 export class IkuUpdateDto {
@@ -48,6 +52,10 @@ export class IkuUpdateDto {
   @IsOptional()
   @IsEnum(["percentage", "text", "number", "file"], { message: "Unit must be one of: percentage, text, number, file" })
   unit?: string;
+
+  @IsOptional()
+  @IsEnum(["IKU_UTAMA", "IKU_SPEKTA"], { message: "Type must be one of: IKU_UTAMA, IKU_SPEKTA" })
+  type?: string;
 }
 
 export class IkuComponentMappingDto {
