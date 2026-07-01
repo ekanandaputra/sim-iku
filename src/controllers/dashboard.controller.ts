@@ -3,6 +3,12 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { IkuResultType } from "../generated/prisma/enums";
 
+const formatDecimal = (val: any): number | null => {
+  if (val == null) return null;
+  const num = Number(val);
+  return isNaN(num) ? null : Number(num.toFixed(2));
+};
+
 const quarterMonths: Record<number, number[]> = {
   1: [1, 2, 3],
   2: [4, 5, 6],
@@ -21,7 +27,9 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
       return res.status(400).json(errorResponse("Invalid year format"));
     }
 
-    const ikus = await prisma.iKU.findMany({ orderBy: { code: "asc" } });
+    const ikus = await prisma.iKU.findMany({
+      orderBy: { code: "asc" }
+    });
 
     const targets = await prisma.ikuTarget.findMany({ where: { year } });
     const targetMap = new Map(targets.map(t => [t.ikuId, t]));
@@ -33,11 +41,23 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
     });
 
     // Kelompokkan per IKU
+    const docIds = new Set<string>();
     const resultsByIku = new Map<string, typeof results>();
     for (const r of results) {
       if (!resultsByIku.has(r.idIku)) resultsByIku.set(r.idIku, []);
       resultsByIku.get(r.idIku)!.push(r);
+      if (r.documentIds && Array.isArray(r.documentIds)) {
+        for (const id of r.documentIds) {
+          if (typeof id === "string") docIds.add(id);
+        }
+      }
     }
+
+    const documents = await prisma.document.findMany({
+      where: { id: { in: Array.from(docIds) } },
+      select: { id: true, url: true, originalName: true }
+    });
+    const docMap = new Map(documents.map(d => [d.id, d]));
 
     const dashboardData = ikus.map(iku => {
       const target = targetMap.get(iku.id);
@@ -48,46 +68,125 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         const row = ikuResults.find(
           r => r.resultType === IkuResultType.quarterly && r.month === quarter
         );
-        return row?.calculatedValue != null ? Number(row.calculatedValue) : null;
+        if (row?.calculatedValue != null) return formatDecimal(row.calculatedValue);
+
+        if (iku.unit === "number") {
+          const monthsInQuarter = quarterMonths[quarter];
+          for (let i = monthsInQuarter.length - 1; i >= 0; i--) {
+            const mRow = ikuResults.find(
+              r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]
+            );
+            if (mRow && mRow.calculatedValue != null) {
+              return formatDecimal(mRow.calculatedValue);
+            }
+          }
+        }
+        return null;
       };
 
       // Yearly: resultType = yearly, month = 0
       const getYearlyRealization = (): number | null => {
         const row = ikuResults.find(r => r.resultType === IkuResultType.yearly);
-        return row?.calculatedValue != null ? Number(row.calculatedValue) : null;
+        if (row?.calculatedValue != null) return formatDecimal(row.calculatedValue);
+
+        if (iku.unit === "number") {
+          for (let i = 12; i >= 1; i--) {
+            const mRow = ikuResults.find(
+              r => r.resultType === IkuResultType.monthly && r.month === i
+            );
+            if (mRow && mRow.calculatedValue != null) {
+              return formatDecimal(mRow.calculatedValue);
+            }
+          }
+        }
+        return null;
       };
+
+      // Helper for text/file table data
+      const getFiles = (docIds: any) => {
+        if (!Array.isArray(docIds) || docIds.length === 0) return [];
+        return docIds
+          .map(id => docMap.get(id))
+          .filter(Boolean)
+          .map((d: any) => ({ name: d.originalName, url: d.url }));
+      };
+
+      const getQuarterTextRealization = (quarter: number) => {
+        const qRow = ikuResults.find(
+          r => r.resultType === IkuResultType.quarterly && r.month === quarter
+        );
+        if (qRow) {
+          if (iku.unit === "file") {
+            const files = getFiles(qRow.documentIds);
+            return { realization: files.length > 0 ? "File Terlampir" : "-", files };
+          }
+          if (iku.unit === "number" || iku.unit === "percentage") {
+            const val = formatDecimal(qRow.calculatedValue);
+            return { realization: val !== null ? val : "-" };
+          }
+          return { realization: qRow.textValue || "-" };
+        }
+
+        const monthsInQuarter = quarterMonths[quarter];
+        for (let i = monthsInQuarter.length - 1; i >= 0; i--) {
+          const mRow = ikuResults.find(
+            r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]
+          );
+          if (mRow) {
+            if (iku.unit === "file") {
+              const files = getFiles(mRow.documentIds);
+              return { realization: files.length > 0 ? "File Terlampir" : "-", files };
+            }
+            if (iku.unit === "number" || iku.unit === "percentage") {
+              const val = formatDecimal(mRow.calculatedValue);
+              return { realization: val !== null ? val : "-" };
+            }
+            return { realization: mRow.textValue || "-" };
+          }
+        }
+        return { realization: "-" };
+      };
+
+      const isChart = ["percentage", "number"].includes(iku.unit);
 
       return {
         ikuId: iku.id,
         ikuCode: iku.code,
         ikuName: iku.name,
-        chartData: [
+        unit: iku.unit,
+        chartData: isChart ? [
           {
             period: "Q1",
-            target: target && target.targetQ1 !== null ? Number(target.targetQ1) : null,
+            target: formatDecimal(target?.targetQ1),
             realization: getQuarterRealization(1),
           },
           {
             period: "Q2",
-            target: target && target.targetQ2 !== null ? Number(target.targetQ2) : null,
+            target: formatDecimal(target?.targetQ2),
             realization: getQuarterRealization(2),
           },
           {
             period: "Q3",
-            target: target && target.targetQ3 !== null ? Number(target.targetQ3) : null,
+            target: formatDecimal(target?.targetQ3),
             realization: getQuarterRealization(3),
           },
           {
             period: "Q4",
-            target: target && target.targetQ4 !== null ? Number(target.targetQ4) : null,
+            target: formatDecimal(target?.targetQ4),
             realization: getQuarterRealization(4),
           },
           {
             period: "Year",
-            target: target && target.targetYear !== null ? Number(target.targetYear) : null,
+            target: formatDecimal(target?.targetYear),
             realization: getYearlyRealization(),
           },
-        ],
+        ] : [],
+        tableData: !isChart ? [
+          { period: "Q1", ...getQuarterTextRealization(1) },
+          { period: "Q2", ...getQuarterTextRealization(2) },
+          { period: "Q3", ...getQuarterTextRealization(3) },
+          { period: "Q4", ...getQuarterTextRealization(4) },
+        ] : []
       };
     });
 
@@ -154,7 +253,8 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
         }
 
         if (!filtered.length) return null;
-        return filtered.reduce((sum, item) => sum + Number(item.value), 0);
+        const sum = filtered.reduce((sum, item) => sum + Number(item.value), 0);
+        return formatDecimal(sum);
       };
 
       return {
@@ -164,27 +264,27 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
         chartData: [
           {
             period: "Q1",
-            target: target && target.targetQ1 !== null ? Number(target.targetQ1) : null,
+            target: formatDecimal(target?.targetQ1),
             realization: getRealization("quarter", 1),
           },
           {
             period: "Q2",
-            target: target && target.targetQ2 !== null ? Number(target.targetQ2) : null,
+            target: formatDecimal(target?.targetQ2),
             realization: getRealization("quarter", 2),
           },
           {
             period: "Q3",
-            target: target && target.targetQ3 !== null ? Number(target.targetQ3) : null,
+            target: formatDecimal(target?.targetQ3),
             realization: getRealization("quarter", 3),
           },
           {
             period: "Q4",
-            target: target && target.targetQ4 !== null ? Number(target.targetQ4) : null,
+            target: formatDecimal(target?.targetQ4),
             realization: getRealization("quarter", 4),
           },
           {
             period: "Year",
-            target: target && target.targetYear !== null ? Number(target.targetYear) : null,
+            target: formatDecimal(target?.targetYear),
             realization: getRealization("year", 1),
           },
         ],

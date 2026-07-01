@@ -51,11 +51,17 @@ enum IkuResultType {
   yearly
 }
 
+enum IkuType {
+  IKU_UTAMA
+  IKU_SPEKTA
+}
+
 model IKU {
   id            String         @id @default(uuid()) @db.VarChar(36)
   code          String         @unique
   name          String
   description   String?
+  type          IkuType        @default(IKU_SPEKTA)
   isDirectInput Boolean        @default(false) @map("is_direct_input")
   unit          IkuUnitType    @default(percentage)
   createdAt     DateTime       @default(now()) @map("created_at")
@@ -78,7 +84,7 @@ model Component {
   dataType         ComponentDataType?         @map("data_type")
   sourceType       ComponentSourceType?       @map("source_type")
   periodType       ComponentPeriodType        @default(yearly) @map("period_type")
-  aggregationType  ComponentAggregationType   @default(SUM) @map("aggregation_type")
+  aggregationType  ComponentAggregationType   @default(LAST) @map("aggregation_type")
   hasBreakdown     Boolean                    @default(false) @map("has_breakdown")
   filterByLevel    Boolean                    @default(false) @map("filter_by_level")
   parentId         String?                    @map("parent_id") @db.VarChar(36)
@@ -205,6 +211,7 @@ model IkuResult {
   narrative       String?       @db.Text
   documentIds     Json?         @map("document_ids")
   metadata        Json?         @map("metadata")
+  debugInfo       Json?         @map("debug_info")
   formulaVersion  String?       @map("formula_version")
   calculatedAt    DateTime      @default(now()) @map("calculated_at")
   createdAt       DateTime      @default(now()) @map("created_at")

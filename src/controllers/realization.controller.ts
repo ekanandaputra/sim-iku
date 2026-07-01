@@ -51,7 +51,7 @@ export const getRealizationMetrics = async (
       userFilterEnabled = false;
     }
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
-    console.log(req.user);
+
     // When user filter is active but token is missing / invalid, return empty result
     if (userFilterEnabled && !userId) {
       return res.json(
@@ -636,18 +636,31 @@ export const getRealizationView = async (
 
       const buildRow = (byMonth: Map<number, typeof allRealizations[0]>, year: number, monthKey: number, extra: object) => {
         const r = byMonth.get(monthKey);
+        let value: any = null;
+        if (r) {
+          if (iku.unit === 'text') {
+            value = r.textValue;
+          } else if (iku.unit === 'file') {
+            value = r.documentIds;
+          } else {
+            value = Number(r.calculatedValue);
+          }
+        }
         return {
           id: r?.idResult ?? null,
           year,
-          value: r ? Number(r.calculatedValue) : null,
+          value,
           _action: r ? "PUT" : "POST",
           ...extra,
         };
       };
 
-      // IKU is yearly (month 0)
+      // IKU is always monthly
       const buildRows = (byMonth: Map<number, typeof allRealizations[0]>, year: number): object[] => {
-        return [buildRow(byMonth, year, 0, {})];
+        return Array.from({ length: 12 }, (_, i) => {
+          const month = i + 1;
+          return buildRow(byMonth, year, month, { month, monthName: MONTH_NAMES[i] });
+        });
       };
 
       const data = years.map((year) => {
@@ -684,6 +697,7 @@ export const getRealizationView = async (
           name: iku.name,
           description: iku.description,
           unit: iku.unit,
+          periodType: "monthly",
           isDirectInput: iku.isDirectInput,
           isAssigned: isIkuAssigned,
           tags: [],

@@ -13,6 +13,7 @@ type PaginationQuery = {
   limit?: string;
   includeInactive?: string;
   search?: string;
+  type?: string;
 };
 
 /**
@@ -30,6 +31,7 @@ export const listIkus = async (
     const skip = (page - 1) * limit;
 
     const searchFilter = req.query.search?.trim();
+    const typeFilter = req.query.type;
 
     const where: any = {};
     if (searchFilter) {
@@ -37,6 +39,10 @@ export const listIkus = async (
         { name: { contains: searchFilter } },
         { code: { contains: searchFilter } },
       ];
+    }
+
+    if (typeFilter) {
+      where.type = typeFilter;
     }
 
     const [ikus, total] = await Promise.all([
@@ -99,7 +105,7 @@ export const createIku = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, isDirectInput, unit } = req.body;
+    const { code, name, description, isDirectInput, unit, type } = req.body;
 
     const existing = await prisma.iKU.findUnique({
       where: { code },
@@ -123,6 +129,10 @@ export const createIku = async (
       ikuData.unit = unit;
     }
 
+    if (type !== undefined) {
+      ikuData.type = type;
+    }
+
     const iku = await prisma.iKU.create({
       data: ikuData,
     });
@@ -134,7 +144,7 @@ export const createIku = async (
       entityName: iku.name,
       action: AuditAction.CREATE,
       userId: (req as any).user?.id ?? null,
-      newValues: { code: iku.code, name: iku.name, description: iku.description, isDirectInput: iku.isDirectInput, unit: iku.unit },
+      newValues: { code: iku.code, name: iku.name, description: iku.description, isDirectInput: iku.isDirectInput, unit: iku.unit, type: iku.type },
       req,
     });
 
@@ -155,7 +165,7 @@ export const updateIku = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, isDirectInput, unit } = req.body;
+    const { code, name, description, isDirectInput, unit, type } = req.body;
 
     const existing = await prisma.iKU.findUnique({
       where: { id },
@@ -189,6 +199,10 @@ export const updateIku = async (
       updateData.unit = unit;
     }
 
+    if (type !== undefined) {
+      updateData.type = type;
+    }
+
     const updated = await prisma.iKU.update({
       where: { id },
       data: updateData,
@@ -201,8 +215,8 @@ export const updateIku = async (
       entityName: updated.name,
       action: AuditAction.UPDATE,
       userId: (req as any).user?.id ?? null,
-      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit },
-      newValues: { code: updated.code, name: updated.name, description: updated.description, isDirectInput: updated.isDirectInput, unit: updated.unit },
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit, type: existing.type },
+      newValues: { code: updated.code, name: updated.name, description: updated.description, isDirectInput: updated.isDirectInput, unit: updated.unit, type: updated.type },
       req,
     });
 
@@ -407,7 +421,7 @@ export const deleteIku = async (
       entityName: existing.name,
       action: AuditAction.DELETE,
       userId: (req as any).user?.id ?? null,
-      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit },
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit, type: existing.type },
       req,
     });
 
