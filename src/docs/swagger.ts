@@ -1446,6 +1446,8 @@ const swaggerDefinition = {
                           ikuId: { type: "string" },
                           ikuCode: { type: "string" },
                           ikuName: { type: "string" },
+                          type: { type: "string", enum: ["IKU_UTAMA", "IKU_SPEKTA"] },
+                          unit: { type: "string", enum: ["percentage", "text", "number", "file"] },
                           chartData: {
                             type: "array",
                             items: {
@@ -1454,6 +1456,26 @@ const swaggerDefinition = {
                                 period: { type: "string" },
                                 target: { type: "number", nullable: true },
                                 realization: { type: "number", nullable: true },
+                              }
+                            }
+                          },
+                          tableData: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                period: { type: "string" },
+                                realization: { type: "string" },
+                                files: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      name: { type: "string" },
+                                      url: { type: "string" },
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
