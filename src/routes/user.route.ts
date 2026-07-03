@@ -4,6 +4,6 @@ import { authenticate } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/pics", authenticate as any, getPics);
+router.get("/pics", getPics);
 
 export default router;
