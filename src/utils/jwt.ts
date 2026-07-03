@@ -22,3 +22,7 @@ export function signJwt(payload: JwtPayload) {
 export function verifyJwt<T extends JwtPayload = JwtPayload>(token: string): T {
   return jwt.verify(token, JWT_SECRET) as T;
 }
+
+export function decodeJwt<T extends JwtPayload = JwtPayload>(token: string): T | null {
+  return jwt.decode(token) as T | null;
+}

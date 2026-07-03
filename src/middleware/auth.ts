@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { errorResponse } from "../utils/response";
-import { verifyJwt } from "../utils/jwt";
+import { decodeJwt } from "../utils/jwt";
+import { validateAuthToken } from "../utils/authService";
 
 interface AuthRequest extends Request {
   user?: {
@@ -10,7 +11,7 @@ interface AuthRequest extends Request {
   };
 }
 
-export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -20,8 +21,17 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
   const token = authHeader.split(" ")[1];
 
   try {
-    const payload = verifyJwt(token);
-    const userId = payload.userId || payload.user?.id;
+    const authUserId = await validateAuthToken(token);
+    if (!authUserId) {
+      return res.status(401).json(errorResponse("Invalid or expired token"));
+    }
+
+    const payload = decodeJwt(token);
+    if (!payload) {
+      return res.status(401).json(errorResponse("Invalid token payload"));
+    }
+
+    const userId = payload.userId || payload.user?.id || authUserId;
     if (!userId) {
       return res.status(401).json(errorResponse("Invalid token payload"));
     }
@@ -48,7 +58,7 @@ export function authenticate(req: AuthRequest, res: Response, next: NextFunction
  * Use this for endpoints that are public by default but need user context
  * when ENABLE_USER_FILTER=true.
  */
-export function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {
+export async function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -58,19 +68,23 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
   const token = authHeader.split(" ")[1];
 
   try {
-    const payload = verifyJwt(token);
-    const userId = payload.userId || payload.user?.id;
-    if (userId) {
-      console.log(payload);
-      const extractedRoles = payload.roles || payload.user?.roles || [];
-      const roleKeys = extractedRoles.map((r: any) => r.key);
-      const combinedPermissions = [...(payload.permissions || []), ...roleKeys];
+    const authUserId = await validateAuthToken(token);
+    if (authUserId) {
+      const payload = decodeJwt(token);
+      if (payload) {
+        const userId = payload.userId || payload.user?.id || authUserId;
+        if (userId) {
+          const extractedRoles = payload.roles || payload.user?.roles || [];
+          const roleKeys = extractedRoles.map((r: any) => r.key);
+          const combinedPermissions = [...(payload.permissions || []), ...roleKeys];
 
-      (req as AuthRequest).user = {
-        id: userId,
-        email: payload.email || payload.user?.email || "",
-        permissions: combinedPermissions,
-      };
+          (req as AuthRequest).user = {
+            id: userId,
+            email: payload.email || payload.user?.email || "",
+            permissions: combinedPermissions,
+          };
+        }
+      }
     }
   } catch {
     // invalid token — silently ignore, proceed without user context

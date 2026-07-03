@@ -123,3 +123,42 @@ export async function searchAuthUsers(
   }
 }
 
+/**
+ * Validates a JWT token via the Auth Service.
+ * Returns the userId if valid, or null if invalid.
+ */
+export async function validateAuthToken(token: string): Promise<string | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping token validation");
+    return null;
+  }
+
+  try {
+    const url = `${baseUrl}/api/auth/validate`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        // "X-Service-Name": "sim-iku",
+        // "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const body = await response.json() as { success: boolean; data: { userId: string } };
+    if (!body.success || !body.data || !body.data.userId) {
+      return null;
+    }
+
+    return body.data.userId;
+  } catch (err) {
+    console.error(`[authService] Error validating token:`, err);
+    return null;
+  }
+}
+
