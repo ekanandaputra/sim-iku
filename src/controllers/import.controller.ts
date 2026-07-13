@@ -48,6 +48,7 @@ export const downloadMasterTemplate = (req: Request, res: Response) => {
     "iku_code",
     "iku_name",
     "iku_description",
+    "iku_type",
     "iku_is_direct_input",
     "iku_unit",
     "ikp_code",
@@ -63,9 +64,9 @@ export const downloadMasterTemplate = (req: Request, res: Response) => {
   ];
 
   const samples = [
-    ["IKU001", "Kualitas Air", "Deskripsi IKU", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "SUM", "FALSE", "FALSE", ""],
-    ["IKU001", "Kualitas Air", "", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "LAST", "TRUE", "TRUE", "COMP001"],
-    ["IKU002", "IKU Manual", "", "TRUE", "number", "", "", "", "", "", "", "", "FALSE", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "Deskripsi IKU", "IKU_SPEKTA", "FALSE", "percentage", "COMP001", "Kadar BOD", "Desc", "number", "manual", "monthly", "SUM", "FALSE", "FALSE", ""],
+    ["IKU001", "Kualitas Air", "", "IKU_SPEKTA", "FALSE", "percentage", "COMP001-A", "Kadar COD", "", "number", "manual", "monthly", "LAST", "TRUE", "TRUE", "COMP001"],
+    ["IKU002", "IKU Manual", "", "IKU_UTAMA", "TRUE", "number", "", "", "", "", "", "", "", "FALSE", "FALSE", ""],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -146,12 +147,16 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
         continue;
       }
 
+      const rawIkuType = toString(first[col("iku_type")]).toUpperCase();
+      const ikuType = (rawIkuType === "IKU_UTAMA" || rawIkuType === "IKU_SPEKTA") ? rawIkuType : "IKU_SPEKTA";
+
       // 1. Upsert IKU
       const iku = await prisma.iKU.upsert({
         where: { code: ikuCode },
         update: {
           name: ikuName,
           description: toString(first[col("iku_description")]) || null,
+          type: ikuType as any,
           isDirectInput: toBool(first[col("iku_is_direct_input")]),
           unit: (toString(first[col("iku_unit")]).toLowerCase() as any) || "percentage",
         },
@@ -159,6 +164,7 @@ export const importMasterData = async (req: Request, res: Response, next: NextFu
           code: ikuCode,
           name: ikuName,
           description: toString(first[col("iku_description")]) || null,
+          type: ikuType as any,
           isDirectInput: toBool(first[col("iku_is_direct_input")]),
           unit: (toString(first[col("iku_unit")]).toLowerCase() as any) || "percentage",
         },
@@ -433,6 +439,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
       "iku_code",
       "iku_name",
       "iku_description",
+      "iku_type",
       "iku_is_direct_input",
       "iku_unit",
       "ikp_code",
@@ -478,6 +485,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
             iku.code,
             iku.name,
             iku.description || "",
+            iku.type,
             iku.isDirectInput ? "TRUE" : "FALSE",
             iku.unit,
             comp.code,
@@ -497,6 +505,7 @@ export const exportMasterData = async (req: Request, res: Response, next: NextFu
           iku.code,
           iku.name,
           iku.description || "",
+          iku.type,
           iku.isDirectInput ? "TRUE" : "FALSE",
           iku.unit,
           "",
