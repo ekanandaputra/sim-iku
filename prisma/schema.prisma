@@ -72,6 +72,7 @@ model IKU {
   targets       IkuTarget[]
   users         IkuUser[]
   bidangs       BidangIKU[]
+  units         UnitIKU[]
 
   @@map("ikus")
 }
@@ -469,4 +470,16 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model UnitIKU {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  unitId    String   @map("unit_id") @db.VarChar(36)
+  ikuId     String   @map("iku_id") @db.VarChar(36)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  iku IKU @relation(fields: [ikuId], references: [id], onDelete: Cascade)
+
+  @@unique([unitId, ikuId])
+  @@map("unit_iku")
 }

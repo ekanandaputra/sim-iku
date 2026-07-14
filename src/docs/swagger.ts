@@ -1306,6 +1306,82 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/units/{id}/ikus": {
+      get: {
+        tags: ["Units"],
+        summary: "Get IKUs linked to a Unit",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Success" },
+          "404": { description: "Unit not found" },
+        },
+      },
+      put: {
+        tags: ["Units"],
+        summary: "Sync (replace) IKUs linked to a Unit",
+        description: "Replaces all IKU links for a Unit. IKUs not in the payload will be removed.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Links updated successfully" },
+          "404": { description: "Unit or IKU not found" },
+        },
+      },
+    },
+    "/api/units/{id}/ikus/assign": {
+      post: {
+        tags: ["Units"],
+        summary: "Assign IKUs to a Unit",
+        description: "Add one or more IKUs to a Unit (additive).",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "IKUs assigned successfully" },
+          "404": { description: "Unit or IKU not found" },
+        },
+      },
+    },
+    "/api/units/{id}/ikus/unassign": {
+      delete: {
+        tags: ["Units"],
+        summary: "Unassign IKUs from a Unit",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "IKUs unassigned successfully" },
+          "404": { description: "Unit not found" },
+        },
+      },
+    },
     "/api/realizations/metrics": {
       get: {
         tags: ["Realization"],

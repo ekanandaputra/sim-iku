@@ -171,6 +171,41 @@ export interface AuthUnit {
 }
 
 /**
+ * Fetch a single unit from auth service.
+ */
+export async function fetchAuthUnit(unitId: string): Promise<AuthUnit | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping fetch unit");
+    return null;
+  }
+
+  try {
+    const url = `${baseUrl}/api/units/${unitId}`;
+    const response = await fetch(url, {
+      headers: {
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`[authService] Failed to fetch unit ${unitId}: HTTP ${response.status}`);
+      return null;
+    }
+
+    const body = await response.json() as { success: boolean; data: AuthUnit };
+    if (!body.success || !body.data) return null;
+
+    return body.data;
+  } catch (err) {
+    console.error(`[authService] Error fetching unit ${unitId}:`, err);
+    return null;
+  }
+}
+
+/**
  * Fetch and search units from auth service with pagination.
  */
 export async function searchAuthUnits(
