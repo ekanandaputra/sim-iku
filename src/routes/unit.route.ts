@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getUnits } from "../controllers/unit.controller";
+import { getUnits, assignUnitUsers, getUnitUsers } from "../controllers/unit.controller";
 import {
   listUnitIkus,
   assignUnitIkus,
@@ -10,6 +10,8 @@ import {
 const router = Router();
 
 router.get("/", getUnits);
+router.post("/:id/assign", assignUnitUsers);
+router.get("/:id/users", getUnitUsers);
 
 router.get("/:id/ikus", listUnitIkus);
 router.post("/:id/ikus/assign", assignUnitIkus);

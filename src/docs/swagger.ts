@@ -1243,6 +1243,49 @@ const swaggerDefinition = {
           },
         },
       },
+      UnitUsersAssignBody: {
+        type: "object",
+        properties: {
+          users: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                userId: { type: "string" },
+                type: { type: "string", example: "PIC" },
+              },
+            },
+          },
+        },
+      },
+      AuthUnitUser: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          email: { type: "string" },
+          name: { type: "string" },
+          nip: { type: "string" },
+          type: { type: "string", example: "EMPLOYEE" },
+          isActive: { type: "boolean" },
+          deletedAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          memberType: { type: "string", example: "PIC" },
+        },
+      },
+      SuccessResponsePaginatedUnitUser: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/AuthUnitUser" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
+          },
+        },
+      },
       Unit: {
         type: "object",
         properties: {
@@ -1300,6 +1343,51 @@ const swaggerDefinition = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/SuccessResponsePaginatedUnit" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/units/{id}/assign": {
+      post: {
+        tags: ["Units"],
+        summary: "Bulk assign or unassign users to a unit",
+        description: "Proxies the assign/unassign request to the external auth service.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Unit ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UnitUsersAssignBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Users assigned successfully" },
+          "400": { description: "Validation error" },
+          "500": { description: "Failed to assign users" },
+        },
+      },
+    },
+    "/api/units/{id}/users": {
+      get: {
+        tags: ["Units"],
+        summary: "Get all users assigned to a specific unit",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Unit ID" },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 }, description: "Page number" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 10 }, description: "Number of items per page" },
+          { name: "search", in: "query", schema: { type: "string" }, description: "Search user by name, email, or nip" },
+        ],
+        responses: {
+          "200": {
+            description: "A list of users",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponsePaginatedUnitUser" },
               },
             },
           },
