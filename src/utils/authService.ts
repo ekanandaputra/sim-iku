@@ -162,3 +162,63 @@ export async function validateAuthToken(token: string): Promise<string | null> {
   }
 }
 
+export interface AuthUnit {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Fetch and search units from auth service with pagination.
+ */
+export async function searchAuthUnits(
+  search: string,
+  page: number,
+  limit: number
+): Promise<{ data: AuthUnit[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping search units");
+    return null;
+  }
+
+  try {
+    const url = new URL(`${baseUrl}/api/units`);
+    if (search) url.searchParams.append("search", search);
+    url.searchParams.append("page", page.toString());
+    url.searchParams.append("limit", limit.toString());
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`[authService] Failed to search units: HTTP ${response.status}`);
+      return null;
+    }
+
+    const body = await response.json() as {
+      success: boolean;
+      data: AuthUnit[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    };
+
+    if (!body.success || !body.data || !body.pagination) {
+      return null;
+    }
+
+    return {
+      data: body.data,
+      pagination: body.pagination
+    };
+  } catch (err) {
+    console.error(`[authService] Error searching units:`, err);
+    return null;
+  }
+}
