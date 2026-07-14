@@ -32,7 +32,7 @@ export const getUnits = async (req: Request, res: Response, next: NextFunction) 
 
 export const assignUnitUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { users } = req.body as { users: { userId: string; type: string }[] };
 
     if (!users || !Array.isArray(users)) {
@@ -57,7 +57,7 @@ export const assignUnitUsers = async (req: Request, res: Response, next: NextFun
 
 export const getUnitUsers = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const search = (req.query.search as string) || "";
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
