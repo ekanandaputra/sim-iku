@@ -34,6 +34,7 @@ const swaggerDefinition = {
     { name: "Bidang", description: "Manajemen Bidang (unit kerja) — pengelompokan user ke IKU dan IKP/Komponen" },
     { name: "AuditLog", description: "Audit log — riwayat perubahan data IKU, IKP, Realisasi Komponen, dan IKU Result" },
     { name: "Users", description: "User management and PIC endpoints" },
+    { name: "Units", description: "Unit management endpoints" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -1242,9 +1243,69 @@ const swaggerDefinition = {
           },
         },
       },
+      Unit: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          description: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      SuccessResponsePaginatedUnit: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/Unit" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
+          },
+        },
+      },
     },
   },
   paths: {
+    "/api/units": {
+      get: {
+        tags: ["Units"],
+        summary: "Get all units with pagination and search",
+        description: "Fetch units from the external auth service",
+        parameters: [
+          {
+            name: "page",
+            in: "query",
+            schema: { type: "integer", default: 1 },
+            description: "Page number",
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 10 },
+            description: "Items per page",
+          },
+          {
+            name: "search",
+            in: "query",
+            schema: { type: "string" },
+            description: "Search query",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponsePaginatedUnit" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/realizations/metrics": {
       get: {
         tags: ["Realization"],
