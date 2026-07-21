@@ -259,6 +259,45 @@ export async function searchAuthUnits(
 }
 
 /**
+ * Create a new unit via auth service.
+ */
+export async function createAuthUnit(
+  name: string,
+  description: string
+): Promise<{ success: boolean; data?: any; message?: string } | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping create unit");
+    return null;
+  }
+
+  try {
+    const url = `${baseUrl}/api/units`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+      body: JSON.stringify({ name, description }),
+    });
+
+    const body = await response.json() as { success: boolean; data?: any; message?: string };
+    
+    if (!response.ok) {
+      console.warn(`[authService] Failed to create unit: HTTP ${response.status} - ${body.message || ''}`);
+    }
+
+    return body;
+  } catch (err) {
+    console.error(`[authService] Error creating unit:`, err);
+    return null;
+  }
+}
+
+/**
  * Bulk assign or unassign users to a unit via auth service.
  */
 export async function assignAuthUnitUsers(

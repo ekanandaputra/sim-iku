@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { successResponse } from "../utils/response";
-import { searchAuthUnits, assignAuthUnitUsers, getAuthUnitUsers } from "../utils/authService";
+import { searchAuthUnits, assignAuthUnitUsers, getAuthUnitUsers, createAuthUnit } from "../utils/authService";
 
 export const getUnits = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -79,6 +79,30 @@ export const getUnitUsers = async (req: Request, res: Response, next: NextFuncti
         "Successfully fetched unit users"
       )
     );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createUnit = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: "Unit name is required" });
+    }
+
+    const authResult = await createAuthUnit(name, description || "");
+
+    if (!authResult) {
+      return res.status(500).json({ success: false, message: "Failed to create unit via auth service" });
+    }
+
+    if (!authResult.success) {
+      return res.status(400).json(authResult);
+    }
+
+    res.status(201).json(authResult);
   } catch (error) {
     next(error);
   }
