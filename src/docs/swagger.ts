@@ -1348,6 +1348,42 @@ const swaggerDefinition = {
           },
         },
       },
+      post: {
+        tags: ["Units"],
+        summary: "Create a new unit",
+        description: "Create a new unit in the auth service",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", example: "Unit A" },
+                  description: { type: "string", example: "Description for Unit A" },
+                },
+                required: ["name"],
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Unit created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: { type: "string", example: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
     "/api/units/{id}/assign": {
       post: {
