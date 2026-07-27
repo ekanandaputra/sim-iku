@@ -2220,6 +2220,67 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/ikus/{id}/units": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["IKU"],
+        summary: "List units assigned to a given IKU",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "IKU id",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "List of units assigned to the IKU",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", format: "uuid" },
+                          ikuId: { type: "string", format: "uuid" },
+                          createdAt: { type: "string", format: "date-time" },
+                          unit: {
+                            type: "object",
+                            nullable: true,
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              name: { type: "string" },
+                              description: { type: "string" },
+                              createdAt: { type: "string", format: "date-time" },
+                              updatedAt: { type: "string", format: "date-time" },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "404": {
+            description: "IKU not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/ikus/{id}/formulas": {
       security: [{ bearerAuth: [] }],
       get: {
