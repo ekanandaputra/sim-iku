@@ -34,6 +34,7 @@ const swaggerDefinition = {
     { name: "Bidang", description: "Manajemen Bidang (unit kerja) — pengelompokan user ke IKU dan IKP/Komponen" },
     { name: "AuditLog", description: "Audit log — riwayat perubahan data IKU, IKP, Realisasi Komponen, dan IKU Result" },
     { name: "Users", description: "User management and PIC endpoints" },
+    { name: "Units", description: "Unit management endpoints" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -1242,9 +1243,269 @@ const swaggerDefinition = {
           },
         },
       },
+      UnitUsersAssignBody: {
+        type: "object",
+        properties: {
+          users: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                userId: { type: "string" },
+                type: { type: "string", example: "PIC" },
+              },
+            },
+          },
+        },
+      },
+      AuthUnitUser: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          email: { type: "string" },
+          name: { type: "string" },
+          nip: { type: "string" },
+          type: { type: "string", example: "EMPLOYEE" },
+          isActive: { type: "boolean" },
+          deletedAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          memberType: { type: "string", example: "PIC" },
+        },
+      },
+      SuccessResponsePaginatedUnitUser: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/AuthUnitUser" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
+          },
+        },
+      },
+      Unit: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          description: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      SuccessResponsePaginatedUnit: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          data: {
+            type: "object",
+            properties: {
+              data: { type: "array", items: { $ref: "#/components/schemas/Unit" } },
+              pagination: { $ref: "#/components/schemas/PaginationMeta" },
+            },
+          },
+        },
+      },
     },
   },
   paths: {
+    "/api/units": {
+      get: {
+        tags: ["Units"],
+        summary: "Get all units with pagination and search",
+        description: "Fetch units from the external auth service",
+        parameters: [
+          {
+            name: "page",
+            in: "query",
+            schema: { type: "integer", default: 1 },
+            description: "Page number",
+          },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 10 },
+            description: "Items per page",
+          },
+          {
+            name: "search",
+            in: "query",
+            schema: { type: "string" },
+            description: "Search query",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponsePaginatedUnit" },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Units"],
+        summary: "Create a new unit",
+        description: "Create a new unit in the auth service",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", example: "Unit A" },
+                  description: { type: "string", example: "Description for Unit A" },
+                },
+                required: ["name"],
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Unit created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: { type: "string", example: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/units/{id}/assign": {
+      post: {
+        tags: ["Units"],
+        summary: "Bulk assign or unassign users to a unit",
+        description: "Proxies the assign/unassign request to the external auth service.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Unit ID" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UnitUsersAssignBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Users assigned successfully" },
+          "400": { description: "Validation error" },
+          "500": { description: "Failed to assign users" },
+        },
+      },
+    },
+    "/api/units/{id}/users": {
+      get: {
+        tags: ["Units"],
+        summary: "Get all users assigned to a specific unit",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" }, description: "Unit ID" },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 }, description: "Page number" },
+          { name: "limit", in: "query", schema: { type: "integer", default: 10 }, description: "Number of items per page" },
+          { name: "search", in: "query", schema: { type: "string" }, description: "Search user by name, email, or nip" },
+        ],
+        responses: {
+          "200": {
+            description: "A list of users",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SuccessResponsePaginatedUnitUser" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/units/{id}/ikus": {
+      get: {
+        tags: ["Units"],
+        summary: "Get IKUs linked to a Unit",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": { description: "Success" },
+          "404": { description: "Unit not found" },
+        },
+      },
+      put: {
+        tags: ["Units"],
+        summary: "Sync (replace) IKUs linked to a Unit",
+        description: "Replaces all IKU links for a Unit. IKUs not in the payload will be removed.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Links updated successfully" },
+          "404": { description: "Unit or IKU not found" },
+        },
+      },
+    },
+    "/api/units/{id}/ikus/assign": {
+      post: {
+        tags: ["Units"],
+        summary: "Assign IKUs to a Unit",
+        description: "Add one or more IKUs to a Unit (additive).",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "IKUs assigned successfully" },
+          "404": { description: "Unit or IKU not found" },
+        },
+      },
+    },
+    "/api/units/{id}/ikus/unassign": {
+      delete: {
+        tags: ["Units"],
+        summary: "Unassign IKUs from a Unit",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/IkuIdsBody" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "IKUs unassigned successfully" },
+          "404": { description: "Unit not found" },
+        },
+      },
+    },
     "/api/realizations/metrics": {
       get: {
         tags: ["Realization"],
@@ -1943,6 +2204,67 @@ const swaggerDefinition = {
                   properties: {
                     success: { type: "boolean", example: true },
                     message: { type: "string", example: "IKU deleted successfully" },
+                  },
+                },
+              },
+            },
+          },
+          "404": {
+            description: "IKU not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BusinessErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/ikus/{id}/units": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["IKU"],
+        summary: "List units assigned to a given IKU",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+            description: "IKU id",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "List of units assigned to the IKU",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", format: "uuid" },
+                          ikuId: { type: "string", format: "uuid" },
+                          createdAt: { type: "string", format: "date-time" },
+                          unit: {
+                            type: "object",
+                            nullable: true,
+                            properties: {
+                              id: { type: "string", format: "uuid" },
+                              name: { type: "string" },
+                              description: { type: "string" },
+                              createdAt: { type: "string", format: "date-time" },
+                              updatedAt: { type: "string", format: "date-time" },
+                            },
+                          },
+                        },
+                      },
+                    },
                   },
                 },
               },

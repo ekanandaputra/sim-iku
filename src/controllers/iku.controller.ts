@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
+import { fetchAuthUnit } from "../utils/authService";
 
 type IkuParams = {
   id: string;
@@ -275,6 +276,47 @@ export const listIkuComponents = async (
     }));
 
     res.json(successResponse(components));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * LIST IKU UNITS
+ * GET /api/ikus/:id/units
+ */
+export const listIkuUnits = async (
+  req: Request<IkuParams>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const id = req.params.id;
+
+    const iku = await prisma.iKU.findUnique({
+      where: { id },
+    });
+
+    if (!iku) {
+      return res.status(404).json(errorResponse("IKU not found"));
+    }
+
+    const links = await prisma.unitIKU.findMany({
+      where: { ikuId: id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const unitsData = await Promise.all(
+      links.map(async (link) => {
+        const unitInfo = await fetchAuthUnit(link.unitId);
+        return {
+          ...link,
+          unit: unitInfo,
+        };
+      })
+    );
+
+    res.json(successResponse(unitsData));
   } catch (error) {
     next(error);
   }

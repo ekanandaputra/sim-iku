@@ -9,6 +9,7 @@ import {
   listIkuFormulasByIku,
   mapComponentToIku,
   unmapComponentFromIku,
+  listIkuUnits,
 } from "../controllers/iku.controller";
 import { validateBody } from "../middleware/validate";
 import { authenticate } from "../middleware/auth";
@@ -23,6 +24,7 @@ router.get("/", listIkus);
 router.get("/:id", getIkuById);
 router.get("/:id/components", listIkuComponents);
 router.get("/:id/formulas", listIkuFormulasByIku);
+router.get("/:id/units", listIkuUnits);
 router.post("/:id/components", validateBody(IkuComponentMappingDto), mapComponentToIku);
 router.delete("/:id/components/:componentId", unmapComponentFromIku);
 

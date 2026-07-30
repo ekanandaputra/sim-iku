@@ -162,3 +162,224 @@ export async function validateAuthToken(token: string): Promise<string | null> {
   }
 }
 
+export interface AuthUnit {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Fetch a single unit from auth service.
+ */
+export async function fetchAuthUnit(unitId: string): Promise<AuthUnit | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping fetch unit");
+    return null;
+  }
+
+  try {
+    const url = `${baseUrl}/api/units/${unitId}`;
+    const response = await fetch(url, {
+      headers: {
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`[authService] Failed to fetch unit ${unitId}: HTTP ${response.status}`);
+      return null;
+    }
+
+    const body = await response.json() as { success: boolean; data: AuthUnit };
+    if (!body.success || !body.data) return null;
+
+    return body.data;
+  } catch (err) {
+    console.error(`[authService] Error fetching unit ${unitId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Fetch and search units from auth service with pagination.
+ */
+export async function searchAuthUnits(
+  search: string,
+  page: number,
+  limit: number
+): Promise<{ data: AuthUnit[]; pagination: { page: number; limit: number; total: number; totalPages: number } } | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping search units");
+    return null;
+  }
+
+  try {
+    const url = new URL(`${baseUrl}/api/units`);
+    if (search) url.searchParams.append("search", search);
+    url.searchParams.append("page", page.toString());
+    url.searchParams.append("limit", limit.toString());
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`[authService] Failed to search units: HTTP ${response.status}`);
+      return null;
+    }
+
+    const body = await response.json() as {
+      success: boolean;
+      data: AuthUnit[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    };
+
+    if (!body.success || !body.data || !body.pagination) {
+      return null;
+    }
+
+    return {
+      data: body.data,
+      pagination: body.pagination
+    };
+  } catch (err) {
+    console.error(`[authService] Error searching units:`, err);
+    return null;
+  }
+}
+
+/**
+ * Create a new unit via auth service.
+ */
+export async function createAuthUnit(
+  name: string,
+  description: string
+): Promise<{ success: boolean; data?: any; message?: string } | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping create unit");
+    return null;
+  }
+
+  try {
+    const url = `${baseUrl}/api/units`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+      body: JSON.stringify({ name, description }),
+    });
+
+    const body = await response.json() as { success: boolean; data?: any; message?: string };
+    
+    if (!response.ok) {
+      console.warn(`[authService] Failed to create unit: HTTP ${response.status} - ${body.message || ''}`);
+    }
+
+    return body;
+  } catch (err) {
+    console.error(`[authService] Error creating unit:`, err);
+    return null;
+  }
+}
+
+/**
+ * Bulk assign or unassign users to a unit via auth service.
+ */
+export async function assignAuthUnitUsers(
+  unitId: string,
+  users: { userId: string; type: string }[]
+): Promise<{ success: boolean; message?: string } | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping assign unit users");
+    return null;
+  }
+
+  try {
+    const url = `${baseUrl}/api/units/${unitId}/assign`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+      body: JSON.stringify({ users }),
+    });
+
+    const body = await response.json() as { success: boolean; message?: string };
+    
+    if (!response.ok) {
+      console.warn(`[authService] Failed to assign users to unit ${unitId}: HTTP ${response.status} - ${body.message || ''}`);
+    }
+
+    return body;
+  } catch (err) {
+    console.error(`[authService] Error assigning users to unit ${unitId}:`, err);
+    return null;
+  }
+}
+
+export interface AuthUnitUser extends AuthUser {
+  memberType: string;
+}
+
+/**
+ * Get users assigned to a unit via auth service.
+ */
+export async function getAuthUnitUsers(
+  unitId: string,
+  search: string = "",
+  page: number = 1,
+  limit: number = 10
+): Promise<{ data: AuthUnitUser[]; pagination: any } | null> {
+  const baseUrl = process.env.AUTH_SERVICE_URL;
+
+  if (!baseUrl) {
+    console.warn("[authService] AUTH_SERVICE_URL is not set, skipping get unit users");
+    return null;
+  }
+
+  try {
+    const url = new URL(`${baseUrl}/api/units/${unitId}/users`);
+    if (search) url.searchParams.append("search", search);
+    url.searchParams.append("page", page.toString());
+    url.searchParams.append("limit", limit.toString());
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        "X-Service-Name": "sim-iku",
+        "X-Internal-Key": process.env.INTERNAL_SERVICE_KEY ?? "",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`[authService] Failed to get unit users for unit ${unitId}: HTTP ${response.status}`);
+      return null;
+    }
+
+    const body = await response.json() as { success: boolean; data: AuthUnitUser[]; pagination: any };
+    if (!body.success) return null;
+
+    return { data: body.data, pagination: body.pagination };
+  } catch (err) {
+    console.error(`[authService] Error getting unit users for unit ${unitId}:`, err);
+    return null;
+  }
+}
