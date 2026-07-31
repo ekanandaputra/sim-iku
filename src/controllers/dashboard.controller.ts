@@ -299,3 +299,111 @@ export const getComponentDashboard = async (req: Request, res: Response, next: N
     next(error);
   }
 };
+
+export const getDashboardSummary = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const yearStr = req.query.year as string;
+    if (!yearStr) {
+      return res.status(400).json(errorResponse("Year is required in query params"));
+    }
+    const year = parseInt(yearStr);
+    if (isNaN(year)) {
+      return res.status(400).json(errorResponse("Invalid year format"));
+    }
+
+    const ikus = await prisma.iKU.findMany({
+      orderBy: { code: "asc" }
+    });
+
+    const targets = await prisma.ikuTarget.findMany({ where: { year } });
+    const targetMap = new Map(targets.map(t => [t.ikuId, t]));
+
+    const results = await prisma.ikuResult.findMany({
+      where: { year },
+      orderBy: [{ idIku: "asc" }, { month: "asc" }],
+    });
+
+    const resultsByIku = new Map<string, typeof results>();
+    for (const r of results) {
+      if (!resultsByIku.has(r.idIku)) resultsByIku.set(r.idIku, []);
+      resultsByIku.get(r.idIku)!.push(r);
+    }
+
+    const summary = [
+      { period: "Q1", achieved: 0, notAchieved: 0 },
+      { period: "Q2", achieved: 0, notAchieved: 0 },
+      { period: "Q3", achieved: 0, notAchieved: 0 },
+      { period: "Q4", achieved: 0, notAchieved: 0 },
+      { period: "Year", achieved: 0, notAchieved: 0 },
+    ];
+
+    for (const iku of ikus) {
+      if (!["percentage", "number"].includes(iku.unit)) continue;
+      
+      const target = targetMap.get(iku.id);
+      const ikuResults = resultsByIku.get(iku.id) || [];
+
+      // Calculate Q1-Q4
+      for (let quarter = 1; quarter <= 4; quarter++) {
+        let realization: number | null = null;
+        const qRow = ikuResults.find(r => r.resultType === IkuResultType.quarterly && r.month === quarter);
+        if (qRow?.calculatedValue != null) {
+          realization = formatDecimal(qRow.calculatedValue);
+        } else if (iku.unit === "number") {
+          const monthsInQuarter = quarterMonths[quarter];
+          for (let i = monthsInQuarter.length - 1; i >= 0; i--) {
+            const mRow = ikuResults.find(r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]);
+            if (mRow && mRow.calculatedValue != null) {
+              realization = formatDecimal(mRow.calculatedValue);
+              break;
+            }
+          }
+        }
+
+        let targetVal: number | null = null;
+        if (quarter === 1) targetVal = formatDecimal(target?.targetQ1);
+        if (quarter === 2) targetVal = formatDecimal(target?.targetQ2);
+        if (quarter === 3) targetVal = formatDecimal(target?.targetQ3);
+        if (quarter === 4) targetVal = formatDecimal(target?.targetQ4);
+
+        if (targetVal != null) {
+          const sumItem = summary.find(s => s.period === `Q${quarter}`)!;
+          if (realization != null && realization >= targetVal) {
+            sumItem.achieved++;
+          } else {
+            sumItem.notAchieved++;
+          }
+        }
+      }
+
+      // Calculate Year
+      let yearlyRealization: number | null = null;
+      const yRow = ikuResults.find(r => r.resultType === IkuResultType.yearly);
+      if (yRow?.calculatedValue != null) {
+        yearlyRealization = formatDecimal(yRow.calculatedValue);
+      } else if (iku.unit === "number") {
+        for (let i = 12; i >= 1; i--) {
+          const mRow = ikuResults.find(r => r.resultType === IkuResultType.monthly && r.month === i);
+          if (mRow && mRow.calculatedValue != null) {
+            yearlyRealization = formatDecimal(mRow.calculatedValue);
+            break;
+          }
+        }
+      }
+
+      const yearlyTargetVal = formatDecimal(target?.targetYear);
+      if (yearlyTargetVal != null) {
+        const sumItem = summary.find(s => s.period === "Year")!;
+        if (yearlyRealization != null && yearlyRealization >= yearlyTargetVal) {
+          sumItem.achieved++;
+        } else {
+          sumItem.notAchieved++;
+        }
+      }
+    }
+
+    res.json(successResponse(summary));
+  } catch (error) {
+    next(error);
+  }
+};
