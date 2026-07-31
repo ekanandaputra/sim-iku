@@ -334,7 +334,6 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
       { period: "Q2", achieved: 0, notAchieved: 0 },
       { period: "Q3", achieved: 0, notAchieved: 0 },
       { period: "Q4", achieved: 0, notAchieved: 0 },
-      { period: "Year", achieved: 0, notAchieved: 0 },
     ];
 
     for (const iku of ikus) {
@@ -376,30 +375,6 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
         }
       }
 
-      // Calculate Year
-      let yearlyRealization: number | null = null;
-      const yRow = ikuResults.find(r => r.resultType === IkuResultType.yearly);
-      if (yRow?.calculatedValue != null) {
-        yearlyRealization = formatDecimal(yRow.calculatedValue);
-      } else if (iku.unit === "number") {
-        for (let i = 12; i >= 1; i--) {
-          const mRow = ikuResults.find(r => r.resultType === IkuResultType.monthly && r.month === i);
-          if (mRow && mRow.calculatedValue != null) {
-            yearlyRealization = formatDecimal(mRow.calculatedValue);
-            break;
-          }
-        }
-      }
-
-      const yearlyTargetVal = formatDecimal(target?.targetYear);
-      if (yearlyTargetVal != null) {
-        const sumItem = summary.find(s => s.period === "Year")!;
-        if (yearlyRealization != null && yearlyRealization >= yearlyTargetVal) {
-          sumItem.achieved++;
-        } else {
-          sumItem.notAchieved++;
-        }
-      }
     }
 
     res.json(successResponse(summary));
