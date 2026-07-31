@@ -5118,6 +5118,49 @@ const swaggerDefinition = {
   }
 };
 
+(swaggerDefinition as any).paths["/api/dashboard/summary"] = {
+  get: {
+    tags: ["Dashboard"],
+    summary: "Get summary of IKU target achievements for all active IKUs",
+    parameters: [
+      {
+        in: "query",
+        name: "year",
+        required: true,
+        schema: { type: "integer" },
+        description: "Year to fetch the dashboard summary for",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Dashboard summary data",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                data: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      period: { type: "string", example: "Q1" },
+                      achieved: { type: "integer", example: 5 },
+                      notAchieved: { type: "integer", example: 2 },
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "400": { description: "Bad request - missing or invalid year" },
+    }
+  }
+};
+
 export const swaggerSpec = swaggerJSDoc({
   definition: swaggerDefinition,
   apis: [],
