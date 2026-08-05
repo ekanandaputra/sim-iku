@@ -337,13 +337,49 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
     ];
 
     for (const iku of ikus) {
-      if (!["percentage", "number"].includes(iku.unit)) continue;
+      if (!["percentage", "number", "file", "text"].includes(iku.unit)) continue;
       
       const target = targetMap.get(iku.id);
       const ikuResults = resultsByIku.get(iku.id) || [];
 
       // Calculate Q1-Q4
       for (let quarter = 1; quarter <= 4; quarter++) {
+        const sumItem = summary.find(s => s.period === `Q${quarter}`)!;
+
+        if (iku.unit === "file" || iku.unit === "text") {
+          let hasValue = false;
+          const qRow = ikuResults.find(r => r.resultType === IkuResultType.quarterly && r.month === quarter);
+          
+          if (qRow) {
+            if (iku.unit === "file" && Array.isArray(qRow.documentIds) && qRow.documentIds.length > 0) {
+              hasValue = true;
+            } else if (iku.unit === "text" && qRow.textValue && qRow.textValue.trim() !== "") {
+              hasValue = true;
+            }
+          } else {
+            const monthsInQuarter = quarterMonths[quarter];
+            for (let i = monthsInQuarter.length - 1; i >= 0; i--) {
+              const mRow = ikuResults.find(r => r.resultType === IkuResultType.monthly && r.month === monthsInQuarter[i]);
+              if (mRow) {
+                if (iku.unit === "file" && Array.isArray(mRow.documentIds) && mRow.documentIds.length > 0) {
+                  hasValue = true;
+                  break;
+                } else if (iku.unit === "text" && mRow.textValue && mRow.textValue.trim() !== "") {
+                  hasValue = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (hasValue) {
+            sumItem.achieved++;
+          } else {
+            sumItem.notAchieved++;
+          }
+          continue;
+        }
+
         let realization: number | null = null;
         const qRow = ikuResults.find(r => r.resultType === IkuResultType.quarterly && r.month === quarter);
         if (qRow?.calculatedValue != null) {
@@ -366,7 +402,6 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
         if (quarter === 4) targetVal = formatDecimal(target?.targetQ4);
 
         if (targetVal != null) {
-          const sumItem = summary.find(s => s.period === `Q${quarter}`)!;
           if (realization != null && realization >= targetVal) {
             sumItem.achieved++;
           } else {
