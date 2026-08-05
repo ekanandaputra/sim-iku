@@ -330,10 +330,10 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
     }
 
     const summary = [
-      { period: "Q1", achieved: 0, notAchieved: 0 },
-      { period: "Q2", achieved: 0, notAchieved: 0 },
-      { period: "Q3", achieved: 0, notAchieved: 0 },
-      { period: "Q4", achieved: 0, notAchieved: 0 },
+      { period: "Q1", achieved: 0, notAchieved: 0, achievedIkus: [] as any[], notAchievedIkus: [] as any[] },
+      { period: "Q2", achieved: 0, notAchieved: 0, achievedIkus: [] as any[], notAchievedIkus: [] as any[] },
+      { period: "Q3", achieved: 0, notAchieved: 0, achievedIkus: [] as any[], notAchievedIkus: [] as any[] },
+      { period: "Q4", achieved: 0, notAchieved: 0, achievedIkus: [] as any[], notAchievedIkus: [] as any[] },
     ];
 
     for (const iku of ikus) {
@@ -374,8 +374,10 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
 
           if (hasValue) {
             sumItem.achieved++;
+            sumItem.achievedIkus.push({ id: iku.id, code: iku.code, name: iku.name });
           } else {
             sumItem.notAchieved++;
+            sumItem.notAchievedIkus.push({ id: iku.id, code: iku.code, name: iku.name });
           }
           continue;
         }
@@ -404,8 +406,10 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
         if (targetVal != null) {
           if (realization != null && realization >= targetVal) {
             sumItem.achieved++;
+            sumItem.achievedIkus.push({ id: iku.id, code: iku.code, name: iku.name });
           } else {
             sumItem.notAchieved++;
+            sumItem.notAchievedIkus.push({ id: iku.id, code: iku.code, name: iku.name });
           }
         }
       }
