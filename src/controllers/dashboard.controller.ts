@@ -403,7 +403,13 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
         if (quarter === 3) targetVal = formatDecimal(target?.targetQ3);
         if (quarter === 4) targetVal = formatDecimal(target?.targetQ4);
 
-        if (targetVal != null) {
+        const isTargetEmptyOrZero = targetVal == null || targetVal === 0;
+        const isRealizationEmptyOrZero = realization == null || realization === 0;
+
+        if (isTargetEmptyOrZero && isRealizationEmptyOrZero) {
+          sumItem.achieved++;
+          sumItem.achievedIkus.push({ id: iku.id, code: iku.code, name: iku.name });
+        } else if (targetVal != null) {
           if (realization != null && realization >= targetVal) {
             sumItem.achieved++;
             sumItem.achievedIkus.push({ id: iku.id, code: iku.code, name: iku.name });
