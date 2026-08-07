@@ -25,6 +25,7 @@ import bidangRouter from "./routes/bidang.route";
 import auditLogRouter from "./routes/auditLog.route";
 import userRouter from "./routes/user.route";
 import unitRouter from "./routes/unit.route";
+import settingsRouter from "./routes/periodLock.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -60,6 +61,7 @@ app.use("/api/bidang", bidangRouter);
 app.use("/api/audit-logs", auditLogRouter);
 app.use("/api/users", userRouter);
 app.use("/api/units", unitRouter);
+app.use("/api/settings", settingsRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

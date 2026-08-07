@@ -7,6 +7,7 @@ import { BulkSaveRealizationDto } from "../dtos/realization.dto";
 import { filterProdisByComponent } from "../utils/prodiFilter";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
+import { checkPeriodLock, PeriodLockError, getLockedMonths } from "../utils/periodLock";
 
 const YEARS_RANGE = 6;
 const MONTH_NAMES = [
@@ -265,6 +266,18 @@ export const getRealizationView = async (
     if (permissions.includes("admin_sim_iku")) {
       userFilterEnabled = false;
     }
+
+    // Fetch lock status for all years in range
+    const locksByYear = new Map<number, Map<number, { locked: boolean; allowAdminBypass: boolean; reason?: string | null }>>();
+    for (const y of years) {
+      locksByYear.set(y, await getLockedMonths(y));
+    }
+    const getMonthLocked = (year: number, month: number): boolean => {
+      const yearLocks = locksByYear.get(year);
+      if (!yearLocks) return false;
+      const lock = yearLocks.get(month);
+      return lock?.locked ?? false;
+    };
     const userId = userFilterEnabled ? (req as any).user?.id : undefined;
 
     if (type.toLowerCase() === "component") {
@@ -354,6 +367,7 @@ export const getRealizationView = async (
               id: r?.idRealization ?? null,
               year,
               value,
+              locked: getMonthLocked(year, monthKey),
               _action: r ? "PUT" : "POST",
               ...extra,
             };
@@ -491,6 +505,7 @@ export const getRealizationView = async (
           id: r?.idRealization ?? null,
           year,
           value,
+          locked: getMonthLocked(year, monthKey),
           _action: r ? "PUT" : "POST",
           ...extra,
         };
@@ -650,6 +665,7 @@ export const getRealizationView = async (
           id: r?.idResult ?? null,
           year,
           value,
+          locked: getMonthLocked(year, monthKey),
           _action: r ? "PUT" : "POST",
           ...extra,
         };
@@ -725,6 +741,19 @@ export const bulkSaveRealization = async (
   try {
     const { type, id } = req.params;
     const { year, realizations } = req.body;
+    const isAdmin = ((req as any).user?.permissions || []).includes("admin_sim_iku");
+
+    // Guard: check period lock for all months in the request
+    for (const item of realizations) {
+      try {
+        await checkPeriodLock(item.month, year, isAdmin);
+      } catch (err) {
+        if (err instanceof PeriodLockError) {
+          return res.status(403).json(errorResponse(err.message));
+        }
+        throw err;
+      }
+    }
 
     if (type.toLowerCase() === "component") {
       const component = await prisma.component.findUnique({

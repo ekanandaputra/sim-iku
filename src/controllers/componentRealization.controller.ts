@@ -5,6 +5,7 @@ import { evaluateFormula, ComponentValues, getFormulaRequiredComponentCodes } fr
 import { IkuResultType } from "../generated/prisma/enums";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
+import { checkPeriodLock, PeriodLockError } from "../utils/periodLock";
 
 type RealizationParams = { id: string };
 
@@ -575,6 +576,17 @@ export const createComponentRealization = async (
     }
     // ------------------------------------------------------------------
 
+    // Guard: period lock check
+    const isAdmin = ((req as any).user?.permissions || []).includes("admin_sim_iku");
+    try {
+      await checkPeriodLock(validatedMonth, year, isAdmin);
+    } catch (err) {
+      if (err instanceof PeriodLockError) {
+        return res.status(403).json(errorResponse(err.message));
+      }
+      throw err;
+    }
+
     let record: any;
 
     if (prodiId) {
@@ -672,6 +684,17 @@ export const updateComponentRealization = async (
 
     if (existing.component.hasBreakdown && !prodiId) {
       return res.status(400).json(errorResponse("prodiId is mandatory for components with breakdowns"));
+    }
+
+    // Guard: period lock check
+    const isAdmin = ((req as any).user?.permissions || []).includes("admin_sim_iku");
+    try {
+      await checkPeriodLock(existing.month ?? 0, existing.year, isAdmin);
+    } catch (err) {
+      if (err instanceof PeriodLockError) {
+        return res.status(403).json(errorResponse(err.message));
+      }
+      throw err;
     }
 
     let updated: any;
