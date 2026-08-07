@@ -35,6 +35,7 @@ const swaggerDefinition = {
     { name: "AuditLog", description: "Audit log — riwayat perubahan data IKU, IKP, Realisasi Komponen, dan IKU Result" },
     { name: "Users", description: "User management and PIC endpoints" },
     { name: "Units", description: "Unit management endpoints" },
+    { name: "Settings", description: "Application settings — period lock untuk mengunci/membuka input realisasi per bulan" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -5159,6 +5160,166 @@ const swaggerDefinition = {
       "400": { description: "Bad request - missing or invalid year" },
     }
   }
+};
+
+// ── Settings: Period Lock ────────────────────────────────────────────────────
+
+(swaggerDefinition as any).components.schemas.PeriodLockStatus = {
+  type: "object",
+  properties: {
+    month: { type: "integer", minimum: 1, maximum: 12, example: 1 },
+    monthName: { type: "string", example: "Januari" },
+    year: { type: "integer", example: 2026 },
+    locked: { type: "boolean", example: false },
+    allowAdminBypass: { type: "boolean", example: false, description: "Jika true, user dengan permission admin_sim_iku tetap bisa input meskipun bulan dikunci" },
+    reason: { type: "string", nullable: true, example: "Deadline sudah lewat" },
+    lockedBy: { type: "string", nullable: true, format: "uuid", description: "ID user yang mengunci" },
+    lockedAt: { type: "string", nullable: true, format: "date-time" },
+  },
+};
+
+(swaggerDefinition as any).components.schemas.TogglePeriodLock = {
+  type: "object",
+  properties: {
+    month: { type: "integer", minimum: 1, maximum: 12, example: 1, description: "Bulan (1-12)" },
+    year: { type: "integer", minimum: 2000, example: 2026 },
+    locked: { type: "boolean", example: true, description: "true = kunci, false = buka" },
+    allowAdminBypass: { type: "boolean", example: false, description: "Jika true, admin tetap bisa input" },
+    reason: { type: "string", example: "Deadline sudah lewat", description: "Alasan penguncian (opsional)" },
+  },
+  required: ["month", "year", "locked"],
+};
+
+(swaggerDefinition as any).components.schemas.BulkPeriodLock = {
+  type: "object",
+  properties: {
+    year: { type: "integer", minimum: 2000, example: 2026 },
+    locks: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          month: { type: "integer", minimum: 1, maximum: 12, example: 1 },
+          locked: { type: "boolean", example: true },
+          allowAdminBypass: { type: "boolean", example: false },
+          reason: { type: "string", example: "Revisi" },
+        },
+        required: ["month", "locked"],
+      },
+    },
+  },
+  required: ["year", "locks"],
+};
+
+(swaggerDefinition as any).paths["/api/settings/period-locks"] = {
+  get: {
+    tags: ["Settings"],
+    summary: "Get period lock status untuk semua bulan dalam satu tahun",
+    description: "Mengembalikan status lock/unlock untuk 12 bulan (Januari–Desember) pada tahun yang ditentukan. Jika bulan di-lock, user tidak bisa menginput realisasi pada bulan tersebut.",
+    parameters: [
+      {
+        in: "query",
+        name: "year",
+        schema: { type: "integer", example: 2026 },
+        description: "Tahun yang ingin dilihat. Default: tahun berjalan.",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Daftar status lock 12 bulan",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                data: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/PeriodLockStatus" },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  post: {
+    tags: ["Settings"],
+    summary: "Toggle lock/unlock satu bulan",
+    description: "Mengunci atau membuka input realisasi untuk satu bulan tertentu. Ketika `locked: true`, record lock dibuat. Ketika `locked: false`, record lock dihapus. Field `allowAdminBypass` menentukan apakah admin tetap bisa input meski bulan dikunci.",
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/TogglePeriodLock" },
+        },
+      },
+    },
+    responses: {
+      "200": {
+        description: "Period lock berhasil di-toggle",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: { type: "string", example: "Periode Januari 2026 berhasil dikunci" },
+                data: { $ref: "#/components/schemas/PeriodLockStatus" },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Validation error" },
+    },
+  },
+};
+
+(swaggerDefinition as any).paths["/api/settings/period-locks/bulk"] = {
+  post: {
+    tags: ["Settings"],
+    summary: "Bulk toggle lock/unlock untuk beberapa bulan sekaligus",
+    description: "Mengunci atau membuka beberapa bulan sekaligus dalam satu tahun. Berguna untuk mengatur semua periode lock dari halaman setting.",
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/BulkPeriodLock" },
+          example: {
+            year: 2026,
+            locks: [
+              { month: 1, locked: true, allowAdminBypass: false, reason: "Deadline lewat" },
+              { month: 2, locked: true, allowAdminBypass: true, reason: "Revisi" },
+              { month: 3, locked: false },
+            ],
+          },
+        },
+      },
+    },
+    responses: {
+      "200": {
+        description: "Bulk toggle berhasil",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: { type: "string", example: "Berhasil mengubah 3 periode" },
+                data: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/PeriodLockStatus" },
+                },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Validation error" },
+    },
+  },
 };
 
 export const swaggerSpec = swaggerJSDoc({
