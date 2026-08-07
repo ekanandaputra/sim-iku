@@ -4,6 +4,7 @@ import { successResponse, errorResponse } from "../utils/response";
 import { filterProdisByComponent } from "../utils/prodiFilter";
 import { SaveBreakdownDto } from "../dtos/componentBreakdown.dto";
 import { calculateIkuResultsForComponentRealization, calculateParentComponentSum } from "./componentRealization.controller";
+import { checkPeriodLock, PeriodLockError } from "../utils/periodLock";
 
 type RealizationParams = { realizationId: string };
 
@@ -89,6 +90,17 @@ export const saveBreakdown = async (
     }
     if (!realization.component.hasBreakdown) {
       return res.status(400).json(errorResponse("This component does not have breakdown enabled"));
+    }
+
+    // Guard: period lock check
+    const isAdmin = ((req as any).user?.permissions || []).includes("admin_sim_iku");
+    try {
+      await checkPeriodLock(realization.month ?? 0, realization.year, isAdmin);
+    } catch (err) {
+      if (err instanceof PeriodLockError) {
+        return res.status(403).json(errorResponse(err.message));
+      }
+      throw err;
     }
 
     // Validate all prodiIds exist
@@ -214,6 +226,17 @@ export const deleteBreakdownEntry = async (
     });
     if (!entry) {
       return res.status(404).json(errorResponse("Breakdown entry not found"));
+    }
+
+    // Guard: period lock check
+    const isAdmin = ((req as any).user?.permissions || []).includes("admin_sim_iku");
+    try {
+      await checkPeriodLock(realization.month ?? 0, realization.year, isAdmin);
+    } catch (err) {
+      if (err instanceof PeriodLockError) {
+        return res.status(403).json(errorResponse(err.message));
+      }
+      throw err;
     }
 
     await prisma.componentRealizationBreakdown.delete({

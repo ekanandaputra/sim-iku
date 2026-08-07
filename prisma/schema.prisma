@@ -483,3 +483,17 @@ model UnitIKU {
   @@unique([unitId, ikuId])
   @@map("unit_iku")
 }
+
+model RealizationPeriodLock {
+  id                String   @id @default(uuid()) @db.VarChar(36)
+  month             Int      // 1-12
+  year              Int
+  reason            String?  @db.Text
+  allowAdminBypass  Boolean  @default(false) @map("allow_admin_bypass")
+  lockedBy          String?  @map("locked_by") @db.VarChar(36)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@unique([month, year])
+  @@map("realization_period_locks")
+}
