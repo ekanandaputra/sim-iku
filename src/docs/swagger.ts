@@ -5403,6 +5403,94 @@ const swaggerDefinition = {
   },
 };
 
+(swaggerDefinition as any).paths["/api/verifications/dashboard"] = {
+  get: {
+    tags: ["Verification"],
+    summary: "Dashboard status verifikasi",
+    description:
+      "Dashboard status verifikasi seluruh IKU (direct input) dan Component per tahun. " +
+      "Menampilkan status verifikasi per record realisasi (IKU & Component).",
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        name: "year",
+        in: "query",
+        required: true,
+        schema: { type: "integer", example: 2026 },
+        description: "Tahun realisasi (contoh: 2026)",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Data dashboard",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                data: {
+                  type: "object",
+                  properties: {
+                    year: { type: "integer", example: 2026 },
+                    summary: {
+                      type: "object",
+                      properties: {
+                        totalRecords: { type: "integer", example: 10 },
+                        totalWithRealization: { type: "integer", example: 8 },
+                        totalVerified: { type: "integer", example: 5 },
+                        totalUnverified: { type: "integer", example: 3 },
+                        totalNoRealization: { type: "integer", example: 2 },
+                      },
+                    },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          entityType: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
+                          entityId: { type: "string", nullable: true, format: "uuid" },
+                          metricType: { type: "string", enum: ["COMPONENT", "IKU"] },
+                          metricId: { type: "string", format: "uuid" },
+                          metricCode: { type: "string", example: "IKU-01" },
+                          metricName: { type: "string", example: "Lulusan Mendapat Pekerjaan yang Layak" },
+                          month: { type: "integer", nullable: true, example: 3 },
+                          monthName: { type: "string", nullable: true, example: "Maret" },
+                          year: { type: "integer", example: 2026 },
+                          hasRealization: { type: "boolean", example: true },
+                          verificationStatus: {
+                            type: "string",
+                            enum: ["TERVERIFIKASI", "BELUM_DIVERIFIKASI", "BELUM_ADA_REALISASI"],
+                          },
+                          verificationCount: { type: "integer", example: 1 },
+                          verifiedBy: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                userId: { type: "string", format: "uuid" },
+                                userName: { type: "string", nullable: true },
+                                note: { type: "string", nullable: true },
+                                verifiedAt: { type: "string", format: "date-time" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Parameter year wajib diisi / format tidak valid" },
+      "401": { description: "Unauthorized" },
+    },
+  },
+};
+
 (swaggerDefinition as any).paths["/api/verifications/{entityType}/{entityId}"] = {
   get: {
     tags: ["Verification"],

@@ -199,3 +199,202 @@ export const deleteVerification = async (
     next(error);
   }
 };
+
+const MONTH_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+];
+
+/**
+ * GET /api/verifications/dashboard?year=2026
+ * Dashboard status verifikasi seluruh IKU (direct input) dan Component
+ * per tahun. Menampilkan status verifikasi per record realisasi.
+ */
+export const getVerificationDashboard = async (
+  req: Request<{}, {}, {}, { year?: string }>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const yearStr = req.query.year;
+    if (!yearStr) {
+      return res.status(400).json(errorResponse("Parameter year wajib diisi"));
+    }
+    const year = parseInt(yearStr);
+    if (isNaN(year)) {
+      return res.status(400).json(errorResponse("Format year tidak valid"));
+    }
+
+    // 1. Fetch all IKUs (direct input) and their results for the year
+    const ikus = await prisma.iKU.findMany({
+      where: { isDirectInput: true },
+      orderBy: { code: "asc" },
+    });
+
+    const ikuResults = await prisma.ikuResult.findMany({
+      where: { year },
+    });
+
+    // 2. Fetch all root Components and their realizations for the year
+    const components = await prisma.component.findMany({
+      where: { parentId: null },
+      orderBy: { code: "asc" },
+    });
+
+    const allComponentIds = components.map((c) => c.id);
+    const componentRealizations = await prisma.componentRealization.findMany({
+      where: { idComponent: { in: allComponentIds }, year },
+    });
+
+    // 3. Collect all entity IDs and fetch verifications in one query
+    const componentRealizationIds = componentRealizations.map((r) => r.idRealization);
+    const ikuResultIds = ikuResults.map((r) => r.idResult);
+
+    const allVerifications = await prisma.realizationVerification.findMany({
+      where: {
+        OR: [
+          ...(componentRealizationIds.length > 0
+            ? [{ entityType: "COMPONENT_REALIZATION" as VerificationEntityType, entityId: { in: componentRealizationIds } }]
+            : []),
+          ...(ikuResultIds.length > 0
+            ? [{ entityType: "IKU_RESULT" as VerificationEntityType, entityId: { in: ikuResultIds } }]
+            : []),
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Map verifications by entityId
+    const verificationsByEntityId = new Map<string, typeof allVerifications>();
+    for (const v of allVerifications) {
+      if (!verificationsByEntityId.has(v.entityId)) {
+        verificationsByEntityId.set(v.entityId, []);
+      }
+      verificationsByEntityId.get(v.entityId)!.push(v);
+    }
+
+    // 4. Build IKU rows
+    const ikuRows = ikus.flatMap((iku) => {
+      const results = ikuResults.filter((r) => r.idIku === iku.id);
+
+      if (results.length === 0) {
+        return [{
+          entityType: "IKU_RESULT",
+          entityId: null as string | null,
+          metricType: "IKU",
+          metricId: iku.id,
+          metricCode: iku.code,
+          metricName: iku.name,
+          month: null as number | null,
+          monthName: null as string | null,
+          year,
+          hasRealization: false,
+          verificationStatus: "BELUM_ADA_REALISASI",
+          verificationCount: 0,
+          verifiedBy: [] as any[],
+        }];
+      }
+
+      return results.map((r) => {
+        const verifs = verificationsByEntityId.get(r.idResult) || [];
+        return {
+          entityType: "IKU_RESULT",
+          entityId: r.idResult as string | null,
+          metricType: "IKU",
+          metricId: iku.id,
+          metricCode: iku.code,
+          metricName: iku.name,
+          month: r.month as number | null,
+          monthName: (r.month >= 1 && r.month <= 12 ? MONTH_NAMES[r.month - 1] : null) as string | null,
+          year: r.year,
+          hasRealization: true,
+          verificationStatus: verifs.length > 0 ? "TERVERIFIKASI" : "BELUM_DIVERIFIKASI",
+          verificationCount: verifs.length,
+          verifiedBy: verifs.map((v) => ({
+            userId: v.userId,
+            userName: v.userName,
+            note: v.note,
+            verifiedAt: v.createdAt,
+          })),
+        };
+      });
+    });
+
+    // 5. Build Component rows
+    const componentRows = components.flatMap((component) => {
+      const realizations = componentRealizations.filter((r) => r.idComponent === component.id);
+
+      if (realizations.length === 0) {
+        return [{
+          entityType: "COMPONENT_REALIZATION",
+          entityId: null as string | null,
+          metricType: "COMPONENT",
+          metricId: component.id,
+          metricCode: component.code,
+          metricName: component.name,
+          month: null as number | null,
+          monthName: null as string | null,
+          year,
+          hasRealization: false,
+          verificationStatus: "BELUM_ADA_REALISASI",
+          verificationCount: 0,
+          verifiedBy: [] as any[],
+        }];
+      }
+
+      return realizations.map((r) => {
+        const verifs = verificationsByEntityId.get(r.idRealization) || [];
+        return {
+          entityType: "COMPONENT_REALIZATION",
+          entityId: r.idRealization as string | null,
+          metricType: "COMPONENT",
+          metricId: component.id,
+          metricCode: component.code,
+          metricName: component.name,
+          month: r.month as number | null,
+          monthName: (r.month != null && r.month >= 1 && r.month <= 12
+            ? MONTH_NAMES[r.month - 1]
+            : null) as string | null,
+          year: r.year,
+          hasRealization: true,
+          verificationStatus: verifs.length > 0 ? "TERVERIFIKASI" : "BELUM_DIVERIFIKASI",
+          verificationCount: verifs.length,
+          verifiedBy: verifs.map((v) => ({
+            userId: v.userId,
+            userName: v.userName,
+            note: v.note,
+            verifiedAt: v.createdAt,
+          })),
+        };
+      });
+    });
+
+    // 6. Merge and sort by code
+    const allRows = [...ikuRows, ...componentRows].sort((a: any, b: any) =>
+      a.metricCode.localeCompare(b.metricCode)
+    );
+
+    // 7. Summary stats
+    const totalRecords = allRows.length;
+    const totalWithRealization = allRows.filter((r: any) => r.hasRealization).length;
+    const totalVerified = allRows.filter((r: any) => r.verificationStatus === "TERVERIFIKASI").length;
+    const totalUnverified = allRows.filter((r: any) => r.verificationStatus === "BELUM_DIVERIFIKASI").length;
+    const totalNoRealization = allRows.filter((r: any) => r.verificationStatus === "BELUM_ADA_REALISASI").length;
+
+    return res.json(
+      successResponse({
+        year,
+        summary: {
+          totalRecords,
+          totalWithRealization,
+          totalVerified,
+          totalUnverified,
+          totalNoRealization,
+        },
+        data: allRows,
+      })
+    );
+  } catch (error) {
+    next(error);
+  }
+};
