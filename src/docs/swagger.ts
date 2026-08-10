@@ -5448,30 +5448,81 @@ const swaggerDefinition = {
                       items: {
                         type: "object",
                         properties: {
-                          entityType: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
-                          entityId: { type: "string", nullable: true, format: "uuid" },
                           metricType: { type: "string", enum: ["COMPONENT", "IKU"] },
                           metricId: { type: "string", format: "uuid" },
                           metricCode: { type: "string", example: "IKU-01" },
                           metricName: { type: "string", example: "Lulusan Mendapat Pekerjaan yang Layak" },
-                          month: { type: "integer", nullable: true, example: 3 },
-                          monthName: { type: "string", nullable: true, example: "Maret" },
-                          year: { type: "integer", example: 2026 },
-                          hasRealization: { type: "boolean", example: true },
-                          verificationStatus: {
-                            type: "string",
-                            enum: ["TERVERIFIKASI", "BELUM_DIVERIFIKASI", "BELUM_ADA_REALISASI"],
-                          },
-                          verificationCount: { type: "integer", example: 1 },
-                          verifiedBy: {
+                          realizations: {
                             type: "array",
                             items: {
                               type: "object",
                               properties: {
-                                userId: { type: "string", format: "uuid" },
-                                userName: { type: "string", nullable: true },
-                                note: { type: "string", nullable: true },
-                                verifiedAt: { type: "string", format: "date-time" },
+                                entityType: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
+                                entityId: { type: "string", nullable: true, format: "uuid" },
+                                month: { type: "integer", nullable: true, example: 3 },
+                                monthName: { type: "string", nullable: true, example: "Maret" },
+                                year: { type: "integer", example: 2026 },
+                                hasRealization: { type: "boolean", example: true },
+                                verificationStatus: {
+                                  type: "string",
+                                  enum: ["TERVERIFIKASI", "BELUM_DIVERIFIKASI", "BELUM_ADA_REALISASI"],
+                                },
+                                verificationCount: { type: "integer", example: 1 },
+                                verifiedBy: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      userId: { type: "string", format: "uuid" },
+                                      userName: { type: "string", nullable: true },
+                                      note: { type: "string", nullable: true },
+                                      verifiedAt: { type: "string", format: "date-time" },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                          components: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                metricType: { type: "string", example: "COMPONENT" },
+                                metricId: { type: "string", format: "uuid" },
+                                metricCode: { type: "string", example: "IKP-01" },
+                                metricName: { type: "string", example: "Nama Komponen" },
+                                realizations: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      entityType: { type: "string", example: "COMPONENT_REALIZATION" },
+                                      entityId: { type: "string", nullable: true, format: "uuid" },
+                                      month: { type: "integer", nullable: true, example: 3 },
+                                      monthName: { type: "string", nullable: true, example: "Maret" },
+                                      year: { type: "integer", example: 2026 },
+                                      hasRealization: { type: "boolean", example: true },
+                                      verificationStatus: {
+                                        type: "string",
+                                        enum: ["TERVERIFIKASI", "BELUM_DIVERIFIKASI", "BELUM_ADA_REALISASI"],
+                                      },
+                                      verificationCount: { type: "integer", example: 1 },
+                                      verifiedBy: {
+                                        type: "array",
+                                        items: {
+                                          type: "object",
+                                          properties: {
+                                            userId: { type: "string", format: "uuid" },
+                                            userName: { type: "string", nullable: true },
+                                            note: { type: "string", nullable: true },
+                                            verifiedAt: { type: "string", format: "date-time" },
+                                          },
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
                               },
                             },
                           },
