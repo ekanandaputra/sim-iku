@@ -26,6 +26,7 @@ import auditLogRouter from "./routes/auditLog.route";
 import userRouter from "./routes/user.route";
 import unitRouter from "./routes/unit.route";
 import settingsRouter from "./routes/periodLock.route";
+import verificationRouter from "./routes/verification.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -62,6 +63,7 @@ app.use("/api/audit-logs", auditLogRouter);
 app.use("/api/users", userRouter);
 app.use("/api/units", unitRouter);
 app.use("/api/settings", settingsRouter);
+app.use("/api/verifications", verificationRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

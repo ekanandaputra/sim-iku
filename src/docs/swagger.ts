@@ -36,6 +36,7 @@ const swaggerDefinition = {
     { name: "Users", description: "User management and PIC endpoints" },
     { name: "Units", description: "Unit management endpoints" },
     { name: "Settings", description: "Application settings — period lock untuk mengunci/membuka input realisasi per bulan" },
+    { name: "Verification", description: "Verifikasi realisasi — histori siapa dan kapan memverifikasi data realisasi" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -5318,6 +5319,271 @@ const swaggerDefinition = {
         },
       },
       "400": { description: "Validation error" },
+    },
+  },
+};
+
+// ──────────────── Verification Schemas ────────────────
+(swaggerDefinition as any).components.schemas.RealizationVerification = {
+  type: "object",
+  properties: {
+    id: { type: "string", format: "uuid" },
+    entityType: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
+    entityId: { type: "string", format: "uuid", description: "ID dari ComponentRealization atau IkuResult" },
+    userId: { type: "string", format: "uuid", description: "User yang melakukan verifikasi" },
+    userName: { type: "string", nullable: true, description: "Nama user yang melakukan verifikasi" },
+    note: { type: "string", nullable: true, description: "Catatan verifikasi" },
+    createdAt: { type: "string", format: "date-time" },
+  },
+  required: ["id", "entityType", "entityId", "userId", "createdAt"],
+};
+
+(swaggerDefinition as any).components.schemas.CreateVerificationRequest = {
+  type: "object",
+  properties: {
+    entityId: {
+      type: "string",
+      format: "uuid",
+      description: "ID dari record realisasi (idRealization untuk Component, idResult untuk IKU). Backend otomatis mendeteksi tipe entitas.",
+    },
+    note: {
+      type: "string",
+      nullable: true,
+      description: "Catatan opsional untuk verifikasi",
+    },
+  },
+  required: ["entityId"],
+};
+
+// ──────────────── Verification Paths ────────────────
+(swaggerDefinition as any).paths["/api/verifications"] = {
+  post: {
+    tags: ["Verification"],
+    summary: "Tambah verifikasi pada satu record realisasi",
+    description:
+      "Menambahkan verifikasi pada satu record realisasi (ComponentRealization atau IkuResult). " +
+      "Backend otomatis mendeteksi tipe entitas dari entityId. " +
+      "Hanya user dengan permission `verifikator_sim_iku` atau `admin_sim_iku` yang bisa memverifikasi. " +
+      "Satu user hanya bisa memverifikasi satu record sekali (unique per entityType + entityId + userId).",
+    security: [{ bearerAuth: [] }],
+    requestBody: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/CreateVerificationRequest" },
+          example: {
+            entityId: "550e8400-e29b-41d4-a716-446655440000",
+            note: "Data sudah sesuai dengan dokumen pendukung",
+          },
+        },
+      },
+    },
+    responses: {
+      "201": {
+        description: "Verifikasi berhasil ditambahkan",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: { type: "string", example: "Verifikasi berhasil ditambahkan" },
+                data: { $ref: "#/components/schemas/RealizationVerification" },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Validation error" },
+      "401": { description: "Unauthorized — token tidak valid" },
+      "403": { description: "Forbidden — tidak memiliki permission verifikator_sim_iku" },
+      "404": { description: "Record realisasi tidak ditemukan" },
+      "409": { description: "User sudah memverifikasi record ini sebelumnya" },
+    },
+  },
+};
+
+(swaggerDefinition as any).paths["/api/verifications/dashboard"] = {
+  get: {
+    tags: ["Verification"],
+    summary: "Dashboard status verifikasi",
+    description:
+      "Dashboard status verifikasi seluruh IKU (direct input) dan Component per tahun. " +
+      "Menampilkan status verifikasi per record realisasi (IKU & Component).",
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        name: "year",
+        in: "query",
+        required: true,
+        schema: { type: "integer", example: 2026 },
+        description: "Tahun realisasi (contoh: 2026)",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Data dashboard",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                data: {
+                  type: "object",
+                  properties: {
+                    year: { type: "integer", example: 2026 },
+                    summary: {
+                      type: "object",
+                      properties: {
+                        totalRecords: { type: "integer", example: 10 },
+                        totalWithRealization: { type: "integer", example: 8 },
+                        totalVerified: { type: "integer", example: 5 },
+                        totalUnverified: { type: "integer", example: 3 },
+                        totalNoRealization: { type: "integer", example: 2 },
+                      },
+                    },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          entityType: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
+                          entityId: { type: "string", nullable: true, format: "uuid" },
+                          metricType: { type: "string", enum: ["COMPONENT", "IKU"] },
+                          metricId: { type: "string", format: "uuid" },
+                          metricCode: { type: "string", example: "IKU-01" },
+                          metricName: { type: "string", example: "Lulusan Mendapat Pekerjaan yang Layak" },
+                          month: { type: "integer", nullable: true, example: 3 },
+                          monthName: { type: "string", nullable: true, example: "Maret" },
+                          year: { type: "integer", example: 2026 },
+                          hasRealization: { type: "boolean", example: true },
+                          verificationStatus: {
+                            type: "string",
+                            enum: ["TERVERIFIKASI", "BELUM_DIVERIFIKASI", "BELUM_ADA_REALISASI"],
+                          },
+                          verificationCount: { type: "integer", example: 1 },
+                          verifiedBy: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                userId: { type: "string", format: "uuid" },
+                                userName: { type: "string", nullable: true },
+                                note: { type: "string", nullable: true },
+                                verifiedAt: { type: "string", format: "date-time" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Parameter year wajib diisi / format tidak valid" },
+      "401": { description: "Unauthorized" },
+    },
+  },
+};
+
+(swaggerDefinition as any).paths["/api/verifications/{entityType}/{entityId}"] = {
+  get: {
+    tags: ["Verification"],
+    summary: "Ambil histori verifikasi untuk satu record realisasi",
+    description:
+      "Mengembalikan semua verifikasi yang sudah dilakukan pada satu record realisasi, " +
+      "termasuk siapa yang memverifikasi, kapan, dan catatan.",
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        name: "entityType",
+        in: "path",
+        required: true,
+        schema: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
+        description: "Tipe entitas",
+      },
+      {
+        name: "entityId",
+        in: "path",
+        required: true,
+        schema: { type: "string", format: "uuid" },
+        description: "ID dari record realisasi",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Histori verifikasi",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                data: {
+                  type: "object",
+                  properties: {
+                    entityType: { type: "string", enum: ["COMPONENT_REALIZATION", "IKU_RESULT"] },
+                    entityId: { type: "string", format: "uuid" },
+                    isVerified: { type: "boolean", description: "true jika sudah ada minimal 1 verifikasi" },
+                    verificationCount: { type: "integer", description: "Jumlah verifikasi" },
+                    verifications: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/RealizationVerification" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "entityType tidak valid" },
+      "401": { description: "Unauthorized" },
+    },
+  },
+};
+
+(swaggerDefinition as any).paths["/api/verifications/{id}"] = {
+  delete: {
+    tags: ["Verification"],
+    summary: "Hapus/batalkan satu verifikasi",
+    description:
+      "Menghapus satu record verifikasi. Hanya user yang membuat verifikasi tersebut " +
+      "atau user dengan permission `admin_sim_iku` yang bisa menghapus.",
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        name: "id",
+        in: "path",
+        required: true,
+        schema: { type: "string", format: "uuid" },
+        description: "ID verifikasi yang akan dihapus",
+      },
+    ],
+    responses: {
+      "200": {
+        description: "Verifikasi berhasil dihapus",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean", example: true },
+                message: { type: "string", example: "Verifikasi berhasil dihapus" },
+                data: { type: "object", nullable: true, example: null },
+              },
+            },
+          },
+        },
+      },
+      "401": { description: "Unauthorized" },
+      "403": { description: "Forbidden — bukan pemilik verifikasi dan bukan admin" },
+      "404": { description: "Verifikasi tidak ditemukan" },
     },
   },
 };

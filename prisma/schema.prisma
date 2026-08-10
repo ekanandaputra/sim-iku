@@ -497,3 +497,23 @@ model RealizationPeriodLock {
   @@unique([month, year])
   @@map("realization_period_locks")
 }
+
+enum VerificationEntityType {
+  COMPONENT_REALIZATION
+  IKU_RESULT
+}
+
+model RealizationVerification {
+  id         String                  @id @default(uuid()) @db.VarChar(36)
+  entityType VerificationEntityType  @map("entity_type")
+  entityId   String                  @map("entity_id") @db.VarChar(36)
+  userId     String                  @map("user_id") @db.VarChar(36)
+  userName   String?                 @map("user_name") @db.VarChar(255)
+  note       String?                 @db.Text
+  createdAt  DateTime                @default(now()) @map("created_at")
+
+  @@unique([entityType, entityId, userId])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@map("realization_verifications")
+}
