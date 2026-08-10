@@ -932,11 +932,23 @@ export const getRealizationDetail = async (
 
       if (!realization) return res.status(404).json(errorResponse("Component realization not found"));
 
+      // Fetch verifications for this realization
+      const verifications = await prisma.realizationVerification.findMany({
+        where: {
+          entityType: "COMPONENT_REALIZATION",
+          entityId: id,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
       const { component, ...realizationData } = realization;
 
       return res.json(successResponse({
         metric: component,
         realization: realizationData,
+        isVerified: verifications.length > 0,
+        verificationCount: verifications.length,
+        verifications,
       }));
 
     } else if (type.toLowerCase() === "iku") {
@@ -954,11 +966,23 @@ export const getRealizationDetail = async (
         });
       }
 
+      // Fetch verifications for this IKU result
+      const verifications = await prisma.realizationVerification.findMany({
+        where: {
+          entityType: "IKU_RESULT",
+          entityId: id,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
       const { iku, ...realizationData } = result;
 
       return res.json(successResponse({
         metric: iku,
         realization: { ...realizationData, documents },
+        isVerified: verifications.length > 0,
+        verificationCount: verifications.length,
+        verifications,
       }));
 
     } else {
