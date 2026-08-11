@@ -338,13 +338,17 @@ export const getVerificationDashboard = async (
         };
       }).sort((a: any, b: any) => a.metricCode.localeCompare(b.metricCode));
 
+      // IKU yang punya Component: verifikasi hanya di komponen,
+      // jadi tidak perlu menampilkan bulan (realizations) di level IKU.
+      const hasComponents = componentRows.length > 0;
+
       return {
         metricType: "IKU",
         metricId: iku.id,
         metricCode: iku.code,
         metricName: iku.name,
         isDirectInput: iku.isDirectInput,
-        realizations,
+        realizations: hasComponents ? [] : realizations,
         components: componentRows,
       };
     });
