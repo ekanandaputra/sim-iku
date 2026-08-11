@@ -113,7 +113,28 @@ export const getIkuResultById = async (
     if (!result) {
       return res.status(404).json(errorResponse("IKU result not found"));
     }
-    res.json(successResponse(result));
+
+    // Fetch verification status
+    const verifications = await prisma.realizationVerification.findMany({
+      where: {
+        entityType: "IKU_RESULT",
+        entityId: id,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(successResponse({
+      ...result,
+      isVerified: verifications.length > 0,
+      verificationCount: verifications.length,
+      verifications: verifications.map((v) => ({
+        id: v.id,
+        userId: v.userId,
+        userName: v.userName,
+        note: v.note,
+        verifiedAt: v.createdAt,
+      })),
+    }));
   } catch (error) {
     next(error);
   }
