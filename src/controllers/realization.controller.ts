@@ -945,7 +945,12 @@ export const getRealizationDetail = async (
 
       return res.json(successResponse({
         metric: component,
-        realization: realizationData,
+        realization: {
+          ...realizationData,
+          isVerified: verifications.length > 0,
+          verificationCount: verifications.length,
+          verifications,
+        },
         isVerified: verifications.length > 0,
         verificationCount: verifications.length,
         verifications,
@@ -979,7 +984,13 @@ export const getRealizationDetail = async (
 
       return res.json(successResponse({
         metric: iku,
-        realization: { ...realizationData, documents },
+        realization: {
+          ...realizationData,
+          documents,
+          isVerified: verifications.length > 0,
+          verificationCount: verifications.length,
+          verifications,
+        },
         isVerified: verifications.length > 0,
         verificationCount: verifications.length,
         verifications,

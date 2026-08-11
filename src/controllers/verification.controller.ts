@@ -238,7 +238,7 @@ export const getVerificationDashboard = async (
     });
 
     const ikuResults = await prisma.ikuResult.findMany({
-      where: { year },
+      where: { year, month: { not: 0 } },
     });
 
     // 2. Fetch all root Components (some might not be in IKU, but usually are)
@@ -247,7 +247,7 @@ export const getVerificationDashboard = async (
     });
     
     const componentRealizations = await prisma.componentRealization.findMany({
-      where: { year },
+      where: { year, month: { not: 0 } },
     });
 
     // 3. Collect all entity IDs and fetch verifications
