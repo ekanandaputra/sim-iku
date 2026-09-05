@@ -78,19 +78,19 @@ model IKU {
 }
 
 model Component {
-  id               String                     @id @default(uuid()) @db.VarChar(36)
-  code             String                     @unique
-  name             String
-  description      String?
-  dataType         ComponentDataType?         @map("data_type")
-  sourceType       ComponentSourceType?       @map("source_type")
-  periodType       ComponentPeriodType        @default(yearly) @map("period_type")
-  aggregationType  ComponentAggregationType   @default(LAST) @map("aggregation_type")
-  hasBreakdown     Boolean                    @default(false) @map("has_breakdown")
-  filterByLevel    Boolean                    @default(false) @map("filter_by_level")
-  parentId         String?                    @map("parent_id") @db.VarChar(36)
-  createdAt        DateTime                   @default(now()) @map("created_at")
-  updatedAt        DateTime                   @updatedAt @map("updated_at")
+  id              String                   @id @default(uuid()) @db.VarChar(36)
+  code            String                   @unique
+  name            String
+  description     String?
+  dataType        ComponentDataType?       @map("data_type")
+  sourceType      ComponentSourceType?     @map("source_type")
+  periodType      ComponentPeriodType      @default(yearly) @map("period_type")
+  aggregationType ComponentAggregationType @default(LAST) @map("aggregation_type")
+  hasBreakdown    Boolean                  @default(false) @map("has_breakdown")
+  filterByLevel   Boolean                  @default(false) @map("filter_by_level")
+  parentId        String?                  @map("parent_id") @db.VarChar(36)
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
 
   parent       Component?             @relation("ComponentHierarchy", fields: [parentId], references: [id])
   children     Component[]            @relation("ComponentHierarchy")
@@ -191,7 +191,7 @@ model ComponentRealization {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  component  Component @relation(fields: [idComponent], references: [id])
+  component  Component                       @relation(fields: [idComponent], references: [id])
   documents  ComponentRealizationDocument[]
   breakdowns ComponentRealizationBreakdown[]
 
@@ -274,10 +274,32 @@ model Document {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  components ComponentDocument[]
+  components           ComponentDocument[]
   realizationDocuments ComponentRealizationDocument[]
 
   @@map("documents")
+}
+
+enum VideoSourceType {
+  YOUTUBE
+  GOOGLE_DRIVE
+}
+
+model Guide {
+  id           String           @id @default(uuid()) @db.VarChar(36)
+  title        String
+  description  String?          @db.Text
+  filename     String?
+  originalName String?          @map("original_name")
+  fileUrl      String?          @map("file_url")
+  mimeType     String?          @map("mime_type")
+  size         Int?
+  videoUrl     String?          @map("video_url")
+  videoSource  VideoSourceType? @map("video_source")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@map("guides")
 }
 
 model ComponentDocument {
@@ -358,13 +380,13 @@ model IkuUser {
 }
 
 model Prodi {
-  id         String   @id @default(uuid()) @db.VarChar(36)
-  code       String   @unique
-  name       String
-  level      String   @default("")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  breakdowns ComponentRealizationBreakdown[]
+  id             String                          @id @default(uuid()) @db.VarChar(36)
+  code           String                          @unique
+  name           String
+  level          String                          @default("")
+  createdAt      DateTime                        @default(now()) @map("created_at")
+  updatedAt      DateTime                        @updatedAt @map("updated_at")
+  breakdowns     ComponentRealizationBreakdown[]
   componentUsers ComponentUser[]
 
   @@map("prodi")
@@ -485,14 +507,14 @@ model UnitIKU {
 }
 
 model RealizationPeriodLock {
-  id                String   @id @default(uuid()) @db.VarChar(36)
-  month             Int      // 1-12
-  year              Int
-  reason            String?  @db.Text
-  allowAdminBypass  Boolean  @default(false) @map("allow_admin_bypass")
-  lockedBy          String?  @map("locked_by") @db.VarChar(36)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid()) @db.VarChar(36)
+  month            Int // 1-12
+  year             Int
+  reason           String?  @db.Text
+  allowAdminBypass Boolean  @default(false) @map("allow_admin_bypass")
+  lockedBy         String?  @map("locked_by") @db.VarChar(36)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@unique([month, year])
   @@map("realization_period_locks")
@@ -504,13 +526,13 @@ enum VerificationEntityType {
 }
 
 model RealizationVerification {
-  id         String                  @id @default(uuid()) @db.VarChar(36)
-  entityType VerificationEntityType  @map("entity_type")
-  entityId   String                  @map("entity_id") @db.VarChar(36)
-  userId     String                  @map("user_id") @db.VarChar(36)
-  userName   String?                 @map("user_name") @db.VarChar(255)
-  note       String?                 @db.Text
-  createdAt  DateTime                @default(now()) @map("created_at")
+  id         String                 @id @default(uuid()) @db.VarChar(36)
+  entityType VerificationEntityType @map("entity_type")
+  entityId   String                 @map("entity_id") @db.VarChar(36)
+  userId     String                 @map("user_id") @db.VarChar(36)
+  userName   String?                @map("user_name") @db.VarChar(255)
+  note       String?                @db.Text
+  createdAt  DateTime               @default(now()) @map("created_at")
 
   @@unique([entityType, entityId, userId])
   @@index([entityType, entityId])
