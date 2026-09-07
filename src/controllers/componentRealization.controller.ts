@@ -393,42 +393,46 @@ export async function calculateIkuResultsForComponentRealization(
 
     // ── 3. YEARLY ───────────────────────────────────────────────────────────
     // Yearly TIDAK dihitung ulang dari formula. Nilainya disalin dari quarterly
-    // result kuartal terakhir yang sudah punya data (bukan selalu Q4).
+    // result kuartal terakhir yang nilainya tidak 0 (bukan selalu Q4).
+    // Jika tidak ada quarter dengan nilai tidak-0, yearly = 0.
     {
-      const lastQuarterResult = await prisma.ikuResult.findFirst({
+      const lastNonZeroQuarterResult = await prisma.ikuResult.findFirst({
         where: {
           idIku: formula.ikuId,
           year,
           resultType: IkuResultType.quarterly,
           calculatedValue: { not: null },
+          NOT: { calculatedValue: 0 },
         },
         orderBy: { quarter: "desc" },
       });
 
-      if (lastQuarterResult) {
-        console.log("Copying formula [yearly] from last quarter", { formulaId: formula.id, quarter: lastQuarterResult.quarter, result: lastQuarterResult.calculatedValue });
-        await prisma.ikuResult.upsert({
-          where: {
-            idIku_month_year_resultType: {
-              idIku: formula.ikuId, month: 0, year, resultType: IkuResultType.yearly,
-            },
+      const yearlyValue = lastNonZeroQuarterResult?.calculatedValue ?? 0;
+      const yearlyDebugInfo = lastNonZeroQuarterResult?.debugInfo ?? undefined;
+      const yearlyFormulaVersion = lastNonZeroQuarterResult?.formulaVersion ?? formula.version.toString();
+
+      console.log("Copying formula [yearly] from last non-zero quarter", { formulaId: formula.id, quarter: lastNonZeroQuarterResult?.quarter ?? null, result: yearlyValue });
+      await prisma.ikuResult.upsert({
+        where: {
+          idIku_month_year_resultType: {
+            idIku: formula.ikuId, month: 0, year, resultType: IkuResultType.yearly,
           },
-          create: {
-            idIku: formula.ikuId, month: 0, year,
-            resultType: IkuResultType.yearly,
-            calculatedValue: lastQuarterResult.calculatedValue,
-            debugInfo: lastQuarterResult.debugInfo as any,
-            formulaVersion: lastQuarterResult.formulaVersion,
-            calculatedAt: new Date(),
-          },
-          update: {
-            calculatedValue: lastQuarterResult.calculatedValue,
-            debugInfo: lastQuarterResult.debugInfo as any,
-            formulaVersion: lastQuarterResult.formulaVersion,
-            calculatedAt: new Date(),
-          },
-        });
-      }
+        },
+        create: {
+          idIku: formula.ikuId, month: 0, year,
+          resultType: IkuResultType.yearly,
+          calculatedValue: yearlyValue,
+          debugInfo: yearlyDebugInfo as any,
+          formulaVersion: yearlyFormulaVersion,
+          calculatedAt: new Date(),
+        },
+        update: {
+          calculatedValue: yearlyValue,
+          debugInfo: yearlyDebugInfo as any,
+          formulaVersion: yearlyFormulaVersion,
+          calculatedAt: new Date(),
+        },
+      });
     }
   }
 }
