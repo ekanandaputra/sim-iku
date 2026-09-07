@@ -8,6 +8,7 @@ import { filterProdisByComponent } from "../utils/prodiFilter";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 import { checkPeriodLock, PeriodLockError, getLockedMonths } from "../utils/periodLock";
+import { toAbsoluteUrl } from "../utils/url";
 
 const YEARS_RANGE = 6;
 const MONTH_NAMES = [
@@ -941,12 +942,16 @@ export const getRealizationDetail = async (
         orderBy: { createdAt: "desc" },
       });
 
-      const { component, ...realizationData } = realization;
+      const { component, documents, ...realizationData } = realization;
+      const documentsWithAbsoluteUrls = documents.map(d => d.document
+        ? { ...d, document: { ...d.document, url: toAbsoluteUrl(d.document.url) } }
+        : d);
 
       return res.json(successResponse({
         metric: component,
         realization: {
           ...realizationData,
+          documents: documentsWithAbsoluteUrls,
           isVerified: verifications.length > 0,
           verificationCount: verifications.length,
           verifications,
@@ -966,9 +971,10 @@ export const getRealizationDetail = async (
 
       let documents: any[] = [];
       if (result.documentIds && Array.isArray(result.documentIds)) {
-        documents = await prisma.document.findMany({
+        const foundDocuments = await prisma.document.findMany({
           where: { id: { in: result.documentIds as string[] } }
         });
+        documents = foundDocuments.map(d => ({ ...d, url: toAbsoluteUrl(d.url) }));
       }
 
       // Fetch verifications for this IKU result

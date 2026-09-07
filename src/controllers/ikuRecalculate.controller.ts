@@ -131,16 +131,20 @@ async function recalculateIkuForYear(ikuId: string, year: number) {
   }
 
   // ── YEARLY ────────────────────────────────────────────────────────────
+  // Yearly TIDAK dihitung ulang dari formula. Nilainya disalin dari quarterly
+  // result kuartal terakhir yang sudah punya data (bukan selalu Q4).
   try {
-    const evalResult = await evaluateForPeriod(formula, codeToInfo, formulaCodes, year, null);
-    if (evalResult) {
-      const debugInfo = {
-        componentValues: evalResult.componentValues,
-        componentAggregations: evalResult.componentAggregations,
-        formulaSteps: evalResult.steps,
-        allFormulas: evalResult.allFormulas,
-        evaluatedAt: new Date().toISOString(),
-      };
+    const lastQuarterResult = await prisma.ikuResult.findFirst({
+      where: {
+        idIku: ikuId,
+        year,
+        resultType: IkuResultType.quarterly,
+        calculatedValue: { not: null },
+      },
+      orderBy: { quarter: "desc" },
+    });
+
+    if (lastQuarterResult) {
       await prisma.ikuResult.upsert({
         where: {
           idIku_month_year_resultType: {
@@ -150,19 +154,19 @@ async function recalculateIkuForYear(ikuId: string, year: number) {
         create: {
           idIku: ikuId, month: 0, year,
           resultType: IkuResultType.yearly,
-          calculatedValue: evalResult.result,
-          debugInfo,
-          formulaVersion: formula.version.toString(),
+          calculatedValue: lastQuarterResult.calculatedValue,
+          debugInfo: lastQuarterResult.debugInfo as any,
+          formulaVersion: lastQuarterResult.formulaVersion,
           calculatedAt: new Date(),
         },
         update: {
-          calculatedValue: evalResult.result,
-          debugInfo,
-          formulaVersion: formula.version.toString(),
+          calculatedValue: lastQuarterResult.calculatedValue,
+          debugInfo: lastQuarterResult.debugInfo as any,
+          formulaVersion: lastQuarterResult.formulaVersion,
           calculatedAt: new Date(),
         },
       });
-      results.push({ resultType: "yearly", month: 0, calculatedValue: evalResult.result, status: "ok" });
+      results.push({ resultType: "yearly", month: 0, quarter: lastQuarterResult.quarter ?? undefined, calculatedValue: lastQuarterResult.calculatedValue !== null ? Number(lastQuarterResult.calculatedValue) : null, status: "ok" });
     } else {
       results.push({ resultType: "yearly", month: 0, calculatedValue: null, status: "no_data" });
     }

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { IkuResultType } from "../generated/prisma/enums";
+import { toAbsoluteUrl } from "../utils/url";
 
 const formatDecimal = (val: any): number | null => {
   if (val == null) return null;
@@ -108,7 +109,7 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         return docIds
           .map(id => docMap.get(id))
           .filter(Boolean)
-          .map((d: any) => ({ name: d.originalName, url: d.url }));
+          .map((d: any) => ({ name: d.originalName, url: toAbsoluteUrl(d.url) }));
       };
 
       const getQuarterTextRealization = (quarter: number) => {

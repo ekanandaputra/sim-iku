@@ -4,9 +4,14 @@ import { successResponse, errorResponse } from "../utils/response";
 import { VideoSourceType } from "../generated/prisma/enums";
 import fs from "fs";
 import path from "path";
+import { toAbsoluteUrl } from "../utils/url";
 
 type GuideParams = { id: string };
 type GuideQuery = { title?: string; page?: string; limit?: string };
+
+function serializeGuide<T extends { fileUrl: string | null }>(guide: T) {
+  return { ...guide, fileUrl: toAbsoluteUrl(guide.fileUrl) };
+}
 
 function detectVideoSource(videoUrl?: string | null): VideoSourceType | null {
   if (!videoUrl) return null;
@@ -45,7 +50,7 @@ export const listGuides = async (
     ]);
 
     res.json(successResponse({
-      data: guides,
+      data: guides.map(serializeGuide),
       pagination: {
         page,
         limit,
@@ -72,7 +77,7 @@ export const getGuideById = async (
     if (!guide) {
       return res.status(404).json(errorResponse("Guide not found"));
     }
-    res.json(successResponse(guide));
+    res.json(successResponse(serializeGuide(guide)));
   } catch (error) {
     next(error);
   }
@@ -109,7 +114,7 @@ export const createGuide = async (req: Request, res: Response, next: NextFunctio
       },
     });
 
-    res.status(201).json(successResponse(guide, "Guide created successfully"));
+    res.status(201).json(successResponse(serializeGuide(guide), "Guide created successfully"));
   } catch (error) {
     next(error);
   }
@@ -161,7 +166,7 @@ export const updateGuide = async (
       },
     });
 
-    res.json(successResponse(guide, "Guide updated successfully"));
+    res.json(successResponse(serializeGuide(guide), "Guide updated successfully"));
   } catch (error) {
     next(error);
   }

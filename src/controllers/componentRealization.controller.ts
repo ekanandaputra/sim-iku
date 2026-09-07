@@ -6,6 +6,17 @@ import { IkuResultType } from "../generated/prisma/enums";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 import { checkPeriodLock, PeriodLockError } from "../utils/periodLock";
+import { toAbsoluteUrl } from "../utils/url";
+
+function withAbsoluteDocumentUrls<T extends { documents?: { document?: { url: string } | null }[] }>(record: T): T {
+  if (!record.documents) return record;
+  return {
+    ...record,
+    documents: record.documents.map(d => d.document
+      ? { ...d, document: { ...d.document, url: toAbsoluteUrl(d.document.url) } }
+      : d),
+  };
+}
 
 type RealizationParams = { id: string };
 
@@ -381,13 +392,21 @@ export async function calculateIkuResultsForComponentRealization(
     }
 
     // ── 3. YEARLY ───────────────────────────────────────────────────────────
+    // Yearly TIDAK dihitung ulang dari formula. Nilainya disalin dari quarterly
+    // result kuartal terakhir yang sudah punya data (bukan selalu Q4).
     {
-      const result = await evaluateFormulaForMonths(
-        formula, componentIds, codeToInfo, formulaCodes, year, null
-      );
+      const lastQuarterResult = await prisma.ikuResult.findFirst({
+        where: {
+          idIku: formula.ikuId,
+          year,
+          resultType: IkuResultType.quarterly,
+          calculatedValue: { not: null },
+        },
+        orderBy: { quarter: "desc" },
+      });
 
-      if (result !== null) {
-        console.log("Evaluating formula [yearly]", { formulaId: formula.id, result: result.result });
+      if (lastQuarterResult) {
+        console.log("Copying formula [yearly] from last quarter", { formulaId: formula.id, quarter: lastQuarterResult.quarter, result: lastQuarterResult.calculatedValue });
         await prisma.ikuResult.upsert({
           where: {
             idIku_month_year_resultType: {
@@ -397,15 +416,15 @@ export async function calculateIkuResultsForComponentRealization(
           create: {
             idIku: formula.ikuId, month: 0, year,
             resultType: IkuResultType.yearly,
-            calculatedValue: result.result,
-            debugInfo: result.debugInfo,
-            formulaVersion: formula.version.toString(),
+            calculatedValue: lastQuarterResult.calculatedValue,
+            debugInfo: lastQuarterResult.debugInfo as any,
+            formulaVersion: lastQuarterResult.formulaVersion,
             calculatedAt: new Date(),
           },
           update: {
-            calculatedValue: result.result,
-            debugInfo: result.debugInfo,
-            formulaVersion: formula.version.toString(),
+            calculatedValue: lastQuarterResult.calculatedValue,
+            debugInfo: lastQuarterResult.debugInfo as any,
+            formulaVersion: lastQuarterResult.formulaVersion,
             calculatedAt: new Date(),
           },
         });
@@ -507,7 +526,7 @@ export const listComponentRealizations = async (
         documents: { include: { document: true } },
       },
     });
-    res.json(successResponse(records));
+    res.json(successResponse(records.map(withAbsoluteDocumentUrls)));
   } catch (error) {
     next(error);
   }
@@ -529,7 +548,7 @@ export const getComponentRealizationById = async (
     });
 
     if (!record) return res.status(404).json(errorResponse("Component realization not found"));
-    res.json(successResponse(record));
+    res.json(successResponse(withAbsoluteDocumentUrls(record)));
   } catch (error) {
     next(error);
   }

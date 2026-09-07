@@ -5649,7 +5649,7 @@ const swaggerDefinition = {
     description: { type: "string", nullable: true },
     filename: { type: "string", nullable: true, description: "Nama file fisik di server" },
     originalName: { type: "string", nullable: true, description: "Nama file asli saat diupload" },
-    fileUrl: { type: "string", nullable: true, description: "Path untuk mengakses materi panduan (mis. /uploads/xxx.pdf)" },
+    fileUrl: { type: "string", nullable: true, description: "Full URL untuk mengakses materi panduan (mis. https://host/uploads/xxx.pdf)" },
     mimeType: { type: "string", nullable: true },
     size: { type: "integer", nullable: true, description: "Ukuran file dalam bytes" },
     videoUrl: { type: "string", nullable: true, description: "Link video YouTube atau Google Drive" },
