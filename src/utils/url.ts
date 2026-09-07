@@ -3,7 +3,7 @@
  * menggunakan BASE_URL dari env. Jika sudah berupa URL absolut (http/https),
  * dikembalikan apa adanya.
  */
-const DEFAULT_BASE_URL = "https://pelaporan.ppns.ac.id";
+const DEFAULT_BASE_URL = "https://sim-iku-api.ppns.ac.id";
 
 export function toAbsoluteUrl(relativePath: string | null | undefined): string | null {
   if (!relativePath) return null;
