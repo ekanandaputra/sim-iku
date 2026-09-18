@@ -64,6 +64,7 @@ model IKU {
   type          IkuType        @default(IKU_SPEKTA)
   isDirectInput Boolean        @default(false) @map("is_direct_input")
   unit          IkuUnitType    @default(percentage)
+  target        String?        @db.Text
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   components    IKUComponent[]

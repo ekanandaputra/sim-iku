@@ -32,6 +32,7 @@ export const listBidangIkus = async (
             name: true,
             description: true,
             unit: true,
+            target: true,
             isDirectInput: true,
           },
         },
@@ -166,7 +167,7 @@ export const syncBidangIkus = async (
     const updated = await prisma.bidangIKU.findMany({
       where: { bidangId: id },
       include: {
-        iku: { select: { id: true, code: true, name: true, unit: true } },
+        iku: { select: { id: true, code: true, name: true, unit: true, target: true } },
       },
     });
 

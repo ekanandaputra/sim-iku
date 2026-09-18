@@ -156,6 +156,7 @@ export const getIkuDashboard = async (req: Request, res: Response, next: NextFun
         ikuName: iku.name,
         type: iku.type,
         unit: iku.unit,
+        ikuTarget: iku.target,
         chartData: isChart ? [
           {
             period: "Q1",

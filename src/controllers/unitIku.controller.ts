@@ -33,6 +33,7 @@ export const listUnitIkus = async (
             name: true,
             description: true,
             unit: true,
+            target: true,
             isDirectInput: true,
           },
         },
@@ -167,7 +168,7 @@ export const syncUnitIkus = async (
     const updated = await prisma.unitIKU.findMany({
       where: { unitId: id },
       include: {
-        iku: { select: { id: true, code: true, name: true, unit: true } },
+        iku: { select: { id: true, code: true, name: true, unit: true, target: true } },
       },
     });
 

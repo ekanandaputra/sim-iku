@@ -191,6 +191,7 @@ export const getRealizationMetrics = async (
         name: i.name,
         description: i.description,
         unit: i.unit,
+        target: i.target,
         isDirectInput: i.isDirectInput,
         tags: [], // IKU has no tags
         createdAt: i.createdAt,
@@ -714,6 +715,7 @@ export const getRealizationView = async (
           name: iku.name,
           description: iku.description,
           unit: iku.unit,
+          target: iku.target,
           periodType: "monthly",
           isDirectInput: iku.isDirectInput,
           isAssigned: isIkuAssigned,
