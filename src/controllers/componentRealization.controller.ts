@@ -75,7 +75,7 @@ type FormulaEvaluationDebugInfo = {
 async function evaluateFormulaForMonths(
   formula: { id: string; version: number; ikuId: string },
   componentIds: string[],
-  codeToInfo: Map<string, { id: string; code: string; periodType: string; aggregationType: string }>,
+  codeToInfo: Map<string, { id: string; code: string; periodType: string; aggregationType: string; hasBreakdown: boolean }>,
   formulaCodes: string[],
   year: number,
   monthsFilter: number[] | null // null = 1-12
@@ -108,6 +108,7 @@ async function evaluateFormulaForMonths(
         year,
         ...(compMonthsFilter ? { month: { in: compMonthsFilter } } : {}),
       },
+      include: { breakdowns: true },
       orderBy: { month: "desc" },
     });
 
@@ -115,8 +116,22 @@ async function evaluateFormulaForMonths(
 
     const monthsUsed = realizations.map(r => r.month).filter((m): m is number => m !== null);
 
-    // Agregasi berdasarkan aggregationType
-    if (info.aggregationType === "LAST") {
+    if (info.hasBreakdown) {
+      // Komponen breakdown per prodi: ambil nilai TERAKHIR per prodi dalam
+      // rentang bulan yang diminta (mis. satu kuartal), lalu jumlahkan semua
+      // prodi. Ini mencegah kontribusi prodi yang input di bulan awal
+      // kuartal hilang ketika prodi lain baru input di bulan berikutnya.
+      const latestByProdi = new Map<string, { month: number | null; value: number }>();
+      for (const r of realizations) {
+        for (const b of r.breakdowns) {
+          const existing = latestByProdi.get(b.prodiId);
+          if (!existing || (r.month ?? 0) > (existing.month ?? 0)) {
+            latestByProdi.set(b.prodiId, { month: r.month, value: Number(b.value) });
+          }
+        }
+      }
+      componentValues[code] = Array.from(latestByProdi.values()).reduce((sum, v) => sum + v.value, 0);
+    } else if (info.aggregationType === "LAST") {
       // Ambil nilai dari record dengan month tertinggi
       componentValues[code] = realizations.length > 0 ? Number(realizations[0].value) : 0;
     } else {
@@ -125,7 +140,7 @@ async function evaluateFormulaForMonths(
     }
 
     componentAggregations[code] = {
-      aggregationType: info.aggregationType,
+      aggregationType: info.hasBreakdown ? "BREAKDOWN_LAST_PER_PRODI_SUM" : info.aggregationType,
       periodType: info.periodType,
       monthsUsed,
       realizationCount: realizations.length,
@@ -246,8 +261,8 @@ export async function calculateIkuResultsForComponentRealization(
     if (formulaCodes.length === 0) continue;
 
     const components = await prisma.component.findMany({ where: { code: { in: formulaCodes } } });
-    const codeToInfo = new Map<string, { id: string; code: string; periodType: string; aggregationType: string }>();
-    components.forEach(c => codeToInfo.set(c.code, { id: c.id, code: c.code, periodType: c.periodType, aggregationType: c.aggregationType }));
+    const codeToInfo = new Map<string, { id: string; code: string; periodType: string; aggregationType: string; hasBreakdown: boolean }>();
+    components.forEach(c => codeToInfo.set(c.code, { id: c.id, code: c.code, periodType: c.periodType, aggregationType: c.aggregationType, hasBreakdown: c.hasBreakdown }));
     const componentIds = components.map(c => c.id);
 
     // ── 1. MONTHLY ──────────────────────────────────────────────────────────
