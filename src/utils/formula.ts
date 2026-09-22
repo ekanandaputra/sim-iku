@@ -30,6 +30,20 @@ export async function evaluateFormula(
   }
   visited.add(formulaId);
 
+  try {
+    return await evaluateFormulaInner(formulaId, componentValues, visited);
+  } finally {
+    // Backtrack so sibling branches that legitimately reference the same
+    // sub-formula (a diamond dependency, not a cycle) aren't falsely flagged.
+    visited.delete(formulaId);
+  }
+}
+
+async function evaluateFormulaInner(
+  formulaId: string,
+  componentValues: ComponentValues,
+  visited: Set<string>
+): Promise<FormulaEvaluationResult> {
   const formula = await prisma.iKUFormula.findUnique({
     where: { id: formulaId },
     include: {
