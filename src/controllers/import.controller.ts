@@ -94,13 +94,14 @@ export const downloadFormulaTemplate = (req: Request, res: Response) => {
     "final_result_key",
     "is_final",
     "prodi_aggregation",
+    "prodi_level",
     "excluded_prodi_names",
   ];
 
   const samples = [
-    ["IKU001", "Rumus Utama", "Perhitungan standar", "((COMP001 + COMP002) / COMP003) * 100", "BOD_COD_RESULT", "TRUE", "", ""],
-    ["IKU001", "Rumus Alternatif", "Tanpa komponen C", "COMP001 + COMP002", "RESULT", "FALSE", "", ""],
-    ["IKU002", "Rata-rata per prodi", "Dihitung per prodi lalu dirata-rata", "(COMP004 / COMP005) * 100", "RESULT", "TRUE", "AVG", "Teknik Informatika, Sistem Informasi"],
+    ["IKU001", "Rumus Utama", "Perhitungan standar", "((COMP001 + COMP002) / COMP003) * 100", "BOD_COD_RESULT", "TRUE", "", "", ""],
+    ["IKU001", "Rumus Alternatif", "Tanpa komponen C", "COMP001 + COMP002", "RESULT", "FALSE", "", "", ""],
+    ["IKU002", "Rata-rata per prodi", "Dihitung per prodi lalu dirata-rata", "(COMP004 / COMP005) * 100", "RESULT", "TRUE", "AVG", "D4", "Teknik Informatika, Sistem Informasi"],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -315,10 +316,12 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
       const name = toString(r[col("formula_name")]) || "Formula Import";
       const finalResultKey = toString(r[col("final_result_key")]) || "RESULT";
       const isFinal = toBool(r[col("is_final")]);
-      // Kolom prodi_aggregation / excluded_prodi_names opsional: file lama yang
+      // Kolom prodi_aggregation / prodi_level / excluded_prodi_names opsional: file lama yang
       // belum punya kolom ini tetap bisa diimport (nilai formula existing dipertahankan).
       const hasProdiAggregationCol = col("prodi_aggregation") !== -1;
+      const hasProdiLevelCol = col("prodi_level") !== -1;
       const hasExcludedProdiCol = col("excluded_prodi_names") !== -1;
+      const prodiLevel = hasProdiLevelCol ? toString(r[col("prodi_level")]) || null : null;
       const prodiAggregationRaw = hasProdiAggregationCol ? toString(r[col("prodi_aggregation")]).toUpperCase() : "";
       const excludedProdiNames = hasExcludedProdiCol
         ? Array.from(new Set(toString(r[col("excluded_prodi_names")]).split(",").map(n => n.trim()).filter(Boolean)))
@@ -331,6 +334,14 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
         continue;
       }
       const prodiAggregation = (prodiAggregationRaw || null) as ProdiAggregation | null;
+
+      if (prodiLevel) {
+        const levelCount = await prisma.prodi.count({ where: { level: prodiLevel } });
+        if (levelCount === 0) {
+          formulaErrors.push({ row: rowNum, error: `No prodi with level '${prodiLevel}'.` });
+          continue;
+        }
+      }
 
       let excludedProdiIds: string[] = [];
       if (excludedProdiNames.length > 0) {
@@ -446,6 +457,7 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
                 description: toString(r[col("formula_description")]) || existing.description,
                 isFinal,
                 ...(hasProdiAggregationCol ? { prodiAggregation } : {}),
+                ...(hasProdiLevelCol ? { prodiLevel } : {}),
                 ...(hasExcludedProdiCol ? { excludedProdis: { deleteMany: {}, create: excludedCreate } } : {}),
                 details: { create: detailData }
               }
@@ -464,6 +476,7 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
                 isActive: true,
                 isFinal,
                 prodiAggregation,
+                prodiLevel,
                 version,
                 excludedProdis: { create: excludedCreate },
                 details: { create: detailData }
@@ -629,6 +642,7 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
       "final_result_key",
       "is_final",
       "prodi_aggregation",
+      "prodi_level",
       "excluded_prodi_names",
     ];
 
@@ -660,6 +674,7 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
         formula.finalResultKey,
         formula.isFinal ? "TRUE" : "FALSE",
         formula.prodiAggregation ?? "",
+        formula.prodiLevel ?? "",
         formula.excludedProdis.map(e => e.prodi.name).sort().join(", "),
       ]);
     }

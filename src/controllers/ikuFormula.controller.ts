@@ -81,6 +81,22 @@ async function validateExcludedProdiIds(excludedProdiIds: string[] | null | unde
   return missing.length > 0 ? `Prodi not found: ${missing.join(", ")}` : null;
 }
 
+/** "" / spasi → null, undefined tetap undefined (= tidak diubah saat update). */
+function normalizeProdiLevel(prodiLevel: string | null | undefined): string | null | undefined {
+  if (prodiLevel === undefined) return undefined;
+  return prodiLevel?.trim() || null;
+}
+
+/** Pastikan ada minimal satu prodi dengan level tersebut. Mengembalikan pesan error atau null. */
+async function validateProdiLevel(prodiLevel: string | null | undefined): Promise<string | null> {
+  const level = normalizeProdiLevel(prodiLevel);
+  if (!level) return null;
+  const prodis = await prisma.prodi.findMany({ select: { level: true } });
+  const levels = Array.from(new Set(prodis.map((p) => p.level.trim()).filter(Boolean)));
+  if (levels.some((l) => l.toLowerCase() === level.toLowerCase())) return null;
+  return `No prodi with level '${level}'. Available levels: ${levels.join(", ") || "-"}`;
+}
+
 /**
  * GET IKU FORMULA BY ID
  * GET /api/iku-formulas/:id
@@ -128,7 +144,7 @@ export const createIkuFormula = async (
   next: NextFunction
 ) => {
   try {
-    const { ikuId, name, description, finalResultKey, isFinal, prodiAggregation, excludedProdiIds, steps } = req.body;
+    const { ikuId, name, description, finalResultKey, isFinal, prodiAggregation, prodiLevel, excludedProdiIds, steps } = req.body;
 
     const iku = await prisma.iKU.findUnique({ where: { id: ikuId } });
     if (!iku) {
@@ -142,6 +158,11 @@ export const createIkuFormula = async (
     const excludedError = await validateExcludedProdiIds(excludedProdiIds);
     if (excludedError) {
       return res.status(400).json(errorResponse(excludedError));
+    }
+
+    const levelError = await validateProdiLevel(prodiLevel);
+    if (levelError) {
+      return res.status(400).json(errorResponse(levelError));
     }
 
     const parsedSteps = plainToInstance(IkuFormulaDetailCreateDto, steps);
@@ -194,6 +215,7 @@ export const createIkuFormula = async (
           isActive: true,
           isFinal: isFinal ?? false,
           prodiAggregation: prodiAggregation ?? null,
+          prodiLevel: normalizeProdiLevel(prodiLevel) ?? null,
           version: nextVersion,
           excludedProdis: {
             create: Array.from(new Set<string>(excludedProdiIds ?? [])).map((prodiId) => ({ prodiId })),
@@ -238,7 +260,7 @@ export const updateIkuFormula = async (
 ) => {
   try {
     const id = req.params.id;
-    const { name, description, finalResultKey, isFinal, prodiAggregation, excludedProdiIds, steps } = req.body;
+    const { name, description, finalResultKey, isFinal, prodiAggregation, prodiLevel, excludedProdiIds, steps } = req.body;
 
     const existing = await prisma.iKUFormula.findUnique({ where: { id } });
     if (!existing) {
@@ -250,6 +272,11 @@ export const updateIkuFormula = async (
     const excludedError = await validateExcludedProdiIds(excludedProdiIds);
     if (excludedError) {
       return res.status(400).json(errorResponse(excludedError));
+    }
+
+    const levelError = await validateProdiLevel(prodiLevel);
+    if (levelError) {
+      return res.status(400).json(errorResponse(levelError));
     }
 
     let createSteps: any[] = [];
@@ -337,6 +364,7 @@ export const updateIkuFormula = async (
           finalResultKey,
           isFinal: newIsFinal,
           prodiAggregation,
+          prodiLevel: normalizeProdiLevel(prodiLevel),
           details: {
             deleteMany: {},
             create: createSteps,

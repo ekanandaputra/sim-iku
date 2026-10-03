@@ -17,6 +17,7 @@ export type ProdiFormulaEntry = {
 
 export type ProdiEvaluationInfo = {
   aggregation: ProdiAggregationType;
+  prodiLevel: string | null;
   prodiCount: number;
   excludedProdiIds: string[];
   prodiResults: ProdiFormulaEntry[];
@@ -81,7 +82,8 @@ export async function fetchProdiValues(
  * komponen non-breakdown memakai nilai totalnya. Hasil tiap prodi lalu
  * dirata-rata (AVG) / dijumlah (SUM).
  *
- * Prodi yang terdaftar di iku_formula_excluded_prodi tidak diproses sama sekali.
+ * Prodi yang tidak sesuai iku_formula.prodi_level (jika diisi) atau terdaftar di
+ * iku_formula_excluded_prodi tidak diproses sama sekali.
  * Prodi lain dilewati (tidak ikut agregasi) jika tidak punya data untuk salah
  * satu komponen breakdown, atau evaluasinya gagal (mis. pembagian dengan nol).
  * Jika formula tidak memakai komponen breakdown sama sekali, formula
@@ -98,20 +100,29 @@ export async function evaluateFormulaPerProdi(
     return evaluateFormula(formulaId, componentValues);
   }
 
-  const excluded = await prisma.ikuFormulaExcludedProdi.findMany({
-    where: { formulaId },
-    select: { prodiId: true },
+  const formulaFilter = await prisma.iKUFormula.findUnique({
+    where: { id: formulaId },
+    select: { prodiLevel: true, excludedProdis: { select: { prodiId: true } } },
   });
-  const excludedIds = new Set(excluded.map(e => e.prodiId));
+  const prodiLevel = formulaFilter?.prodiLevel?.trim() || null;
+  const excludedIds = new Set((formulaFilter?.excludedProdis ?? []).map(e => e.prodiId));
 
-  const prodiIds = Array.from(
+  const candidateIds = Array.from(
     new Set(breakdownCodes.flatMap(code => Object.keys(prodiValues[code])))
   ).filter(id => !excludedIds.has(id));
   const prodis = await prisma.prodi.findMany({
-    where: { id: { in: prodiIds } },
-    select: { id: true, code: true, name: true },
+    where: { id: { in: candidateIds } },
+    select: { id: true, code: true, name: true, level: true },
   });
   const prodiById = new Map(prodis.map(p => [p.id, p]));
+  const prodiIds = prodiLevel
+    ? candidateIds.filter(id => prodiById.get(id)?.level.trim().toLowerCase() === prodiLevel.toLowerCase())
+    : candidateIds;
+  if (prodiIds.length === 0) {
+    throw new Error(
+      `Tidak ada prodi yang memenuhi filter${prodiLevel ? ` level '${prodiLevel}'` : ""}${excludedIds.size ? " dan exclude" : ""}`
+    );
+  }
 
   const prodiResults: ProdiFormulaEntry[] = [];
   for (const prodiId of prodiIds) {
@@ -164,6 +175,7 @@ export async function evaluateFormulaPerProdi(
     steps: [],
     prodiEvaluation: {
       aggregation,
+      prodiLevel,
       prodiCount: validResults.length,
       excludedProdiIds: Array.from(excludedIds),
       prodiResults,
