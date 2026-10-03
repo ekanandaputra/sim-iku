@@ -38,6 +38,11 @@ enum ComponentAggregationType {
   LAST
 }
 
+enum ProdiAggregationType {
+  AVG
+  SUM
+}
+
 enum IkuUnitType {
   percentage
   text
@@ -141,20 +146,38 @@ enum FormulaOperator {
 }
 
 model IKUFormula {
-  id             String             @id @default(uuid()) @db.VarChar(36)
-  iku            IKU                @relation(fields: [ikuId], references: [id])
-  ikuId          String             @db.VarChar(36)
-  name           String
-  description    String?
-  finalResultKey String             @default("RESULT")
-  isActive       Boolean            @default(true) @map("is_active")
-  isFinal        Boolean            @default(false) @map("is_final")
-  version        Int                @default(1)
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
-  details        IKUFormulaDetail[]
+  id               String                    @id @default(uuid()) @db.VarChar(36)
+  iku              IKU                       @relation(fields: [ikuId], references: [id])
+  ikuId            String                    @db.VarChar(36)
+  name             String
+  description      String?
+  finalResultKey   String                    @default("RESULT")
+  isActive         Boolean                   @default(true) @map("is_active")
+  isFinal          Boolean                   @default(false) @map("is_final")
+  // Jika diisi, formula dievaluasi per prodi (pakai nilai breakdown) lalu
+  // hasil tiap prodi diagregasi. null = evaluasi dari nilai total komponen.
+  prodiAggregation ProdiAggregationType?     @map("prodi_aggregation")
+  version          Int                       @default(1)
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  details          IKUFormulaDetail[]
+  excludedProdis   IkuFormulaExcludedProdi[]
 
   @@map("iku_formula")
+}
+
+// Prodi yang TIDAK ikut dihitung saat formula memakai prodiAggregation.
+model IkuFormulaExcludedProdi {
+  formulaId String   @map("formula_id") @db.VarChar(36)
+  prodiId   String   @map("prodi_id") @db.VarChar(36)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  formula IKUFormula @relation(fields: [formulaId], references: [id], onDelete: Cascade)
+  prodi   Prodi      @relation(fields: [prodiId], references: [id], onDelete: Cascade)
+
+  @@id([formulaId, prodiId])
+  @@index([prodiId])
+  @@map("iku_formula_excluded_prodi")
 }
 
 model IKUFormulaDetail {
@@ -219,7 +242,8 @@ model IkuResult {
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  iku IKU @relation(fields: [idIku], references: [id])
+  iku          IKU              @relation(fields: [idIku], references: [id])
+  prodiResults IkuResultProdi[]
 
   @@unique([idIku, month, year, resultType])
   @@index([idIku])
@@ -389,8 +413,31 @@ model Prodi {
   updatedAt      DateTime                        @updatedAt @map("updated_at")
   breakdowns     ComponentRealizationBreakdown[]
   componentUsers ComponentUser[]
+  ikuResults     IkuResultProdi[]
+  excludedFrom   IkuFormulaExcludedProdi[]
 
   @@map("prodi")
+}
+
+// Hasil formula per prodi untuk IkuResult yang formulanya memakai prodiAggregation.
+model IkuResultProdi {
+  id              String   @id @default(uuid()) @db.VarChar(36)
+  resultId        String   @map("result_id")
+  prodiId         String   @map("prodi_id") @db.VarChar(36)
+  // null jika prodi dilewati (data tidak lengkap / evaluasi gagal)
+  calculatedValue Decimal? @map("calculated_value") @db.Decimal(18, 4)
+  skippedReason   String?  @map("skipped_reason") @db.Text
+  // componentValues & formulaSteps yang dipakai untuk prodi ini
+  debugInfo       Json?    @map("debug_info")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  result IkuResult @relation(fields: [resultId], references: [idResult], onDelete: Cascade)
+  prodi  Prodi     @relation(fields: [prodiId], references: [id])
+
+  @@unique([resultId, prodiId])
+  @@index([prodiId])
+  @@map("iku_result_prodi")
 }
 
 model ComponentRealizationBreakdown {

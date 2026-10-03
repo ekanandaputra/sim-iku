@@ -103,7 +103,13 @@ export const listIkuResults = async (
         where,
         skip,
         take: limit,
-        include: { iku: true },
+        include: {
+          iku: true,
+          prodiResults: {
+            include: { prodi: { select: { id: true, code: true, name: true } } },
+            orderBy: { prodi: { code: "asc" } },
+          },
+        },
         orderBy: [{ createdAt: "desc" }],
       }),
       prisma.ikuResult.count({ where }),
@@ -140,7 +146,13 @@ export const getIkuResultById = async (
     const id = req.params.id;
     const result = await prisma.ikuResult.findUnique({
       where: { idResult: id },
-      include: { iku: true },
+      include: {
+        iku: true,
+        prodiResults: {
+          include: { prodi: { select: { id: true, code: true, name: true } } },
+          orderBy: { prodi: { code: "asc" } },
+        },
+      },
     });
     if (!result) {
       return res.status(404).json(errorResponse("IKU result not found"));

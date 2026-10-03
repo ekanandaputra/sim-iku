@@ -471,6 +471,8 @@ const swaggerDefinition = {
           finalResultKey: { type: "string" },
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
+          prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           version: { type: "integer" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -504,6 +506,8 @@ const swaggerDefinition = {
           finalResultKey: { type: "string", maxLength: 100 },
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
+          prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           steps: {
             type: "array",
             items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
@@ -519,6 +523,8 @@ const swaggerDefinition = {
           finalResultKey: { type: "string", maxLength: 100 },
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
+          prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           steps: {
             type: "array",
             items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
@@ -770,6 +776,29 @@ const swaggerDefinition = {
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           iku: { type: "object" },
+          prodiResults: {
+            type: "array",
+            description: "Hasil formula per prodi (hanya terisi jika formula final memakai prodiAggregation). Hasil yearly disalin dari quarterly sumbernya.",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                resultId: { type: "string", format: "uuid" },
+                prodiId: { type: "string", format: "uuid" },
+                calculatedValue: { type: "number", nullable: true, description: "null jika prodi dilewati" },
+                skippedReason: { type: "string", nullable: true, description: "Alasan prodi tidak ikut agregasi (data tidak lengkap / evaluasi gagal)" },
+                debugInfo: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    componentValues: { type: "object", additionalProperties: { type: "number" } },
+                    formulaSteps: { type: "array", items: { type: "object", properties: { sequence: { type: "integer" }, expression: { type: "string" }, result: { type: "number" } } } },
+                  },
+                },
+                prodi: { type: "object", properties: { id: { type: "string", format: "uuid" }, code: { type: "string" }, name: { type: "string" } } },
+              },
+            },
+          },
         },
         required: ["idResult", "idIku", "month", "year", "calculatedAt"],
       },

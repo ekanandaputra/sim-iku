@@ -7,6 +7,8 @@ import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 import { checkPeriodLock, PeriodLockError } from "../utils/periodLock";
 import { toAbsoluteUrl } from "../utils/url";
+import { evaluateFormulaPerProdi, fetchProdiValues, saveProdiResults, copyProdiResults, FinalFormulaEvaluation, ProdiEvaluationInfo } from "../utils/prodiFormula";
+import { ProdiAggregationType } from "../generated/prisma/enums";
 
 function withAbsoluteDocumentUrls<T extends { documents?: { document?: { url: string } | null }[] }>(record: T): T {
   if (!record.documents) return record;
@@ -67,13 +69,14 @@ type FormulaEvaluationDebugInfo = {
     componentValues: ComponentValues;
     componentAggregations: Record<string, { aggregationType: string; periodType: string; monthsUsed: number[] | null; realizationCount: number }>;
     formulaSteps: { sequence: number; expression: string; result: number }[];
+    prodiEvaluation?: ProdiEvaluationInfo;
     allFormulas: FormulaDebugEntry[];
     evaluatedAt: string;
   };
 };
 
 async function evaluateFormulaForMonths(
-  formula: { id: string; version: number; ikuId: string },
+  formula: { id: string; version: number; ikuId: string; prodiAggregation: ProdiAggregationType | null },
   componentIds: string[],
   codeToInfo: Map<string, { id: string; code: string; periodType: string; aggregationType: string; hasBreakdown: boolean }>,
   formulaCodes: string[],
@@ -150,7 +153,12 @@ async function evaluateFormulaForMonths(
   if (!hasAnyData) return null;
 
   try {
-    const evaluation = await evaluateFormula(formula.id, componentValues);
+    const evaluation: FinalFormulaEvaluation = formula.prodiAggregation
+      ? await evaluateFormulaPerProdi(
+          formula.id, formula.prodiAggregation, componentValues,
+          await fetchProdiValues(codeToInfo, formulaCodes, year, monthsFilter ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+        )
+      : await evaluateFormula(formula.id, componentValues);
 
     // Evaluate ALL active formulas for this IKU (not just isFinal)
     const allActiveFormulas = await prisma.iKUFormula.findMany({
@@ -192,6 +200,7 @@ async function evaluateFormulaForMonths(
         componentValues,
         componentAggregations,
         formulaSteps: evaluation.steps,
+        prodiEvaluation: evaluation.prodiEvaluation,
         allFormulas,
         evaluatedAt: new Date().toISOString(),
       },
@@ -299,7 +308,12 @@ export async function calculateIkuResultsForComponentRealization(
       if (hasData) {
         console.log("Evaluating formula [monthly]", { formulaId: formula.id, month, componentValues });
         try {
-          const evaluation = await evaluateFormula(formula.id, componentValues);
+          const evaluation: FinalFormulaEvaluation = formula.prodiAggregation
+            ? await evaluateFormulaPerProdi(
+                formula.id, formula.prodiAggregation, componentValues,
+                await fetchProdiValues(codeToInfo, formulaCodes, year, [month])
+              )
+            : await evaluateFormula(formula.id, componentValues);
 
           // Evaluate ALL active formulas for this IKU (not just isFinal)
           const allActiveFormulas = await prisma.iKUFormula.findMany({
@@ -338,10 +352,11 @@ export async function calculateIkuResultsForComponentRealization(
           const monthlyDebugInfo = {
             componentValues,
             formulaSteps: evaluation.steps,
+            prodiEvaluation: evaluation.prodiEvaluation,
             allFormulas,
             evaluatedAt: new Date().toISOString(),
           };
-          await prisma.ikuResult.upsert({
+          const savedMonthly = await prisma.ikuResult.upsert({
             where: {
               idIku_month_year_resultType: {
                 idIku: formula.ikuId, month, year, resultType: IkuResultType.monthly,
@@ -362,6 +377,9 @@ export async function calculateIkuResultsForComponentRealization(
               calculatedAt: new Date(),
             },
           });
+          if (formula.prodiAggregation) {
+            await saveProdiResults(savedMonthly.idResult, evaluation.prodiEvaluation);
+          }
         } catch (error) {
           console.error("IKU monthly result calculation failed", { formulaId: formula.id, error });
         }
@@ -380,7 +398,7 @@ export async function calculateIkuResultsForComponentRealization(
 
       if (result !== null) {
         console.log("Evaluating formula [quarterly]", { formulaId: formula.id, quarter, result: result.result });
-        await prisma.ikuResult.upsert({
+        const savedQuarterly = await prisma.ikuResult.upsert({
           where: {
             idIku_month_year_resultType: {
               // month = quarter number (1-4) sebagai natural key untuk Q1/Q2/Q3/Q4
@@ -403,6 +421,9 @@ export async function calculateIkuResultsForComponentRealization(
             calculatedAt: new Date(),
           },
         });
+        if (formula.prodiAggregation) {
+          await saveProdiResults(savedQuarterly.idResult, result.debugInfo.prodiEvaluation);
+        }
       }
     }
 
@@ -427,7 +448,7 @@ export async function calculateIkuResultsForComponentRealization(
       const yearlyFormulaVersion = lastNonZeroQuarterResult?.formulaVersion ?? formula.version.toString();
 
       console.log("Copying formula [yearly] from last non-zero quarter", { formulaId: formula.id, quarter: lastNonZeroQuarterResult?.quarter ?? null, result: yearlyValue });
-      await prisma.ikuResult.upsert({
+      const savedYearly = await prisma.ikuResult.upsert({
         where: {
           idIku_month_year_resultType: {
             idIku: formula.ikuId, month: 0, year, resultType: IkuResultType.yearly,
@@ -448,6 +469,9 @@ export async function calculateIkuResultsForComponentRealization(
           calculatedAt: new Date(),
         },
       });
+      if (formula.prodiAggregation) {
+        await copyProdiResults(lastNonZeroQuarterResult?.idResult ?? null, savedYearly.idResult);
+      }
     }
   }
 }
