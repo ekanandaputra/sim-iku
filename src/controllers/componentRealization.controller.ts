@@ -170,7 +170,10 @@ async function evaluateFormulaForMonths(
     const allFormulas: FormulaDebugEntry[] = [];
     for (const f of allActiveFormulas) {
       try {
-        const eval2 = await evaluateFormula(f.id, componentValues);
+        // Formula final mode per prodi: pakai hasil per prodi yang sama dengan calculatedValue
+        const eval2 = formula.prodiAggregation && f.id === formula.id
+          ? evaluation
+          : await evaluateFormula(f.id, componentValues);
         allFormulas.push({
           formulaId: f.id,
           formulaName: f.name,
@@ -325,7 +328,10 @@ export async function calculateIkuResultsForComponentRealization(
           const allFormulas: FormulaDebugEntry[] = [];
           for (const f of allActiveFormulas) {
             try {
-              const eval2 = await evaluateFormula(f.id, componentValues);
+              // Formula final mode per prodi: pakai hasil per prodi yang sama dengan calculatedValue
+              const eval2 = formula.prodiAggregation && f.id === formula.id
+                ? evaluation
+                : await evaluateFormula(f.id, componentValues);
               allFormulas.push({
                 formulaId: f.id,
                 formulaName: f.name,
