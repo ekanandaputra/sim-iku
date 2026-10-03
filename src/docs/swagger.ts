@@ -4018,7 +4018,7 @@ const swaggerDefinition = {
       get: {
         tags: ["Import"],
         summary: "Download Excel template for formula import",
-        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final.",
+        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final, prodi_aggregation (AVG/SUM/kosong), excluded_prodi_names (nama prodi dipisah koma).",
         responses: {
           "200": {
             description: "Excel template file (.xlsx)",
@@ -4044,7 +4044,7 @@ const swaggerDefinition = {
       post: {
         tags: ["Import"],
         summary: "Import formulas from Excel",
-        description: "Upload an .xlsx file with sheet 'FormulaData'. Expressions will be parsed into steps. IKU codes must exist.",
+        description: "Upload an .xlsx file with sheet 'FormulaData'. Expressions will be parsed into steps. IKU codes must exist. Kolom opsional `prodi_aggregation` (AVG/SUM/kosong) dan `excluded_prodi_names` (nama prodi dipisah koma, case-insensitive; nama yang cocok ke lebih dari satu prodi ditolak). Jika kolom tidak ada di file, nilai formula existing dipertahankan; jika kolom ada tapi sel kosong, nilai dikosongkan.",
         requestBody: {
           required: true,
           content: {

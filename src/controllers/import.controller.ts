@@ -14,12 +14,14 @@ const VALID_DATA_TYPES = ["number", "percentage", "integer"] as const;
 const VALID_SOURCE_TYPES = ["database", "api", "manual"] as const;
 const VALID_PERIOD_TYPES = ["monthly", "quarter", "semester", "yearly"] as const;
 const VALID_AGGREGATION_TYPES = ["SUM", "LAST"] as const;
+const VALID_PRODI_AGGREGATIONS = ["AVG", "SUM"] as const;
 
 type IkuUnit = typeof VALID_IKU_UNITS[number];
 type DataType = typeof VALID_DATA_TYPES[number];
 type SourceType = typeof VALID_SOURCE_TYPES[number];
 type PeriodType = typeof VALID_PERIOD_TYPES[number];
 type AggregationType = typeof VALID_AGGREGATION_TYPES[number];
+type ProdiAggregation = typeof VALID_PRODI_AGGREGATIONS[number];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -91,11 +93,14 @@ export const downloadFormulaTemplate = (req: Request, res: Response) => {
     "formula_expression",
     "final_result_key",
     "is_final",
+    "prodi_aggregation",
+    "excluded_prodi_names",
   ];
 
   const samples = [
-    ["IKU001", "Rumus Utama", "Perhitungan standar", "((COMP001 + COMP002) / COMP003) * 100", "BOD_COD_RESULT", "TRUE"],
-    ["IKU001", "Rumus Alternatif", "Tanpa komponen C", "COMP001 + COMP002", "RESULT", "FALSE"],
+    ["IKU001", "Rumus Utama", "Perhitungan standar", "((COMP001 + COMP002) / COMP003) * 100", "BOD_COD_RESULT", "TRUE", "", ""],
+    ["IKU001", "Rumus Alternatif", "Tanpa komponen C", "COMP001 + COMP002", "RESULT", "FALSE", "", ""],
+    ["IKU002", "Rata-rata per prodi", "Dihitung per prodi lalu dirata-rata", "(COMP004 / COMP005) * 100", "RESULT", "TRUE", "AVG", "Teknik Informatika, Sistem Informasi"],
   ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, ...samples]);
@@ -310,8 +315,50 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
       const name = toString(r[col("formula_name")]) || "Formula Import";
       const finalResultKey = toString(r[col("final_result_key")]) || "RESULT";
       const isFinal = toBool(r[col("is_final")]);
+      // Kolom prodi_aggregation / excluded_prodi_names opsional: file lama yang
+      // belum punya kolom ini tetap bisa diimport (nilai formula existing dipertahankan).
+      const hasProdiAggregationCol = col("prodi_aggregation") !== -1;
+      const hasExcludedProdiCol = col("excluded_prodi_names") !== -1;
+      const prodiAggregationRaw = hasProdiAggregationCol ? toString(r[col("prodi_aggregation")]).toUpperCase() : "";
+      const excludedProdiNames = hasExcludedProdiCol
+        ? Array.from(new Set(toString(r[col("excluded_prodi_names")]).split(",").map(n => n.trim()).filter(Boolean)))
+        : [];
 
       if (!ikuCode || !expression) continue;
+
+      if (prodiAggregationRaw && !VALID_PRODI_AGGREGATIONS.includes(prodiAggregationRaw as ProdiAggregation)) {
+        formulaErrors.push({ row: rowNum, error: `Invalid prodi_aggregation '${prodiAggregationRaw}'. Must be one of: ${VALID_PRODI_AGGREGATIONS.join(", ")} or empty.` });
+        continue;
+      }
+      const prodiAggregation = (prodiAggregationRaw || null) as ProdiAggregation | null;
+
+      let excludedProdiIds: string[] = [];
+      if (excludedProdiNames.length > 0) {
+        // Nama prodi tidak unique di DB → cocokkan case-insensitive dan tolak jika ambigu
+        const prodis = await prisma.prodi.findMany({ select: { id: true, code: true, name: true } });
+        const byName = new Map<string, { id: string; code: string }[]>();
+        for (const p of prodis) {
+          const key = p.name.trim().toLowerCase();
+          byName.set(key, [...(byName.get(key) ?? []), { id: p.id, code: p.code }]);
+        }
+        const missingNames: string[] = [];
+        const ambiguousNames: string[] = [];
+        for (const n of excludedProdiNames) {
+          const matches = byName.get(n.toLowerCase()) ?? [];
+          if (matches.length === 0) missingNames.push(n);
+          else if (matches.length > 1) ambiguousNames.push(`${n} (${matches.map(m => m.code).join("/")})`);
+          else excludedProdiIds.push(matches[0].id);
+        }
+        if (missingNames.length > 0 || ambiguousNames.length > 0) {
+          const parts = [];
+          if (missingNames.length > 0) parts.push(`Prodi name(s) not found: ${missingNames.join(", ")}`);
+          if (ambiguousNames.length > 0) parts.push(`Ambiguous prodi name(s), matches more than one prodi: ${ambiguousNames.join(", ")}`);
+          formulaErrors.push({ row: rowNum, error: parts.join(". ") });
+          continue;
+        }
+        excludedProdiIds = Array.from(new Set(excludedProdiIds));
+      }
+      const excludedCreate = excludedProdiIds.map(prodiId => ({ prodiId }));
 
       const iku = await prisma.iKU.findUnique({ where: { code: ikuCode } });
       if (!iku) {
@@ -388,12 +435,18 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
           if (existing) {
             // UPDATE: Clear old details and update formula
             await tx.iKUFormulaDetail.deleteMany({ where: { formulaId: existing.id } });
+            // Mode per prodi dimatikan → hapus hasil per prodi lama milik IKU ini
+            if (hasProdiAggregationCol && prodiAggregation === null && existing.prodiAggregation !== null) {
+              await tx.ikuResultProdi.deleteMany({ where: { result: { idIku: iku.id } } });
+            }
             await tx.iKUFormula.update({
               where: { id: existing.id },
               data: {
                 name,
                 description: toString(r[col("formula_description")]) || existing.description,
                 isFinal,
+                ...(hasProdiAggregationCol ? { prodiAggregation } : {}),
+                ...(hasExcludedProdiCol ? { excludedProdis: { deleteMany: {}, create: excludedCreate } } : {}),
                 details: { create: detailData }
               }
             });
@@ -410,7 +463,9 @@ export const importFormulas = async (req: Request, res: Response, next: NextFunc
                 finalResultKey: parsed.finalResultKey,
                 isActive: true,
                 isFinal,
+                prodiAggregation,
                 version,
+                excludedProdis: { create: excludedCreate },
                 details: { create: detailData }
               }
             });
@@ -573,12 +628,15 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
       "formula_expression",
       "final_result_key",
       "is_final",
+      "prodi_aggregation",
+      "excluded_prodi_names",
     ];
 
     const formulas = await prisma.iKUFormula.findMany({
       include: {
         iku: true,
-        details: true
+        details: true,
+        excludedProdis: { include: { prodi: { select: { name: true } } } },
       }
     });
 
@@ -601,6 +659,8 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
         expression,
         formula.finalResultKey,
         formula.isFinal ? "TRUE" : "FALSE",
+        formula.prodiAggregation ?? "",
+        formula.excludedProdis.map(e => e.prodi.name).sort().join(", "),
       ]);
     }
 
