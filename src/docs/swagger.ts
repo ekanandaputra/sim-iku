@@ -37,6 +37,7 @@ const swaggerDefinition = {
     { name: "Units", description: "Unit management endpoints" },
     { name: "Settings", description: "Application settings — period lock untuk mengunci/membuka input realisasi per bulan" },
     { name: "Verification", description: "Verifikasi realisasi — histori siapa dan kapan memverifikasi data realisasi" },
+    { name: "Guide", description: "Manajemen panduan — upload materi panduan dan link video (YouTube/Google Drive)" },
   ],
   security: [{ bearerAuth: [] }],
   components: {
@@ -470,6 +471,8 @@ const swaggerDefinition = {
           finalResultKey: { type: "string" },
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
+          prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           version: { type: "integer" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
@@ -503,6 +506,8 @@ const swaggerDefinition = {
           finalResultKey: { type: "string", maxLength: 100 },
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
+          prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           steps: {
             type: "array",
             items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
@@ -518,6 +523,8 @@ const swaggerDefinition = {
           finalResultKey: { type: "string", maxLength: 100 },
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
+          prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           steps: {
             type: "array",
             items: { $ref: "#/components/schemas/IkuFormulaDetailCreate" },
@@ -769,6 +776,29 @@ const swaggerDefinition = {
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           iku: { type: "object" },
+          prodiResults: {
+            type: "array",
+            description: "Hasil formula per prodi (hanya terisi jika formula final memakai prodiAggregation). Hasil yearly disalin dari quarterly sumbernya.",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string", format: "uuid" },
+                resultId: { type: "string", format: "uuid" },
+                prodiId: { type: "string", format: "uuid" },
+                calculatedValue: { type: "number", nullable: true, description: "null jika prodi dilewati" },
+                skippedReason: { type: "string", nullable: true, description: "Alasan prodi tidak ikut agregasi (data tidak lengkap / evaluasi gagal)" },
+                debugInfo: {
+                  type: "object",
+                  nullable: true,
+                  properties: {
+                    componentValues: { type: "object", additionalProperties: { type: "number" } },
+                    formulaSteps: { type: "array", items: { type: "object", properties: { sequence: { type: "integer" }, expression: { type: "string" }, result: { type: "number" } } } },
+                  },
+                },
+                prodi: { type: "object", properties: { id: { type: "string", format: "uuid" }, code: { type: "string" }, name: { type: "string" } } },
+              },
+            },
+          },
         },
         required: ["idResult", "idIku", "month", "year", "calculatedAt"],
       },
@@ -3988,7 +4018,7 @@ const swaggerDefinition = {
       get: {
         tags: ["Import"],
         summary: "Download Excel template for formula import",
-        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final.",
+        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final, prodi_aggregation (AVG/SUM/kosong), excluded_prodi_names (nama prodi dipisah koma).",
         responses: {
           "200": {
             description: "Excel template file (.xlsx)",
@@ -4014,7 +4044,7 @@ const swaggerDefinition = {
       post: {
         tags: ["Import"],
         summary: "Import formulas from Excel",
-        description: "Upload an .xlsx file with sheet 'FormulaData'. Expressions will be parsed into steps. IKU codes must exist.",
+        description: "Upload an .xlsx file with sheet 'FormulaData'. Expressions will be parsed into steps. IKU codes must exist. Kolom opsional `prodi_aggregation` (AVG/SUM/kosong) dan `excluded_prodi_names` (nama prodi dipisah koma, case-insensitive; nama yang cocok ke lebih dari satu prodi ditolak). Jika kolom tidak ada di file, nilai formula existing dipertahankan; jika kolom ada tapi sel kosong, nilai dikosongkan.",
         requestBody: {
           required: true,
           content: {
@@ -5635,6 +5665,194 @@ const swaggerDefinition = {
       "401": { description: "Unauthorized" },
       "403": { description: "Forbidden — bukan pemilik verifikasi dan bukan admin" },
       "404": { description: "Verifikasi tidak ditemukan" },
+    },
+  },
+};
+
+// ──────────────── Guide Schema ────────────────
+(swaggerDefinition as any).components.schemas.Guide = {
+  type: "object",
+  properties: {
+    id: { type: "string", format: "uuid" },
+    title: { type: "string" },
+    description: { type: "string", nullable: true },
+    filename: { type: "string", nullable: true, description: "Nama file fisik di server" },
+    originalName: { type: "string", nullable: true, description: "Nama file asli saat diupload" },
+    fileUrl: { type: "string", nullable: true, description: "Full URL untuk mengakses materi panduan (mis. https://host/uploads/xxx.pdf)" },
+    mimeType: { type: "string", nullable: true },
+    size: { type: "integer", nullable: true, description: "Ukuran file dalam bytes" },
+    videoUrl: { type: "string", nullable: true, description: "Link video YouTube atau Google Drive" },
+    videoSource: { type: "string", enum: ["YOUTUBE", "GOOGLE_DRIVE"], nullable: true, description: "Terdeteksi otomatis dari videoUrl" },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time" },
+  },
+  required: ["id", "title"],
+};
+
+// ──────────────── Guide Paths ────────────────
+(swaggerDefinition as any).paths["/api/guides"] = {
+  get: {
+    tags: ["Guide"],
+    summary: "List panduan",
+    parameters: [
+      { name: "title", in: "query", schema: { type: "string" }, description: "Filter berdasarkan judul (contains)" },
+      { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+      { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+    ],
+    responses: {
+      "200": {
+        description: "Paginated list of guides",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: {
+                  type: "object",
+                  properties: {
+                    data: { type: "array", items: { $ref: "#/components/schemas/Guide" } },
+                    pagination: {
+                      type: "object",
+                      properties: {
+                        page: { type: "integer" },
+                        limit: { type: "integer" },
+                        total: { type: "integer" },
+                        totalPages: { type: "integer" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  post: {
+    tags: ["Guide"],
+    summary: "Buat panduan baru",
+    description:
+      "Membuat panduan baru berupa materi (file) dan/atau link video (YouTube/Google Drive). " +
+      "Minimal salah satu dari `file` atau `videoUrl` wajib diisi. " +
+      "`videoSource` terdeteksi otomatis dari domain `videoUrl`.",
+    requestBody: {
+      required: true,
+      content: {
+        "multipart/form-data": {
+          schema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              videoUrl: { type: "string", description: "Link YouTube atau Google Drive" },
+              file: { type: "string", format: "binary", description: "Materi panduan (opsional)" },
+            },
+            required: ["title"],
+          },
+        },
+      },
+    },
+    responses: {
+      "201": {
+        description: "Guide created successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                message: { type: "string" },
+                data: { $ref: "#/components/schemas/Guide" },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Validation error — title kosong, videoUrl tidak valid, atau file & videoUrl kosong keduanya" },
+    },
+  },
+};
+
+(swaggerDefinition as any).paths["/api/guides/{id}"] = {
+  get: {
+    tags: ["Guide"],
+    summary: "Detail panduan",
+    parameters: [
+      { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+    ],
+    responses: {
+      "200": {
+        description: "Guide detail",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                data: { $ref: "#/components/schemas/Guide" },
+              },
+            },
+          },
+        },
+      },
+      "404": { description: "Guide not found" },
+    },
+  },
+  put: {
+    tags: ["Guide"],
+    summary: "Update panduan",
+    description: "Mengupdate judul, deskripsi, link video, dan/atau mengganti file materi. Upload file baru akan menghapus file lama.",
+    parameters: [
+      { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+    ],
+    requestBody: {
+      required: false,
+      content: {
+        "multipart/form-data": {
+          schema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              videoUrl: { type: "string", description: "Link YouTube atau Google Drive" },
+              file: { type: "string", format: "binary", description: "Materi panduan pengganti (opsional)" },
+            },
+          },
+        },
+      },
+    },
+    responses: {
+      "200": {
+        description: "Guide updated successfully",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                message: { type: "string" },
+                data: { $ref: "#/components/schemas/Guide" },
+              },
+            },
+          },
+        },
+      },
+      "400": { description: "Validation error" },
+      "404": { description: "Guide not found" },
+    },
+  },
+  delete: {
+    tags: ["Guide"],
+    summary: "Hapus panduan",
+    description: "Menghapus record panduan beserta file fisik materi (jika ada) dari server.",
+    parameters: [
+      { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+    ],
+    responses: {
+      "200": { description: "Guide deleted successfully" },
+      "404": { description: "Guide not found" },
     },
   },
 };

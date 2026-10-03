@@ -106,7 +106,7 @@ export const createIku = async (
   next: NextFunction
 ) => {
   try {
-    const { code, name, description, isDirectInput, unit, type } = req.body;
+    const { code, name, description, isDirectInput, unit, type, target } = req.body;
 
     const existing = await prisma.iKU.findUnique({
       where: { code },
@@ -134,6 +134,10 @@ export const createIku = async (
       ikuData.type = type;
     }
 
+    if (target !== undefined) {
+      ikuData.target = target;
+    }
+
     const iku = await prisma.iKU.create({
       data: ikuData,
     });
@@ -145,7 +149,7 @@ export const createIku = async (
       entityName: iku.name,
       action: AuditAction.CREATE,
       userId: (req as any).user?.id ?? null,
-      newValues: { code: iku.code, name: iku.name, description: iku.description, isDirectInput: iku.isDirectInput, unit: iku.unit, type: iku.type },
+      newValues: { code: iku.code, name: iku.name, description: iku.description, isDirectInput: iku.isDirectInput, unit: iku.unit, type: iku.type, target: iku.target },
       req,
     });
 
@@ -166,7 +170,7 @@ export const updateIku = async (
 ) => {
   try {
     const id = req.params.id;
-    const { code, name, description, isDirectInput, unit, type } = req.body;
+    const { code, name, description, isDirectInput, unit, type, target } = req.body;
 
     const existing = await prisma.iKU.findUnique({
       where: { id },
@@ -204,6 +208,10 @@ export const updateIku = async (
       updateData.type = type;
     }
 
+    if (target !== undefined) {
+      updateData.target = target;
+    }
+
     const updated = await prisma.iKU.update({
       where: { id },
       data: updateData,
@@ -216,8 +224,8 @@ export const updateIku = async (
       entityName: updated.name,
       action: AuditAction.UPDATE,
       userId: (req as any).user?.id ?? null,
-      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit, type: existing.type },
-      newValues: { code: updated.code, name: updated.name, description: updated.description, isDirectInput: updated.isDirectInput, unit: updated.unit, type: updated.type },
+      oldValues: { code: existing.code, name: existing.name, description: existing.description, isDirectInput: existing.isDirectInput, unit: existing.unit, type: existing.type, target: existing.target },
+      newValues: { code: updated.code, name: updated.name, description: updated.description, isDirectInput: updated.isDirectInput, unit: updated.unit, type: updated.type, target: updated.target },
       req,
     });
 

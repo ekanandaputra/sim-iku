@@ -27,6 +27,7 @@ import userRouter from "./routes/user.route";
 import unitRouter from "./routes/unit.route";
 import settingsRouter from "./routes/periodLock.route";
 import verificationRouter from "./routes/verification.route";
+import guideRouter from "./routes/guide.route";
 import { swaggerSpec } from "./docs/swagger";
 import { errorHandler } from "./middleware/errorHandler";
 
@@ -64,6 +65,7 @@ app.use("/api/users", userRouter);
 app.use("/api/units", unitRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/verifications", verificationRouter);
+app.use("/api/guides", guideRouter);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

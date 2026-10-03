@@ -38,6 +38,11 @@ enum ComponentAggregationType {
   LAST
 }
 
+enum ProdiAggregationType {
+  AVG
+  SUM
+}
+
 enum IkuUnitType {
   percentage
   text
@@ -64,6 +69,7 @@ model IKU {
   type          IkuType        @default(IKU_SPEKTA)
   isDirectInput Boolean        @default(false) @map("is_direct_input")
   unit          IkuUnitType    @default(percentage)
+  target        String?        @db.Text
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   components    IKUComponent[]
@@ -78,19 +84,19 @@ model IKU {
 }
 
 model Component {
-  id               String                     @id @default(uuid()) @db.VarChar(36)
-  code             String                     @unique
-  name             String
-  description      String?
-  dataType         ComponentDataType?         @map("data_type")
-  sourceType       ComponentSourceType?       @map("source_type")
-  periodType       ComponentPeriodType        @default(yearly) @map("period_type")
-  aggregationType  ComponentAggregationType   @default(LAST) @map("aggregation_type")
-  hasBreakdown     Boolean                    @default(false) @map("has_breakdown")
-  filterByLevel    Boolean                    @default(false) @map("filter_by_level")
-  parentId         String?                    @map("parent_id") @db.VarChar(36)
-  createdAt        DateTime                   @default(now()) @map("created_at")
-  updatedAt        DateTime                   @updatedAt @map("updated_at")
+  id              String                   @id @default(uuid()) @db.VarChar(36)
+  code            String                   @unique
+  name            String
+  description     String?
+  dataType        ComponentDataType?       @map("data_type")
+  sourceType      ComponentSourceType?     @map("source_type")
+  periodType      ComponentPeriodType      @default(yearly) @map("period_type")
+  aggregationType ComponentAggregationType @default(LAST) @map("aggregation_type")
+  hasBreakdown    Boolean                  @default(false) @map("has_breakdown")
+  filterByLevel   Boolean                  @default(false) @map("filter_by_level")
+  parentId        String?                  @map("parent_id") @db.VarChar(36)
+  createdAt       DateTime                 @default(now()) @map("created_at")
+  updatedAt       DateTime                 @updatedAt @map("updated_at")
 
   parent       Component?             @relation("ComponentHierarchy", fields: [parentId], references: [id])
   children     Component[]            @relation("ComponentHierarchy")
@@ -140,20 +146,38 @@ enum FormulaOperator {
 }
 
 model IKUFormula {
-  id             String             @id @default(uuid()) @db.VarChar(36)
-  iku            IKU                @relation(fields: [ikuId], references: [id])
-  ikuId          String             @db.VarChar(36)
-  name           String
-  description    String?
-  finalResultKey String             @default("RESULT")
-  isActive       Boolean            @default(true) @map("is_active")
-  isFinal        Boolean            @default(false) @map("is_final")
-  version        Int                @default(1)
-  createdAt      DateTime           @default(now()) @map("created_at")
-  updatedAt      DateTime           @updatedAt @map("updated_at")
-  details        IKUFormulaDetail[]
+  id               String                    @id @default(uuid()) @db.VarChar(36)
+  iku              IKU                       @relation(fields: [ikuId], references: [id])
+  ikuId            String                    @db.VarChar(36)
+  name             String
+  description      String?
+  finalResultKey   String                    @default("RESULT")
+  isActive         Boolean                   @default(true) @map("is_active")
+  isFinal          Boolean                   @default(false) @map("is_final")
+  // Jika diisi, formula dievaluasi per prodi (pakai nilai breakdown) lalu
+  // hasil tiap prodi diagregasi. null = evaluasi dari nilai total komponen.
+  prodiAggregation ProdiAggregationType?     @map("prodi_aggregation")
+  version          Int                       @default(1)
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
+  details          IKUFormulaDetail[]
+  excludedProdis   IkuFormulaExcludedProdi[]
 
   @@map("iku_formula")
+}
+
+// Prodi yang TIDAK ikut dihitung saat formula memakai prodiAggregation.
+model IkuFormulaExcludedProdi {
+  formulaId String   @map("formula_id") @db.VarChar(36)
+  prodiId   String   @map("prodi_id") @db.VarChar(36)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  formula IKUFormula @relation(fields: [formulaId], references: [id], onDelete: Cascade)
+  prodi   Prodi      @relation(fields: [prodiId], references: [id], onDelete: Cascade)
+
+  @@id([formulaId, prodiId])
+  @@index([prodiId])
+  @@map("iku_formula_excluded_prodi")
 }
 
 model IKUFormulaDetail {
@@ -191,7 +215,7 @@ model ComponentRealization {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  component  Component @relation(fields: [idComponent], references: [id])
+  component  Component                       @relation(fields: [idComponent], references: [id])
   documents  ComponentRealizationDocument[]
   breakdowns ComponentRealizationBreakdown[]
 
@@ -218,7 +242,8 @@ model IkuResult {
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
-  iku IKU @relation(fields: [idIku], references: [id])
+  iku          IKU              @relation(fields: [idIku], references: [id])
+  prodiResults IkuResultProdi[]
 
   @@unique([idIku, month, year, resultType])
   @@index([idIku])
@@ -274,10 +299,32 @@ model Document {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  components ComponentDocument[]
+  components           ComponentDocument[]
   realizationDocuments ComponentRealizationDocument[]
 
   @@map("documents")
+}
+
+enum VideoSourceType {
+  YOUTUBE
+  GOOGLE_DRIVE
+}
+
+model Guide {
+  id           String           @id @default(uuid()) @db.VarChar(36)
+  title        String
+  description  String?          @db.Text
+  filename     String?
+  originalName String?          @map("original_name")
+  fileUrl      String?          @map("file_url")
+  mimeType     String?          @map("mime_type")
+  size         Int?
+  videoUrl     String?          @map("video_url")
+  videoSource  VideoSourceType? @map("video_source")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@map("guides")
 }
 
 model ComponentDocument {
@@ -358,16 +405,39 @@ model IkuUser {
 }
 
 model Prodi {
-  id         String   @id @default(uuid()) @db.VarChar(36)
-  code       String   @unique
-  name       String
-  level      String   @default("")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  breakdowns ComponentRealizationBreakdown[]
+  id             String                          @id @default(uuid()) @db.VarChar(36)
+  code           String                          @unique
+  name           String
+  level          String                          @default("")
+  createdAt      DateTime                        @default(now()) @map("created_at")
+  updatedAt      DateTime                        @updatedAt @map("updated_at")
+  breakdowns     ComponentRealizationBreakdown[]
   componentUsers ComponentUser[]
+  ikuResults     IkuResultProdi[]
+  excludedFrom   IkuFormulaExcludedProdi[]
 
   @@map("prodi")
+}
+
+// Hasil formula per prodi untuk IkuResult yang formulanya memakai prodiAggregation.
+model IkuResultProdi {
+  id              String   @id @default(uuid()) @db.VarChar(36)
+  resultId        String   @map("result_id")
+  prodiId         String   @map("prodi_id") @db.VarChar(36)
+  // null jika prodi dilewati (data tidak lengkap / evaluasi gagal)
+  calculatedValue Decimal? @map("calculated_value") @db.Decimal(18, 4)
+  skippedReason   String?  @map("skipped_reason") @db.Text
+  // componentValues & formulaSteps yang dipakai untuk prodi ini
+  debugInfo       Json?    @map("debug_info")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  result IkuResult @relation(fields: [resultId], references: [idResult], onDelete: Cascade)
+  prodi  Prodi     @relation(fields: [prodiId], references: [id])
+
+  @@unique([resultId, prodiId])
+  @@index([prodiId])
+  @@map("iku_result_prodi")
 }
 
 model ComponentRealizationBreakdown {
@@ -485,14 +555,14 @@ model UnitIKU {
 }
 
 model RealizationPeriodLock {
-  id                String   @id @default(uuid()) @db.VarChar(36)
-  month             Int      // 1-12
-  year              Int
-  reason            String?  @db.Text
-  allowAdminBypass  Boolean  @default(false) @map("allow_admin_bypass")
-  lockedBy          String?  @map("locked_by") @db.VarChar(36)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid()) @db.VarChar(36)
+  month            Int // 1-12
+  year             Int
+  reason           String?  @db.Text
+  allowAdminBypass Boolean  @default(false) @map("allow_admin_bypass")
+  lockedBy         String?  @map("locked_by") @db.VarChar(36)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   @@unique([month, year])
   @@map("realization_period_locks")
@@ -504,13 +574,13 @@ enum VerificationEntityType {
 }
 
 model RealizationVerification {
-  id         String                  @id @default(uuid()) @db.VarChar(36)
-  entityType VerificationEntityType  @map("entity_type")
-  entityId   String                  @map("entity_id") @db.VarChar(36)
-  userId     String                  @map("user_id") @db.VarChar(36)
-  userName   String?                 @map("user_name") @db.VarChar(255)
-  note       String?                 @db.Text
-  createdAt  DateTime                @default(now()) @map("created_at")
+  id         String                 @id @default(uuid()) @db.VarChar(36)
+  entityType VerificationEntityType @map("entity_type")
+  entityId   String                 @map("entity_id") @db.VarChar(36)
+  userId     String                 @map("user_id") @db.VarChar(36)
+  userName   String?                @map("user_name") @db.VarChar(255)
+  note       String?                @db.Text
+  createdAt  DateTime               @default(now()) @map("created_at")
 
   @@unique([entityType, entityId, userId])
   @@index([entityType, entityId])

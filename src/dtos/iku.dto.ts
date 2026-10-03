@@ -27,6 +27,10 @@ export class IkuCreateDto {
   @IsOptional()
   @IsEnum(["IKU_UTAMA", "IKU_SPEKTA"], { message: "Type must be one of: IKU_UTAMA, IKU_SPEKTA" })
   type?: string;
+
+  @IsOptional()
+  @IsString({ message: "Target must be a string" })
+  target?: string;
 }
 
 export class IkuUpdateDto {
@@ -56,6 +60,10 @@ export class IkuUpdateDto {
   @IsOptional()
   @IsEnum(["IKU_UTAMA", "IKU_SPEKTA"], { message: "Type must be one of: IKU_UTAMA, IKU_SPEKTA" })
   type?: string;
+
+  @IsOptional()
+  @IsString({ message: "Target must be a string" })
+  target?: string;
 }
 
 export class IkuComponentMappingDto {

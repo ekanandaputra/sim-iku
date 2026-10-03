@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
+import { toAbsoluteUrl } from "../utils/url";
 
 type IkuResultParams = { id: string };
 
@@ -57,6 +58,29 @@ async function validateValueByUnit(
   return null;
 }
 
+/**
+ * IkuResult tidak punya tabel join dokumen (hanya `documentIds` array of id).
+ * Helper ini membentuk field "documents" dengan struktur yang sama seperti
+ * relasi documents pada component realization (id, realizationId, documentId,
+ * createdAt, document{...}), supaya konsisten di seluruh API.
+ */
+function buildResultDocuments(
+  result: { idResult: string; documentIds: Prisma.JsonValue; calculatedAt: Date },
+  docMap: Map<string, { id: string; url: string; [key: string]: any }>
+) {
+  const ids = Array.isArray(result.documentIds) ? (result.documentIds as string[]) : [];
+  return ids
+    .map((id) => docMap.get(id))
+    .filter((d): d is NonNullable<typeof d> => Boolean(d))
+    .map((d) => ({
+      id: d.id,
+      realizationId: result.idResult,
+      documentId: d.id,
+      createdAt: result.calculatedAt,
+      document: { ...d, url: toAbsoluteUrl(d.url) },
+    }));
+}
+
 export const listIkuResults = async (
   req: Request<{}, {}, {}, IkuResultQuery>,
   res: Response,
@@ -79,14 +103,28 @@ export const listIkuResults = async (
         where,
         skip,
         take: limit,
-        include: { iku: true },
+        include: {
+          iku: true,
+          prodiResults: {
+            include: { prodi: { select: { id: true, code: true, name: true } } },
+            orderBy: { prodi: { code: "asc" } },
+          },
+        },
         orderBy: [{ createdAt: "desc" }],
       }),
       prisma.ikuResult.count({ where }),
     ]);
 
+    const allDocIds = Array.from(new Set(
+      results.flatMap((r) => (Array.isArray(r.documentIds) ? (r.documentIds as string[]) : []))
+    ));
+    const documents = allDocIds.length
+      ? await prisma.document.findMany({ where: { id: { in: allDocIds } } })
+      : [];
+    const docMap = new Map(documents.map((d) => [d.id, d]));
+
     res.json(successResponse({
-      data: results,
+      data: results.map((r) => ({ ...r, documents: buildResultDocuments(r, docMap) })),
       pagination: {
         page,
         limit,
@@ -108,12 +146,46 @@ export const getIkuResultById = async (
     const id = req.params.id;
     const result = await prisma.ikuResult.findUnique({
       where: { idResult: id },
-      include: { iku: true },
+      include: {
+        iku: true,
+        prodiResults: {
+          include: { prodi: { select: { id: true, code: true, name: true } } },
+          orderBy: { prodi: { code: "asc" } },
+        },
+      },
     });
     if (!result) {
       return res.status(404).json(errorResponse("IKU result not found"));
     }
-    res.json(successResponse(result));
+
+    // Fetch verification status
+    const verifications = await prisma.realizationVerification.findMany({
+      where: {
+        entityType: "IKU_RESULT",
+        entityId: id,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const ids = Array.isArray(result.documentIds) ? (result.documentIds as string[]) : [];
+    const documents = ids.length
+      ? await prisma.document.findMany({ where: { id: { in: ids } } })
+      : [];
+    const docMap = new Map(documents.map((d) => [d.id, d]));
+
+    res.json(successResponse({
+      ...result,
+      documents: buildResultDocuments(result, docMap),
+      isVerified: verifications.length > 0,
+      verificationCount: verifications.length,
+      verifications: verifications.map((v) => ({
+        id: v.id,
+        userId: v.userId,
+        userName: v.userName,
+        note: v.note,
+        verifiedAt: v.createdAt,
+      })),
+    }));
   } catch (error) {
     next(error);
   }

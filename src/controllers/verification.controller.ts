@@ -238,7 +238,7 @@ export const getVerificationDashboard = async (
     });
 
     const ikuResults = await prisma.ikuResult.findMany({
-      where: { year },
+      where: { year, month: { not: 0 } },
     });
 
     // 2. Fetch all root Components (some might not be in IKU, but usually are)
@@ -247,7 +247,7 @@ export const getVerificationDashboard = async (
     });
     
     const componentRealizations = await prisma.componentRealization.findMany({
-      where: { year },
+      where: { year, month: { not: 0 } },
     });
 
     // 3. Collect all entity IDs and fetch verifications
@@ -338,13 +338,17 @@ export const getVerificationDashboard = async (
         };
       }).sort((a: any, b: any) => a.metricCode.localeCompare(b.metricCode));
 
+      // IKU yang punya Component: verifikasi hanya di komponen,
+      // jadi tidak perlu menampilkan bulan (realizations) di level IKU.
+      const hasComponents = componentRows.length > 0;
+
       return {
         metricType: "IKU",
         metricId: iku.id,
         metricCode: iku.code,
         metricName: iku.name,
         isDirectInput: iku.isDirectInput,
-        realizations,
+        realizations: hasComponents ? [] : realizations,
         components: componentRows,
       };
     });

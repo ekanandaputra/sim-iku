@@ -8,6 +8,7 @@ import { filterProdisByComponent } from "../utils/prodiFilter";
 import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 import { checkPeriodLock, PeriodLockError, getLockedMonths } from "../utils/periodLock";
+import { toAbsoluteUrl } from "../utils/url";
 
 const YEARS_RANGE = 6;
 const MONTH_NAMES = [
@@ -190,6 +191,7 @@ export const getRealizationMetrics = async (
         name: i.name,
         description: i.description,
         unit: i.unit,
+        target: i.target,
         isDirectInput: i.isDirectInput,
         tags: [], // IKU has no tags
         createdAt: i.createdAt,
@@ -713,6 +715,7 @@ export const getRealizationView = async (
           name: iku.name,
           description: iku.description,
           unit: iku.unit,
+          target: iku.target,
           periodType: "monthly",
           isDirectInput: iku.isDirectInput,
           isAssigned: isIkuAssigned,
@@ -941,11 +944,20 @@ export const getRealizationDetail = async (
         orderBy: { createdAt: "desc" },
       });
 
-      const { component, ...realizationData } = realization;
+      const { component, documents, ...realizationData } = realization;
+      const documentsWithAbsoluteUrls = documents.map(d => d.document
+        ? { ...d, document: { ...d.document, url: toAbsoluteUrl(d.document.url) } }
+        : d);
 
       return res.json(successResponse({
         metric: component,
-        realization: realizationData,
+        realization: {
+          ...realizationData,
+          documents: documentsWithAbsoluteUrls,
+          isVerified: verifications.length > 0,
+          verificationCount: verifications.length,
+          verifications,
+        },
         isVerified: verifications.length > 0,
         verificationCount: verifications.length,
         verifications,
@@ -961,9 +973,10 @@ export const getRealizationDetail = async (
 
       let documents: any[] = [];
       if (result.documentIds && Array.isArray(result.documentIds)) {
-        documents = await prisma.document.findMany({
+        const foundDocuments = await prisma.document.findMany({
           where: { id: { in: result.documentIds as string[] } }
         });
+        documents = foundDocuments.map(d => ({ ...d, url: toAbsoluteUrl(d.url) }));
       }
 
       // Fetch verifications for this IKU result
@@ -979,7 +992,13 @@ export const getRealizationDetail = async (
 
       return res.json(successResponse({
         metric: iku,
-        realization: { ...realizationData, documents },
+        realization: {
+          ...realizationData,
+          documents,
+          isVerified: verifications.length > 0,
+          verificationCount: verifications.length,
+          verifications,
+        },
         isVerified: verifications.length > 0,
         verificationCount: verifications.length,
         verifications,

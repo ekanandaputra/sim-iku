@@ -1,6 +1,7 @@
-import { IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, Length, IsUUID, ValidateNested } from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, Length, IsUUID, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
 import { IkuFormulaDetailCreateDto } from "./ikuFormulaDetail.dto";
+import { ProdiAggregationType } from "../generated/prisma/enums";
 
 export class IkuFormulaCreateDto {
   @IsNotEmpty({ message: "IKU ID is required" })
@@ -29,6 +30,15 @@ export class IkuFormulaCreateDto {
   @IsOptional()
   @IsBoolean({ message: "isFinal must be a boolean" })
   isFinal?: boolean;
+
+  @IsOptional()
+  @IsEnum(ProdiAggregationType, { message: "prodiAggregation must be AVG or SUM" })
+  prodiAggregation?: ProdiAggregationType | null;
+
+  @IsOptional()
+  @IsArray({ message: "excludedProdiIds must be an array" })
+  @IsUUID("all", { each: true, message: "Each excludedProdiIds item must be a valid UUID" })
+  excludedProdiIds?: string[];
 
   @IsOptional()
   @IsArray({ message: "Steps must be an array" })
@@ -60,6 +70,15 @@ export class IkuFormulaUpdateDto {
   @IsOptional()
   @IsBoolean({ message: "isFinal must be a boolean" })
   isFinal?: boolean;
+
+  @IsOptional()
+  @IsEnum(ProdiAggregationType, { message: "prodiAggregation must be AVG or SUM" })
+  prodiAggregation?: ProdiAggregationType | null;
+
+  @IsOptional()
+  @IsArray({ message: "excludedProdiIds must be an array" })
+  @IsUUID("all", { each: true, message: "Each excludedProdiIds item must be a valid UUID" })
+  excludedProdiIds?: string[];
 
   @IsOptional()
   @IsArray({ message: "Steps must be an array" })

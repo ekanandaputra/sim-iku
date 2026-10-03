@@ -71,6 +71,16 @@ export const listIkuFormulas = async (
   }
 };
 
+/** Pastikan semua prodi di excludedProdiIds ada. Mengembalikan pesan error atau null. */
+async function validateExcludedProdiIds(excludedProdiIds: string[] | null | undefined): Promise<string | null> {
+  if (!excludedProdiIds || excludedProdiIds.length === 0) return null;
+  const uniqueIds = Array.from(new Set(excludedProdiIds));
+  const found = await prisma.prodi.findMany({ where: { id: { in: uniqueIds } }, select: { id: true } });
+  const foundIds = new Set(found.map((p) => p.id));
+  const missing = uniqueIds.filter((id) => !foundIds.has(id));
+  return missing.length > 0 ? `Prodi not found: ${missing.join(", ")}` : null;
+}
+
 /**
  * GET IKU FORMULA BY ID
  * GET /api/iku-formulas/:id
@@ -88,6 +98,9 @@ export const getIkuFormulaById = async (
       include: {
         details: {
           orderBy: { sequence: "asc" },
+        },
+        excludedProdis: {
+          include: { prodi: { select: { id: true, code: true, name: true } } },
         },
       },
     });
@@ -115,7 +128,7 @@ export const createIkuFormula = async (
   next: NextFunction
 ) => {
   try {
-    const { ikuId, name, description, finalResultKey, isFinal, steps } = req.body;
+    const { ikuId, name, description, finalResultKey, isFinal, prodiAggregation, excludedProdiIds, steps } = req.body;
 
     const iku = await prisma.iKU.findUnique({ where: { id: ikuId } });
     if (!iku) {
@@ -124,6 +137,11 @@ export const createIkuFormula = async (
 
     if (!Array.isArray(steps) || steps.length === 0) {
       return res.status(400).json(errorResponse("At least one formula step is required"));
+    }
+
+    const excludedError = await validateExcludedProdiIds(excludedProdiIds);
+    if (excludedError) {
+      return res.status(400).json(errorResponse(excludedError));
     }
 
     const parsedSteps = plainToInstance(IkuFormulaDetailCreateDto, steps);
@@ -175,7 +193,11 @@ export const createIkuFormula = async (
           finalResultKey,
           isActive: true,
           isFinal: isFinal ?? false,
+          prodiAggregation: prodiAggregation ?? null,
           version: nextVersion,
+          excludedProdis: {
+            create: Array.from(new Set<string>(excludedProdiIds ?? [])).map((prodiId) => ({ prodiId })),
+          },
           details: {
             create: parsedSteps.map((step) => ({
               sequence: step.sequence,
@@ -187,6 +209,9 @@ export const createIkuFormula = async (
               resultKey: step.resultKey,
             })),
           },
+        },
+        include: {
+          excludedProdis: { select: { prodiId: true } },
         },
       })
     );
@@ -213,7 +238,7 @@ export const updateIkuFormula = async (
 ) => {
   try {
     const id = req.params.id;
-    const { name, description, finalResultKey, isFinal, steps } = req.body;
+    const { name, description, finalResultKey, isFinal, prodiAggregation, excludedProdiIds, steps } = req.body;
 
     const existing = await prisma.iKUFormula.findUnique({ where: { id } });
     if (!existing) {
@@ -221,6 +246,11 @@ export const updateIkuFormula = async (
     }
 
     const ikuId = existing.ikuId;
+
+    const excludedError = await validateExcludedProdiIds(excludedProdiIds);
+    if (excludedError) {
+      return res.status(400).json(errorResponse(excludedError));
+    }
 
     let createSteps: any[] = [];
 
@@ -290,6 +320,14 @@ export const updateIkuFormula = async (
       );
     }
 
+    // Mode per prodi dimatikan → hapus hasil per prodi lama milik IKU ini,
+    // karena perhitungan dengan prodiAggregation=null tidak menyentuh tabel tsb.
+    if (prodiAggregation === null && existing.prodiAggregation !== null) {
+      transactionOps.push(
+        prisma.ikuResultProdi.deleteMany({ where: { result: { idIku: ikuId } } })
+      );
+    }
+
     transactionOps.push(
       prisma.iKUFormula.update({
         where: { id },
@@ -298,10 +336,23 @@ export const updateIkuFormula = async (
           description,
           finalResultKey,
           isFinal: newIsFinal,
+          prodiAggregation,
           details: {
             deleteMany: {},
             create: createSteps,
           },
+          // excludedProdiIds tidak dikirim → daftar exclude lama dipertahankan
+          ...(excludedProdiIds !== undefined
+            ? {
+                excludedProdis: {
+                  deleteMany: {},
+                  create: Array.from(new Set<string>(excludedProdiIds ?? [])).map((prodiId) => ({ prodiId })),
+                },
+              }
+            : {}),
+        },
+        include: {
+          excludedProdis: { select: { prodiId: true } },
         },
       })
     );

@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma";
 import { successResponse, errorResponse } from "../utils/response";
 import fs from "fs";
 import path from "path";
+import { toAbsoluteUrl } from "../utils/url";
 
 export const uploadDocuments = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -22,7 +23,7 @@ export const uploadDocuments = async (req: Request, res: Response, next: NextFun
           size: file.size,
         },
       });
-      createdDocuments.push(doc);
+      createdDocuments.push({ ...doc, url: toAbsoluteUrl(doc.url) });
     }
 
     res.status(201).json(successResponse(createdDocuments, "Documents uploaded successfully"));
@@ -48,7 +49,7 @@ export const listDocuments = async (req: Request, res: Response, next: NextFunct
     ]);
 
     res.json(successResponse({
-      data: documents,
+      data: documents.map(d => ({ ...d, url: toAbsoluteUrl(d.url) })),
       pagination: {
         page,
         limit,
