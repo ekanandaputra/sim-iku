@@ -36,6 +36,11 @@ export class IkuFormulaCreateDto {
   prodiAggregation?: ProdiAggregationType | null;
 
   @IsOptional()
+  @IsString({ message: "prodiLevel must be a string" })
+  @Length(0, 50, { message: "prodiLevel must be at most 50 characters" })
+  prodiLevel?: string | null;
+
+  @IsOptional()
   @IsArray({ message: "excludedProdiIds must be an array" })
   @IsUUID("all", { each: true, message: "Each excludedProdiIds item must be a valid UUID" })
   excludedProdiIds?: string[];
@@ -74,6 +79,11 @@ export class IkuFormulaUpdateDto {
   @IsOptional()
   @IsEnum(ProdiAggregationType, { message: "prodiAggregation must be AVG or SUM" })
   prodiAggregation?: ProdiAggregationType | null;
+
+  @IsOptional()
+  @IsString({ message: "prodiLevel must be a string" })
+  @Length(0, 50, { message: "prodiLevel must be at most 50 characters" })
+  prodiLevel?: string | null;
 
   @IsOptional()
   @IsArray({ message: "excludedProdiIds must be an array" })

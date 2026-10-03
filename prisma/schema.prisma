@@ -157,6 +157,8 @@ model IKUFormula {
   // Jika diisi, formula dievaluasi per prodi (pakai nilai breakdown) lalu
   // hasil tiap prodi diagregasi. null = evaluasi dari nilai total komponen.
   prodiAggregation ProdiAggregationType?     @map("prodi_aggregation")
+  // Jika diisi (mis. "D4"), hanya prodi dengan level ini yang ikut perhitungan per prodi
+  prodiLevel       String?                   @map("prodi_level")
   version          Int                       @default(1)
   createdAt        DateTime                  @default(now()) @map("created_at")
   updatedAt        DateTime                  @updatedAt @map("updated_at")

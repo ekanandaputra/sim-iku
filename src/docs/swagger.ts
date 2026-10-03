@@ -472,6 +472,7 @@ const swaggerDefinition = {
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
           prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          prodiLevel: { type: "string", nullable: true, example: "D4", description: "Jika diisi, hanya prodi dengan level ini yang ikut perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Case-insensitive. Saat update, tidak dikirim = dipertahankan; null/\"\" = semua level." },
           excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           version: { type: "integer" },
           createdAt: { type: "string", format: "date-time" },
@@ -507,6 +508,7 @@ const swaggerDefinition = {
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
           prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          prodiLevel: { type: "string", nullable: true, example: "D4", description: "Jika diisi, hanya prodi dengan level ini yang ikut perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Case-insensitive. Saat update, tidak dikirim = dipertahankan; null/\"\" = semua level." },
           excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           steps: {
             type: "array",
@@ -524,6 +526,7 @@ const swaggerDefinition = {
           isActive: { type: "boolean" },
           isFinal: { type: "boolean" },
           prodiAggregation: { type: "string", enum: ["AVG", "SUM"], nullable: true, description: "Jika diisi, formula dievaluasi per prodi (komponen breakdown pakai nilai prodi) lalu hasilnya dirata-rata (AVG) atau dijumlah (SUM). null = evaluasi dari nilai total." },
+          prodiLevel: { type: "string", nullable: true, example: "D4", description: "Jika diisi, hanya prodi dengan level ini yang ikut perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Case-insensitive. Saat update, tidak dikirim = dipertahankan; null/\"\" = semua level." },
           excludedProdiIds: { type: "array", items: { type: "string", format: "uuid" }, description: "Prodi yang dikecualikan dari perhitungan per prodi (hanya berlaku jika prodiAggregation diisi). Saat update, tidak dikirim = daftar lama dipertahankan; [] = kosongkan." },
           steps: {
             type: "array",
@@ -4018,7 +4021,7 @@ const swaggerDefinition = {
       get: {
         tags: ["Import"],
         summary: "Download Excel template for formula import",
-        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final, prodi_aggregation (AVG/SUM/kosong), excluded_prodi_names (nama prodi dipisah koma).",
+        description: "Returns an .xlsx file with columns: iku_code, formula_name, formula_description, formula_expression, final_result_key, is_final, prodi_aggregation (AVG/SUM/kosong), prodi_level (mis. D4, kosong = semua level), excluded_prodi_names (nama prodi dipisah koma).",
         responses: {
           "200": {
             description: "Excel template file (.xlsx)",
@@ -4044,7 +4047,7 @@ const swaggerDefinition = {
       post: {
         tags: ["Import"],
         summary: "Import formulas from Excel",
-        description: "Upload an .xlsx file with sheet 'FormulaData'. Expressions will be parsed into steps. IKU codes must exist. Kolom opsional `prodi_aggregation` (AVG/SUM/kosong) dan `excluded_prodi_names` (nama prodi dipisah koma, case-insensitive; nama yang cocok ke lebih dari satu prodi ditolak). Jika kolom tidak ada di file, nilai formula existing dipertahankan; jika kolom ada tapi sel kosong, nilai dikosongkan.",
+        description: "Upload an .xlsx file with sheet 'FormulaData'. Expressions will be parsed into steps. IKU codes must exist. Kolom opsional `prodi_aggregation` (AVG/SUM/kosong), `prodi_level` (mis. D4, kosong = semua level), dan `excluded_prodi_names` (nama prodi dipisah koma, case-insensitive; nama yang cocok ke lebih dari satu prodi ditolak). Jika kolom tidak ada di file, nilai formula existing dipertahankan; jika kolom ada tapi sel kosong, nilai dikosongkan.",
         requestBody: {
           required: true,
           content: {
