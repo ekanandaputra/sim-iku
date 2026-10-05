@@ -646,17 +646,30 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
       "excluded_prodi_names",
     ];
 
+    // IKU diambil terpisah (bukan include) supaya formula yang IKU-nya sudah tidak
+    // ada (data orphan) tidak membuat seluruh export gagal.
     const formulas = await prisma.iKUFormula.findMany({
       include: {
-        iku: true,
         details: true,
         excludedProdis: { include: { prodi: { select: { name: true } } } },
       }
     });
+    const ikus = await prisma.iKU.findMany({
+      where: { id: { in: Array.from(new Set(formulas.map(f => f.ikuId))) } },
+      select: { id: true, code: true },
+    });
+    const ikuCodeById = new Map(ikus.map(i => [i.id, i.code]));
 
     const data: any[][] = [headers];
+    const orphanFormulas: { id: string; name: string; ikuId: string }[] = [];
 
     for (const formula of formulas) {
+      const ikuCode = ikuCodeById.get(formula.ikuId);
+      if (!ikuCode) {
+        orphanFormulas.push({ id: formula.id, name: formula.name, ikuId: formula.ikuId });
+        continue;
+      }
+
       let expression = "";
       if (formula.details && formula.details.length > 0) {
         expression = reconstructFormula(formula.details, formula.finalResultKey);
@@ -667,7 +680,7 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
       }
 
       data.push([
-        formula.iku.code,
+        ikuCode,
         formula.name,
         formula.description || "",
         expression,
@@ -677,6 +690,10 @@ export const exportFormulas = async (req: Request, res: Response, next: NextFunc
         formula.prodiLevel ?? "",
         formula.excludedProdis.map(e => e.prodi.name).sort().join(", "),
       ]);
+    }
+
+    if (orphanFormulas.length > 0) {
+      console.warn("[exportFormulas] Skipped formulas whose IKU no longer exists", orphanFormulas);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(data);
