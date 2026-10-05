@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { ProdiAggregationType } from "../generated/prisma/enums";
-import { evaluateFormula, ComponentValues, FormulaEvaluationStep, FormulaEvaluationOptions } from "./formula";
+import { evaluateFormula, getFormulaRequiredComponentCodes, ComponentValues, FormulaEvaluationStep, FormulaEvaluationOptions } from "./formula";
 
 /** Nilai breakdown per komponen: kode komponen → prodiId → nilai. */
 export type ProdiValues = Record<string, Record<string, number>>;
@@ -167,7 +167,11 @@ export async function evaluateFormulaPerProdi(
   componentValues: ComponentValues,
   prodiValues: ProdiValues
 ): Promise<FinalFormulaEvaluation> {
-  const breakdownCodes = Object.keys(prodiValues);
+  // Hanya komponen breakdown yang dipakai formula ini (termasuk sub-formulanya).
+  // prodiValues bisa berisi komponen milik formula lain dalam satu IKU, mis. saat
+  // formula ini dipanggil sebagai sub-formula dari "AEE D4 + AEE S2".
+  const requiredCodes = await getFormulaRequiredComponentCodes(formulaId);
+  const breakdownCodes = Object.keys(prodiValues).filter(code => requiredCodes.has(code));
   if (breakdownCodes.length === 0) {
     return evaluateFormula(formulaId, componentValues);
   }
