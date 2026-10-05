@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { ProdiAggregationType } from "../generated/prisma/enums";
-import { evaluateFormula, ComponentValues, FormulaEvaluationStep } from "./formula";
+import { evaluateFormula, ComponentValues, FormulaEvaluationStep, FormulaEvaluationOptions } from "./formula";
 
 /** Nilai breakdown per komponen: kode komponen → prodiId → nilai. */
 export type ProdiValues = Record<string, Record<string, number>>;
@@ -13,6 +13,9 @@ export type ProdiFormulaEntry = {
   result: number | null;
   steps: FormulaEvaluationStep[];
   skipped?: string;
+  /** Diisi jika hasil ini berasal dari sub-formula yang direferensikan */
+  formulaId?: string;
+  formulaName?: string;
 };
 
 export type ProdiEvaluationInfo = {
@@ -28,6 +31,75 @@ export type FinalFormulaEvaluation = {
   steps: FormulaEvaluationStep[];
   prodiEvaluation?: ProdiEvaluationInfo;
 };
+
+/** Hasil sub-formula (formula_ref) yang dihitung per prodi. */
+export type RefProdiEvaluation = {
+  formulaId: string;
+  formulaName: string;
+  result: number;
+  prodiEvaluation?: ProdiEvaluationInfo;
+};
+
+/**
+ * Context untuk evaluasi formula yang mereferensikan sub-formula dengan
+ * prodiAggregation (mis. "AEE D4 + AEE D3"). Sub-formula tersebut dihitung per
+ * prodi sesuai filternya, bukan dari nilai total.
+ *
+ * Nilai per prodi baru diambil (lazy) saat ada sub-formula yang membutuhkannya,
+ * sehingga formula tanpa prodiAggregation tidak menjalankan query tambahan.
+ */
+export function createProdiRefContext(loadProdiValues: () => Promise<ProdiValues>) {
+  let prodiValuesPromise: Promise<ProdiValues> | null = null;
+  const getProdiValues = () => (prodiValuesPromise ??= loadProdiValues());
+  const refEvaluations = new Map<string, RefProdiEvaluation>();
+
+  const options: FormulaEvaluationOptions = {
+    resolveFormulaRef: async (ref, componentValues) => {
+      if (!ref.prodiAggregation) return null;
+      const evaluation = await evaluateFormulaPerProdi(
+        ref.id, ref.prodiAggregation, componentValues, await getProdiValues()
+      );
+      refEvaluations.set(ref.id, {
+        formulaId: ref.id,
+        formulaName: ref.name,
+        result: evaluation.result,
+        prodiEvaluation: evaluation.prodiEvaluation,
+      });
+      return evaluation.result;
+    },
+  };
+
+  return {
+    options,
+    getProdiValues,
+    getRefEvaluations: (): RefProdiEvaluation[] => Array.from(refEvaluations.values()),
+  };
+}
+
+/**
+ * Gabungkan hasil per prodi untuk disimpan ke iku_result_prodi:
+ * - formula final memakai prodiAggregation → hasil per prodi formula final
+ * - selain itu → gabungan hasil per prodi dari sub-formula (mis. AEE D4 + AEE D3).
+ *   Jika satu prodi muncul di beberapa sub-formula, yang pertama dipakai.
+ * Mengembalikan undefined jika tidak ada perhitungan per prodi sama sekali.
+ */
+export function collectProdiEntries(
+  finalEvaluation: ProdiEvaluationInfo | undefined,
+  refEvaluations: RefProdiEvaluation[] | undefined
+): ProdiFormulaEntry[] | undefined {
+  if (finalEvaluation) return finalEvaluation.prodiResults;
+  if (!refEvaluations || refEvaluations.length === 0) return undefined;
+
+  const byProdi = new Map<string, ProdiFormulaEntry>();
+  for (const ref of refEvaluations) {
+    for (const p of ref.prodiEvaluation?.prodiResults ?? []) {
+      if (!byProdi.has(p.prodiId)) {
+        byProdi.set(p.prodiId, { ...p, formulaId: ref.formulaId, formulaName: ref.formulaName });
+      }
+    }
+  }
+  return Array.from(byProdi.values());
+}
 
 /**
  * Ambil nilai TERAKHIR (month tertinggi) per prodi dari sekumpulan realisasi.
@@ -164,7 +236,8 @@ export async function evaluateFormulaPerProdi(
     .map(p => p.result)
     .filter((r): r is number => r !== null);
   if (validResults.length === 0) {
-    throw new Error("Tidak ada prodi dengan data lengkap untuk dievaluasi");
+    const reasons = prodiResults.map(p => `${p.prodiCode ?? p.prodiId}: ${p.skipped}`).join("; ");
+    throw new Error(`Tidak ada prodi dengan data lengkap untuk dievaluasi (${reasons})`);
   }
 
   const sum = validResults.reduce((acc, r) => acc + r, 0);
@@ -185,25 +258,29 @@ export async function evaluateFormulaPerProdi(
 
 /**
  * Simpan hasil per prodi untuk sebuah IkuResult (replace semua baris lama).
- * prodiEvaluation kosong (formula tanpa komponen breakdown) → baris lama dihapus.
+ * entries kosong (tidak ada perhitungan per prodi) → baris lama dihapus.
  */
 export async function saveProdiResults(
   resultId: string,
-  prodiEvaluation: ProdiEvaluationInfo | undefined
+  entries: ProdiFormulaEntry[] | undefined
 ): Promise<void> {
-  if (!prodiEvaluation) {
+  if (!entries) {
     await prisma.ikuResultProdi.deleteMany({ where: { resultId } });
     return;
   }
   await prisma.$transaction([
     prisma.ikuResultProdi.deleteMany({ where: { resultId } }),
     prisma.ikuResultProdi.createMany({
-      data: prodiEvaluation.prodiResults.map(p => ({
+      data: entries.map(p => ({
         resultId,
         prodiId: p.prodiId,
         calculatedValue: p.result,
         skippedReason: p.skipped ?? null,
-        debugInfo: { componentValues: p.componentValues, formulaSteps: p.steps },
+        debugInfo: {
+          componentValues: p.componentValues,
+          formulaSteps: p.steps,
+          ...(p.formulaId ? { formulaId: p.formulaId, formulaName: p.formulaName } : {}),
+        },
       })),
     }),
   ]);
