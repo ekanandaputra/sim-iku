@@ -1,7 +1,19 @@
 import { prisma } from "../lib/prisma";
-import { FormulaOperandType, FormulaOperator } from "../generated/prisma/enums";
+import { FormulaOperandType, FormulaOperator, ProdiAggregationType } from "../generated/prisma/enums";
 
 export type ComponentValues = Record<string, number>;
+
+export type FormulaEvaluationOptions = {
+  /**
+   * Hook untuk me-resolve formula yang direferensikan (formula_ref / "formula:").
+   * Kembalikan angka untuk memakai hasil tersebut, atau null untuk evaluasi biasa.
+   * Dipakai agar sub-formula dengan prodiAggregation tetap dihitung per prodi.
+   */
+  resolveFormulaRef?: (
+    ref: { id: string; name: string; prodiAggregation: ProdiAggregationType | null },
+    componentValues: ComponentValues
+  ) => Promise<number | null>;
+};
 
 export type FormulaEvaluationStep = {
   sequence: number;
@@ -23,7 +35,8 @@ export type FormulaEvaluationResult = {
 export async function evaluateFormula(
   formulaId: string,
   componentValues: ComponentValues,
-  visited: Set<string> = new Set()
+  visited: Set<string> = new Set(),
+  options?: FormulaEvaluationOptions
 ): Promise<FormulaEvaluationResult> {
   if (visited.has(formulaId)) {
     throw new Error(`Circular formula dependency detected for '${formulaId}'`);
@@ -31,7 +44,7 @@ export async function evaluateFormula(
   visited.add(formulaId);
 
   try {
-    return await evaluateFormulaInner(formulaId, componentValues, visited);
+    return await evaluateFormulaInner(formulaId, componentValues, visited, options);
   } finally {
     // Backtrack so sibling branches that legitimately reference the same
     // sub-formula (a diamond dependency, not a cycle) aren't falsely flagged.
@@ -42,7 +55,8 @@ export async function evaluateFormula(
 async function evaluateFormulaInner(
   formulaId: string,
   componentValues: ComponentValues,
-  visited: Set<string>
+  visited: Set<string>,
+  options?: FormulaEvaluationOptions
 ): Promise<FormulaEvaluationResult> {
   const formula = await prisma.iKUFormula.findUnique({
     where: { id: formulaId },
@@ -81,7 +95,10 @@ async function evaluateFormulaInner(
           throw new Error(`Formula reference '${ref}' not found`);
         }
 
-        const evaluation = await evaluateFormula(refFormula.id, componentValues, visited);
+        const override = await options?.resolveFormulaRef?.(refFormula, componentValues);
+        if (override != null) return override;
+
+        const evaluation = await evaluateFormula(refFormula.id, componentValues, visited, options);
         return evaluation.result;
       }
 
@@ -115,7 +132,10 @@ async function evaluateFormulaInner(
         throw new Error(`Formula reference '${ref}' not found`);
       }
 
-      const evaluation = await evaluateFormula(refFormula.id, componentValues, visited);
+      const override = await options?.resolveFormulaRef?.(refFormula, componentValues);
+      if (override != null) return override;
+
+      const evaluation = await evaluateFormula(refFormula.id, componentValues, visited, options);
       return evaluation.result;
     }
 

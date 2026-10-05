@@ -7,7 +7,7 @@ import { writeAuditLog } from "../utils/auditLog";
 import { AuditAction, AuditEntityType } from "../generated/prisma/enums";
 import { checkPeriodLock, PeriodLockError } from "../utils/periodLock";
 import { toAbsoluteUrl } from "../utils/url";
-import { evaluateFormulaPerProdi, fetchProdiValues, saveProdiResults, copyProdiResults, FinalFormulaEvaluation, ProdiEvaluationInfo } from "../utils/prodiFormula";
+import { evaluateFormulaPerProdi, fetchProdiValues, saveProdiResults, copyProdiResults, createProdiRefContext, collectProdiEntries, FinalFormulaEvaluation, ProdiEvaluationInfo, RefProdiEvaluation } from "../utils/prodiFormula";
 import { ProdiAggregationType } from "../generated/prisma/enums";
 
 function withAbsoluteDocumentUrls<T extends { documents?: { document?: { url: string } | null }[] }>(record: T): T {
@@ -70,6 +70,7 @@ type FormulaEvaluationDebugInfo = {
     componentAggregations: Record<string, { aggregationType: string; periodType: string; monthsUsed: number[] | null; realizationCount: number }>;
     formulaSteps: { sequence: number; expression: string; result: number }[];
     prodiEvaluation?: ProdiEvaluationInfo;
+    refProdiEvaluations?: RefProdiEvaluation[];
     allFormulas: FormulaDebugEntry[];
     evaluatedAt: string;
   };
@@ -153,12 +154,13 @@ async function evaluateFormulaForMonths(
   if (!hasAnyData) return null;
 
   try {
+    // Sub-formula (formula_ref) dengan prodiAggregation dihitung per prodi;
+    // nilai per prodi baru di-query jika memang dibutuhkan.
+    const prodiCtx = createProdiRefContext(() => fetchProdiValues(codeToInfo, formulaCodes, year, monthsFilter ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));
     const evaluation: FinalFormulaEvaluation = formula.prodiAggregation
-      ? await evaluateFormulaPerProdi(
-          formula.id, formula.prodiAggregation, componentValues,
-          await fetchProdiValues(codeToInfo, formulaCodes, year, monthsFilter ?? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
-        )
-      : await evaluateFormula(formula.id, componentValues);
+      ? await evaluateFormulaPerProdi(formula.id, formula.prodiAggregation, componentValues, await prodiCtx.getProdiValues())
+      : await evaluateFormula(formula.id, componentValues, undefined, prodiCtx.options);
+    const refProdiEvaluations = prodiCtx.getRefEvaluations();
 
     // Evaluate ALL active formulas for this IKU (not just isFinal)
     const allActiveFormulas = await prisma.iKUFormula.findMany({
@@ -170,10 +172,12 @@ async function evaluateFormulaForMonths(
     const allFormulas: FormulaDebugEntry[] = [];
     for (const f of allActiveFormulas) {
       try {
-        // Formula final mode per prodi: pakai hasil per prodi yang sama dengan calculatedValue
-        const eval2 = formula.prodiAggregation && f.id === formula.id
+        // Formula dengan prodiAggregation dihitung per prodi (final: pakai hasil yang sama dengan calculatedValue)
+        const eval2 = f.id === formula.id && formula.prodiAggregation
           ? evaluation
-          : await evaluateFormula(f.id, componentValues);
+          : f.prodiAggregation
+            ? await evaluateFormulaPerProdi(f.id, f.prodiAggregation, componentValues, await prodiCtx.getProdiValues())
+            : await evaluateFormula(f.id, componentValues, undefined, prodiCtx.options);
         allFormulas.push({
           formulaId: f.id,
           formulaName: f.name,
@@ -204,6 +208,7 @@ async function evaluateFormulaForMonths(
         componentAggregations,
         formulaSteps: evaluation.steps,
         prodiEvaluation: evaluation.prodiEvaluation,
+        refProdiEvaluations: refProdiEvaluations.length ? refProdiEvaluations : undefined,
         allFormulas,
         evaluatedAt: new Date().toISOString(),
       },
@@ -311,12 +316,13 @@ export async function calculateIkuResultsForComponentRealization(
       if (hasData) {
         console.log("Evaluating formula [monthly]", { formulaId: formula.id, month, componentValues });
         try {
+          // Sub-formula (formula_ref) dengan prodiAggregation dihitung per prodi;
+          // nilai per prodi baru di-query jika memang dibutuhkan.
+          const prodiCtx = createProdiRefContext(() => fetchProdiValues(codeToInfo, formulaCodes, year, [month]));
           const evaluation: FinalFormulaEvaluation = formula.prodiAggregation
-            ? await evaluateFormulaPerProdi(
-                formula.id, formula.prodiAggregation, componentValues,
-                await fetchProdiValues(codeToInfo, formulaCodes, year, [month])
-              )
-            : await evaluateFormula(formula.id, componentValues);
+            ? await evaluateFormulaPerProdi(formula.id, formula.prodiAggregation, componentValues, await prodiCtx.getProdiValues())
+            : await evaluateFormula(formula.id, componentValues, undefined, prodiCtx.options);
+          const refProdiEvaluations = prodiCtx.getRefEvaluations();
 
           // Evaluate ALL active formulas for this IKU (not just isFinal)
           const allActiveFormulas = await prisma.iKUFormula.findMany({
@@ -328,10 +334,12 @@ export async function calculateIkuResultsForComponentRealization(
           const allFormulas: FormulaDebugEntry[] = [];
           for (const f of allActiveFormulas) {
             try {
-              // Formula final mode per prodi: pakai hasil per prodi yang sama dengan calculatedValue
-              const eval2 = formula.prodiAggregation && f.id === formula.id
+              // Formula dengan prodiAggregation dihitung per prodi (final: pakai hasil yang sama dengan calculatedValue)
+              const eval2 = f.id === formula.id && formula.prodiAggregation
                 ? evaluation
-                : await evaluateFormula(f.id, componentValues);
+                : f.prodiAggregation
+                  ? await evaluateFormulaPerProdi(f.id, f.prodiAggregation, componentValues, await prodiCtx.getProdiValues())
+                  : await evaluateFormula(f.id, componentValues, undefined, prodiCtx.options);
               allFormulas.push({
                 formulaId: f.id,
                 formulaName: f.name,
@@ -359,6 +367,7 @@ export async function calculateIkuResultsForComponentRealization(
             componentValues,
             formulaSteps: evaluation.steps,
             prodiEvaluation: evaluation.prodiEvaluation,
+            refProdiEvaluations: refProdiEvaluations.length ? refProdiEvaluations : undefined,
             allFormulas,
             evaluatedAt: new Date().toISOString(),
           };
@@ -383,8 +392,9 @@ export async function calculateIkuResultsForComponentRealization(
               calculatedAt: new Date(),
             },
           });
-          if (formula.prodiAggregation) {
-            await saveProdiResults(savedMonthly.idResult, evaluation.prodiEvaluation);
+          const prodiEntries = collectProdiEntries(evaluation.prodiEvaluation, refProdiEvaluations);
+          if (formula.prodiAggregation || prodiEntries) {
+            await saveProdiResults(savedMonthly.idResult, prodiEntries);
           }
         } catch (error) {
           console.error("IKU monthly result calculation failed", { formulaId: formula.id, error });
@@ -427,8 +437,9 @@ export async function calculateIkuResultsForComponentRealization(
             calculatedAt: new Date(),
           },
         });
-        if (formula.prodiAggregation) {
-          await saveProdiResults(savedQuarterly.idResult, result.debugInfo.prodiEvaluation);
+        const prodiEntries = collectProdiEntries(result.debugInfo.prodiEvaluation, result.debugInfo.refProdiEvaluations);
+        if (formula.prodiAggregation || prodiEntries) {
+          await saveProdiResults(savedQuarterly.idResult, prodiEntries);
         }
       }
     }
@@ -475,7 +486,8 @@ export async function calculateIkuResultsForComponentRealization(
           calculatedAt: new Date(),
         },
       });
-      if (formula.prodiAggregation) {
+      const yearlySourceDebug = lastNonZeroQuarterResult?.debugInfo as { prodiEvaluation?: unknown; refProdiEvaluations?: unknown } | null | undefined;
+      if (formula.prodiAggregation || yearlySourceDebug?.prodiEvaluation || yearlySourceDebug?.refProdiEvaluations) {
         await copyProdiResults(lastNonZeroQuarterResult?.idResult ?? null, savedYearly.idResult);
       }
     }
