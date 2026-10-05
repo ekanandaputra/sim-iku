@@ -435,7 +435,7 @@ model IkuResultProdi {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   result IkuResult @relation(fields: [resultId], references: [idResult], onDelete: Cascade)
-  prodi  Prodi     @relation(fields: [prodiId], references: [id])
+  prodi  Prodi     @relation(fields: [prodiId], references: [id], onDelete: Cascade)
 
   @@unique([resultId, prodiId])
   @@index([prodiId])
