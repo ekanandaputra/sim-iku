@@ -429,3 +429,344 @@ export const getDashboardSummary = async (req: Request, res: Response, next: Nex
     next(error);
   }
 };
+
+// ── IKU breakdown (detail perhitungan sampai level prodi) ───────────────
+
+type StoredStep = { sequence: number; expression: string; result: number };
+
+type StoredProdiEntry = {
+  prodiId: string;
+  prodiCode: string | null;
+  prodiName: string | null;
+  componentValues: Record<string, number>;
+  result: number | null;
+  steps: StoredStep[];
+  skipped?: string;
+};
+
+type StoredProdiEvaluation = {
+  aggregation: "AVG" | "SUM";
+  prodiLevel: string | null;
+  prodiCount: number;
+  excludedProdiIds: string[];
+  prodiResults: StoredProdiEntry[];
+};
+
+type StoredDebugInfo = {
+  componentValues?: Record<string, number>;
+  componentAggregations?: Record<string, { aggregationType: string; periodType: string; monthsUsed: number[]; realizationCount: number }>;
+  formulaSteps?: StoredStep[];
+  prodiEvaluation?: StoredProdiEvaluation;
+  refProdiEvaluations?: { formulaId: string; formulaName: string; result: number; prodiEvaluation?: StoredProdiEvaluation }[];
+  allFormulas?: { formulaId: string; formulaName: string; isFinal: boolean; finalResultKey: string; steps: StoredStep[] }[];
+  evaluatedAt?: string;
+};
+
+type BreakdownWarning = { code: string; message: string; formulaId?: string; prodiId?: string };
+
+/**
+ * "Q1".."Q4" | "Year" (sama dengan label chartData di getIkuDashboard) atau
+ * "M1".."M12" untuk bulanan. Dipetakan ke kunci unik iku_results
+ * (month, resultType): quarterly → month = nomor kuartal, yearly → month = 0.
+ */
+function parseDashboardPeriod(raw: string):
+  | { resultType: IkuResultType; month: number; quarter: number | null; label: string }
+  | null {
+  const value = raw.trim().toUpperCase();
+  if (value === "YEAR" || value === "Y") {
+    return { resultType: IkuResultType.yearly, month: 0, quarter: null, label: "Year" };
+  }
+  const quarter = /^Q([1-4])$/.exec(value);
+  if (quarter) {
+    const q = Number(quarter[1]);
+    return { resultType: IkuResultType.quarterly, month: q, quarter: q, label: `Q${q}` };
+  }
+  const month = /^M(1[0-2]|[1-9])$/.exec(value);
+  if (month) {
+    const m = Number(month[1]);
+    return { resultType: IkuResultType.monthly, month: m, quarter: Math.ceil(m / 3), label: `M${m}` };
+  }
+  return null;
+}
+
+/** Kode komponen yang hilang, dari pesan skip evaluateFormulaPerProdi. */
+function parseMissingComponents(skippedReason: string | null | undefined): Set<string> {
+  const match = /^Tidak ada data untuk komponen: (.+)$/.exec(skippedReason ?? "");
+  return new Set(match ? match[1].split(",").map(s => s.trim()) : []);
+}
+
+export const getIkuBreakdown = async (req: Request<{ ikuId: string }>, res: Response, next: NextFunction) => {
+  try {
+    const { ikuId } = req.params;
+    const year = parseInt(req.query.year as string);
+    if (isNaN(year)) {
+      return res.status(400).json(errorResponse("Year is required in query params"));
+    }
+    const iku = await prisma.iKU.findUnique({ where: { id: ikuId } });
+    if (!iku) {
+      return res.status(404).json(errorResponse("IKU not found"));
+    }
+
+    // period tidak dikirim → pakai kuartal terakhir (nomor tertinggi) yang sudah punya nilai
+    const rawPeriod = ((req.query.period as string | undefined) ?? "").trim();
+    let periodAutoSelected = false;
+    let period: ReturnType<typeof parseDashboardPeriod>;
+    if (rawPeriod) {
+      period = parseDashboardPeriod(rawPeriod);
+      if (!period) {
+        return res.status(400).json(errorResponse("Invalid period, use Q1-Q4, Year, or M1-M12"));
+      }
+    } else {
+      // Quarterly disimpan dengan month = nomor kuartal
+      const lastQuarter = await prisma.ikuResult.findFirst({
+        where: {
+          idIku: ikuId, year, resultType: IkuResultType.quarterly,
+          OR: [{ calculatedValue: { not: null } }, { textValue: { not: null } }],
+        },
+        orderBy: { month: "desc" },
+        select: { month: true },
+      });
+      if (!lastQuarter) {
+        return res.status(404).json(errorResponse(`Belum ada hasil perhitungan kuartal untuk IKU ini di tahun ${year}`));
+      }
+      period = parseDashboardPeriod(`Q${lastQuarter.month}`)!;
+      periodAutoSelected = true;
+    }
+
+    const result = await prisma.ikuResult.findUnique({
+      where: {
+        idIku_month_year_resultType: { idIku: ikuId, month: period.month, year, resultType: period.resultType },
+      },
+    });
+    if (!result) {
+      return res.status(404).json(errorResponse(`Belum ada hasil perhitungan IKU untuk ${period.label} ${year}`));
+    }
+
+    const debug = (result.debugInfo ?? {}) as StoredDebugInfo;
+    const warnings: BreakdownWarning[] = [];
+
+    // ── Target & status ─────────────────────────────────────────────────
+    const ikuTarget = await prisma.ikuTarget.findUnique({ where: { ikuId_year: { ikuId, year } } });
+    const targetKey = period.quarter
+      ? (["targetQ1", "targetQ2", "targetQ3", "targetQ4"] as const)[period.quarter - 1]
+      : "targetYear";
+    const target = formatDecimal(ikuTarget?.[targetKey]);
+    const calculatedValue = formatDecimal(result.calculatedValue);
+    const achievementRatio =
+      calculatedValue != null && target != null && target !== 0 ? Number((calculatedValue / target).toFixed(4)) : null;
+    const status =
+      calculatedValue == null ? "NO_DATA"
+      : target == null ? "NO_TARGET"
+      : calculatedValue >= target ? "ACHIEVED"
+      : "NOT_ACHIEVED";
+
+    const verificationCount = await prisma.realizationVerification.count({
+      where: { entityType: "IKU_RESULT", entityId: result.idResult },
+    });
+
+    // Yearly disalin dari kuartal terakhir yang tidak nol (lihat recalculateIku).
+    let copiedFromQuarter: number | null = null;
+    if (period.resultType === IkuResultType.yearly) {
+      const source = await prisma.ikuResult.findFirst({
+        where: {
+          idIku: ikuId, year, resultType: IkuResultType.quarterly,
+          calculatedValue: { not: null }, NOT: { calculatedValue: 0 },
+        },
+        orderBy: { quarter: "desc" },
+        select: { quarter: true, month: true },
+      });
+      copiedFromQuarter = source?.quarter ?? source?.month ?? null;
+    }
+
+    // ── Komponen ────────────────────────────────────────────────────────
+    const componentCodes = Object.keys(debug.componentValues ?? {});
+    const componentRows = componentCodes.length
+      ? await prisma.component.findMany({
+          where: { code: { in: componentCodes } },
+          select: { code: true, name: true, hasBreakdown: true },
+        })
+      : [];
+    const componentByCode = new Map(componentRows.map(c => [c.code, c]));
+
+    const components = componentCodes.sort().map(code => {
+      const aggregation = debug.componentAggregations?.[code];
+      return {
+        code,
+        name: componentByCode.get(code)?.name ?? null,
+        hasBreakdown: componentByCode.get(code)?.hasBreakdown ?? false,
+        totalValue: formatDecimal(debug.componentValues?.[code]),
+        aggregationType: aggregation?.aggregationType ?? null,
+        periodType: aggregation?.periodType ?? null,
+        monthsUsed: aggregation?.monthsUsed ?? [],
+        realizationCount: aggregation?.realizationCount ?? 0,
+      };
+    });
+
+    // ── Formula final ───────────────────────────────────────────────────
+    const finalFormulaRow = await prisma.iKUFormula.findFirst({
+      where: { ikuId, isFinal: true, isActive: true },
+      select: { id: true, name: true, finalResultKey: true, prodiAggregation: true, prodiLevel: true },
+    });
+
+    const mode = debug.prodiEvaluation ? "PER_PRODI"
+      : debug.refProdiEvaluations?.length ? "REF_PRODI"
+      : result.debugInfo == null ? "DIRECT_INPUT"
+      : "TOTAL";
+
+    // ── Prodi per formula ───────────────────────────────────────────────
+    const evaluations: { formulaId: string; formulaName: string; result: number; evaluation: StoredProdiEvaluation }[] =
+      mode === "PER_PRODI"
+        ? [{
+            formulaId: finalFormulaRow?.id ?? "",
+            formulaName: finalFormulaRow?.name ?? "",
+            result: Number(result.calculatedValue ?? 0),
+            evaluation: debug.prodiEvaluation!,
+          }]
+        : (debug.refProdiEvaluations ?? [])
+            .filter(ref => ref.prodiEvaluation)
+            .map(ref => ({ formulaId: ref.formulaId, formulaName: ref.formulaName, result: ref.result, evaluation: ref.prodiEvaluation! }));
+
+    // Prodi yang di-exclude tidak punya entry di prodiResults; ambil datanya dari tabel prodi.
+    const allProdiIds = new Set<string>();
+    for (const { evaluation } of evaluations) {
+      evaluation.prodiResults.forEach(p => allProdiIds.add(p.prodiId));
+      evaluation.excludedProdiIds.forEach(id => allProdiIds.add(id));
+    }
+    const prodiRows = allProdiIds.size
+      ? await prisma.prodi.findMany({
+          where: { id: { in: Array.from(allProdiIds) } },
+          select: { id: true, code: true, name: true, level: true },
+        })
+      : [];
+    const prodiById = new Map(prodiRows.map(p => [p.id, p]));
+
+    const formulas = evaluations.map(({ formulaId, formulaName, result: formulaResult, evaluation }) => {
+      const counted = evaluation.prodiResults.filter(p => p.result != null);
+      const countedValues = counted.map(p => formatDecimal(p.result)!);
+      const sumExpression = countedValues.join(" + ") || "0";
+      const expression = evaluation.aggregation === "AVG"
+        ? `(${sumExpression}) / ${countedValues.length}`
+        : sumExpression;
+
+      const prodis = evaluation.prodiResults.map(p => {
+        const prodi = prodiById.get(p.prodiId);
+        const missing = parseMissingComponents(p.skipped);
+        const isCounted = p.result != null;
+        if (!isCounted) {
+          warnings.push({
+            code: "PRODI_SKIPPED",
+            formulaId,
+            prodiId: p.prodiId,
+            message: `${prodi?.code ?? p.prodiCode ?? p.prodiId} tidak ikut dihitung di ${formulaName}: ${p.skipped ?? "tanpa alasan"}`,
+          });
+        }
+        return {
+          prodiId: p.prodiId,
+          code: prodi?.code ?? p.prodiCode,
+          name: prodi?.name ?? p.prodiName,
+          level: prodi?.level ?? null,
+          status: isCounted ? "COUNTED" : "SKIPPED",
+          calculatedValue: formatDecimal(p.result),
+          skippedReason: p.skipped ?? null,
+          componentValues: Object.entries(p.componentValues)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([code, value]) => {
+              // evaluateFormulaPerProdi menyalin nilai total lalu menimpa komponen
+              // breakdown; komponen yang hilang tetap berisi total, jadi tandai MISSING.
+              const source = missing.has(code) ? "MISSING"
+                : componentByCode.get(code)?.hasBreakdown ? "BREAKDOWN"
+                : "TOTAL";
+              return { code, value: source === "MISSING" ? null : formatDecimal(value), source };
+            }),
+          steps: p.steps,
+        };
+      });
+
+      const excluded = evaluation.excludedProdiIds.map(id => {
+        const prodi = prodiById.get(id);
+        return {
+          prodiId: id,
+          code: prodi?.code ?? null,
+          name: prodi?.name ?? null,
+          level: prodi?.level ?? null,
+          status: "EXCLUDED",
+          calculatedValue: null,
+          skippedReason: "Dikecualikan pada formula",
+          componentValues: [],
+          steps: [],
+        };
+      });
+
+      return {
+        formulaId,
+        formulaName,
+        prodiAggregation: evaluation.aggregation,
+        prodiLevel: evaluation.prodiLevel,
+        result: formatDecimal(formulaResult),
+        aggregationDetail: {
+          expression,
+          prodiCounted: counted.length,
+          prodiSkipped: evaluation.prodiResults.length - counted.length,
+          prodiExcluded: excluded.length,
+        },
+        prodis: [...prodis, ...excluded],
+      };
+    });
+
+    // Result lama (sebelum add_iku_result_prodi) belum menyimpan detail per prodi.
+    if (mode === "TOTAL" && finalFormulaRow?.prodiAggregation) {
+      warnings.push({
+        code: "RECALCULATE_REQUIRED",
+        message: "Formula memakai agregasi per prodi tetapi hasil ini belum menyimpan detail prodi. Jalankan recalculate.",
+      });
+    }
+
+    const storedFinal = debug.allFormulas?.find(f => f.isFinal);
+
+    res.json(successResponse({
+      iku: {
+        id: iku.id,
+        code: iku.code,
+        name: iku.name,
+        type: iku.type,
+        unit: iku.unit,
+        isDirectInput: iku.isDirectInput,
+      },
+      period: {
+        resultId: result.idResult,
+        label: period.label,
+        year,
+        resultType: result.resultType,
+        month: result.month,
+        quarter: period.quarter,
+        autoSelected: periodAutoSelected,
+        calculatedAt: result.calculatedAt,
+        evaluatedAt: debug.evaluatedAt ?? null,
+        formulaVersion: result.formulaVersion,
+        copiedFromQuarter,
+      },
+      summary: {
+        calculatedValue,
+        textValue: result.textValue,
+        target,
+        targetSource: ikuTarget ? targetKey : null,
+        achievementRatio,
+        status,
+        isVerified: verificationCount > 0,
+        verificationCount,
+      },
+      finalFormula: {
+        id: storedFinal?.formulaId ?? finalFormulaRow?.id ?? null,
+        name: storedFinal?.formulaName ?? finalFormulaRow?.name ?? null,
+        finalResultKey: storedFinal?.finalResultKey ?? finalFormulaRow?.finalResultKey ?? null,
+        mode,
+        steps: debug.formulaSteps ?? [],
+      },
+      components,
+      formulas,
+      warnings,
+    }));
+  } catch (error) {
+    next(error);
+  }
+};
