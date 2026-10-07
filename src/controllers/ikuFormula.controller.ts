@@ -413,7 +413,12 @@ export const deleteIkuFormula = async (
       return res.status(404).json(errorResponse("Formula not found"));
     }
 
-    await prisma.iKUFormula.delete({ where: { id } });
+    // iku_formula_detail → iku_formula memakai FK RESTRICT, jadi step harus dihapus dulu
+    await prisma.$transaction([
+      prisma.iKUFormulaDetail.deleteMany({ where: { formulaId: id } }),
+      prisma.ikuFormulaExcludedProdi.deleteMany({ where: { formulaId: id } }),
+      prisma.iKUFormula.delete({ where: { id } }),
+    ]);
 
     res.json(successResponse(null, "Formula deleted successfully"));
   } catch (error) {

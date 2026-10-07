@@ -1794,6 +1794,105 @@ const swaggerDefinition = {
         },
       },
     },
+    "/api/dashboard/iku/{ikuId}": {
+      security: [{ bearerAuth: [] }],
+      get: {
+        tags: ["Dashboard"],
+        summary: "Get IKU Calculation Breakdown (down to prodi level)",
+        description: "Detail perhitungan satu IKU untuk satu periode: target, langkah formula final, nilai komponen, dan hasil per prodi (COUNTED / SKIPPED / EXCLUDED) untuk setiap formula yang diagregasi per prodi. Diambil dari debugInfo hasil recalculate.",
+        parameters: [
+          { name: "ikuId", in: "path", required: true, schema: { type: "string" } },
+          { name: "year", in: "query", required: true, schema: { type: "integer" }, example: 2026 },
+          {
+            name: "period",
+            in: "query",
+            required: false,
+            schema: { type: "string" },
+            description: "Q1-Q4, Year, atau M1-M12 (bulanan). Jika tidak dikirim, dipakai kuartal terakhir (nomor tertinggi) yang sudah punya hasil; response `period.autoSelected` = true.",
+            example: "Q3",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Breakdown perhitungan IKU",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    data: {
+                      type: "object",
+                      properties: {
+                        iku: { type: "object" },
+                        period: { type: "object" },
+                        summary: {
+                          type: "object",
+                          properties: {
+                            calculatedValue: { type: "number", nullable: true },
+                            target: { type: "number", nullable: true },
+                            achievementRatio: { type: "number", nullable: true },
+                            status: { type: "string", enum: ["ACHIEVED", "NOT_ACHIEVED", "NO_TARGET", "NO_DATA"] },
+                            isVerified: { type: "boolean" },
+                          },
+                        },
+                        finalFormula: {
+                          type: "object",
+                          properties: {
+                            mode: { type: "string", enum: ["PER_PRODI", "REF_PRODI", "TOTAL", "DIRECT_INPUT"] },
+                            steps: { type: "array", items: { type: "object" } },
+                          },
+                        },
+                        components: { type: "array", items: { type: "object" } },
+                        formulas: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              formulaId: { type: "string" },
+                              formulaName: { type: "string" },
+                              prodiAggregation: { type: "string", enum: ["AVG", "SUM"] },
+                              prodiLevel: { type: "string", nullable: true },
+                              result: { type: "number", nullable: true },
+                              aggregationDetail: { type: "object" },
+                              prodis: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    prodiId: { type: "string" },
+                                    code: { type: "string" },
+                                    name: { type: "string" },
+                                    status: { type: "string", enum: ["COUNTED", "SKIPPED", "EXCLUDED"] },
+                                    calculatedValue: { type: "number", nullable: true },
+                                    skippedReason: { type: "string", nullable: true },
+                                    componentValues: { type: "array", items: { type: "object" } },
+                                    steps: { type: "array", items: { type: "object" } },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                        warnings: { type: "array", items: { type: "object" } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Validation error",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } },
+          },
+          "404": {
+            description: "IKU atau hasil perhitungan periode tersebut tidak ditemukan",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/BusinessErrorResponse" } } },
+          },
+        },
+      },
+    },
     "/api/dashboard/component": {
       security: [{ bearerAuth: [] }],
       get: {
